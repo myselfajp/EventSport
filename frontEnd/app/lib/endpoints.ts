@@ -1,0 +1,129 @@
+"use client";
+
+const API_V1_BASE = (process.env.NEXT_PUBLIC_API_V1_BASE || "").replace(
+  /\/+$/,
+  ""
+);
+const API_ASSETS_URL = (process.env.NEXT_PUBLIC_API_ASSETS_BASE || "").replace(
+  /\/+$/,
+  ""
+);
+
+if (!API_V1_BASE) {
+  if (typeof window !== "undefined") {
+    console.warn("NEXT_PUBLIC_API_V1_BASE is not set");
+  } else if (process.env.NODE_ENV === "production") {
+    throw new Error("NEXT_PUBLIC_API_V1_BASE is required");
+  }
+}
+
+const AUTH_API = `${API_V1_BASE}/auth`;
+const ADMIN_API = `${API_V1_BASE}/admin`;
+const REFERENCE_DATA_API = `${API_V1_BASE}/reference-data`;
+const PARTICIPANT_DATA_API = `${API_V1_BASE}/participant`;
+const COACH_DATA_API = `${API_V1_BASE}/coach`;
+const FACILITY_API = `${API_V1_BASE}/facility`;
+const COMPANY_API = `${API_V1_BASE}/company`;
+
+export const EP = {
+  API_BASE: API_V1_BASE,
+  API_ASSETS_BASE: API_ASSETS_URL,
+  AUTH: {
+    signIn: `${AUTH_API}/sign-in`,
+    signUp: `${AUTH_API}/sign-up`,
+    signOut: `${AUTH_API}/sign-out`,
+    refresh: `${AUTH_API}/refresh`,
+    me: `${AUTH_API}/get-current-user`,
+    editUserPhoto: `${AUTH_API}/edit-user-photo`,
+    getUsers: `${AUTH_API}/get-user`,
+    getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,
+  },
+  ADMIN: {
+    panel: `${ADMIN_API}/panel`,
+  },
+  REFERENCE: {
+    sportGroup: `${REFERENCE_DATA_API}/get-sport-group`,
+    sport: `${REFERENCE_DATA_API}/get-sport`,
+    sportGoal: `${REFERENCE_DATA_API}/get-sport-goal`,
+    sportGoalById: (sportGoalId: string) =>
+      `${REFERENCE_DATA_API}/get-sport-goal/${sportGoalId}`,
+  },
+  PARTICIPANT: {
+    createProfile: `${PARTICIPANT_DATA_API}/create-profile`,
+    editProfile: `${PARTICIPANT_DATA_API}/edit-profile`,
+    getDetails: (participantId: string) =>
+      `${PARTICIPANT_DATA_API}/get-by-detail/${participantId}`,
+    getFavorites: `${PARTICIPANT_DATA_API}/get-favorites`,
+    getFollows: `${PARTICIPANT_DATA_API}/follows`,
+    favoriteCoach: `${PARTICIPANT_DATA_API}/favorite-coach`,
+    favoriteFacility: `${PARTICIPANT_DATA_API}/favorite-facility`,
+    favoriteEvent: `${PARTICIPANT_DATA_API}/favorite-event`,
+    unfavorite: (type: "coach" | "facility" | "event") =>
+      `${PARTICIPANT_DATA_API}/favorite/${type}`,
+    follow: {
+      group: `${PARTICIPANT_DATA_API}/follow-group`,
+      company: `${PARTICIPANT_DATA_API}/follow-company`,
+      club: `${PARTICIPANT_DATA_API}/follow-club`,
+      facility: `${PARTICIPANT_DATA_API}/follow-facility`,
+      coach: `${PARTICIPANT_DATA_API}/follow-coach`,
+    },
+    unfollow: {
+      group: `${PARTICIPANT_DATA_API}/unfollow-group`,
+      company: `${PARTICIPANT_DATA_API}/unfollow-company`,
+      club: `${PARTICIPANT_DATA_API}/unfollow-club`,
+      facility: `${PARTICIPANT_DATA_API}/unfollow-facility`,
+      coach: `${PARTICIPANT_DATA_API}/unfollow-coach`,
+    },
+  },
+  COACH: {
+    createProfileAndBranch: `${COACH_DATA_API}/create-branch`,
+    editProfileAndBranch: `${COACH_DATA_API}/edit-branch`,
+    editCoach: `${COACH_DATA_API}/edit-coach`,
+    createEvent: `${COACH_DATA_API}/create-event`,
+    getCurrentBranches: `${COACH_DATA_API}/current-branches`,
+    getCoachDetails: `${COACH_DATA_API}/get-by-detail`,
+    getCoachById: (coachId: string) =>
+      `${COACH_DATA_API}/get-by-detail/${coachId}`,
+    getCoachList: `${API_V1_BASE}/get-coach-list`,
+  },
+  PARTICIPANT_LIST: {
+    getParticipantList: `${API_V1_BASE}/get-participant-list`,
+  },
+  FACILITY: {
+    base: `${API_V1_BASE}/facility`,
+    getFacility: `${API_V1_BASE}/get-facility`,
+    createFacility: `${API_V1_BASE}/facility/create-facility`,
+    editFacility: (id: string) => `${API_V1_BASE}/facility/${id}`,
+    deleteFacility: (id: string) => `${API_V1_BASE}/facility/${id}`,
+  },
+  COMPANY: {
+    getCompany: `${API_V1_BASE}/get-company`,
+    createCompany: `${COMPANY_API}/create-company`,
+    editCompany: (id: string) => `${COMPANY_API}/${id}`,
+    deleteCompany: (id: string) => `${COMPANY_API}/${id}`,
+  },
+  SALON: {
+    getSalon: `${API_V1_BASE}/get-salon`,
+    getSalonsByFacility: (facilityId: string) =>
+      `${API_V1_BASE}/get-salon/${facilityId}`,
+  },
+  CLUB: {
+    getClub: `${API_V1_BASE}/get-club`,
+    createClub: `${COACH_DATA_API}/create-club`,
+    editClub: (clubId: string) => `${COACH_DATA_API}/edit-club/${clubId}`,
+    deleteClub: (clubId: string) => `${COACH_DATA_API}/delete-club/${clubId}`,
+  },
+  GROUP: {
+    getGroup: `${API_V1_BASE}/get-group`,
+  },
+  CLUB_GROUPS: {
+    getClubGroups: `${API_V1_BASE}/get-group-by-coach`,
+    createGroup: (clubId: string) => `${COACH_DATA_API}/create-group/${clubId}`,
+    editGroup: (groupId: string) => `${COACH_DATA_API}/edit-group/${groupId}`,
+    deleteGroup: (groupId: string) =>
+      `${COACH_DATA_API}/delete-group/${groupId}`,
+    getClubs: `${API_V1_BASE}/get-club`,
+  },
+  EVENT_STYLE: { getEventStyle: `${API_V1_BASE}/get-event-style` },
+  EVENTS: { getEvents: `${API_V1_BASE}/get-event` },
+};
