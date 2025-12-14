@@ -6,12 +6,19 @@ const CSRF_TOKEN_COOKIE = 'csrf-token';
 export const generateCSRFToken = (req, res, next) => {
     if (req.method === 'GET' && !req.cookies[CSRF_TOKEN_COOKIE]) {
         const token = crypto.randomBytes(32).toString('hex');
-        res.cookie(CSRF_TOKEN_COOKIE, token, {
+        const cookieOptions = {
             httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: false,
+            sameSite: 'lax',
             maxAge: 24 * 60 * 60 * 1000,
-        });
+        };
+
+        const cookieDomain = process.env.COOKIE_DOMAIN;
+        if (cookieDomain && !cookieDomain.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+            cookieOptions.domain = cookieDomain;
+        }
+
+        res.cookie(CSRF_TOKEN_COOKIE, token, cookieOptions);
     }
     next();
 };
