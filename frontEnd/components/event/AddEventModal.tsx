@@ -261,7 +261,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const fetchSportGroups = async () => {
     setLoadingSportGroups(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sportGroup, {
+      const res = await fetchJSON(EP.REFERENCE.sportGroup.get, {
         method: "POST",
         body: { perPage: 100, pageNumber: 1 },
       });
@@ -278,7 +278,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const fetchSports = async (groupId: string) => {
     setLoadingSports(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sport, {
+      const res = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
         body: { perPage: 100, pageNumber: 1, groupId },
       });

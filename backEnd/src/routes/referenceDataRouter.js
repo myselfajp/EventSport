@@ -8,10 +8,12 @@ router.delete('/delete-sport-goal/:sportGoalId', referenceDataController.deleteS
 // sportGroup
 router.post('/create-sport-group/', referenceDataController.createSportGroup);
 router.post('/get-sport-group/', referenceDataController.getSportGroup);
+router.put('/update-sport-group/:sportGroupId', referenceDataController.updateSportGroup);
 router.delete('/delete-sport-group/:sportGroupId', referenceDataController.deleteSportGroup);
 // sport
 router.post('/create-sport/:sportGroupId', referenceDataController.createSport);
 router.post('/get-sport/', referenceDataController.getSport);
+router.put('/update-sport/:sportId', referenceDataController.updateSport);
 router.delete('/delete-sport/:sportId', referenceDataController.deleteSport);
 // eventStyle
 router.post('/create-event-style/', referenceDataController.createEventStyle);

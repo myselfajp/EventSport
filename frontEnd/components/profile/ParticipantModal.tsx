@@ -179,9 +179,9 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const fetchSportGroups = async () => {
     setLoading(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sportGroup, {
+      const res = await fetchJSON(EP.REFERENCE.sportGroup.get, {
         method: "POST",
-        body: { perPage: 20, pageNumber: 1 },
+        body: { perPage: 100, pageNumber: 1 },
       });
 
       if (res.success && res.data) {
@@ -197,10 +197,10 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const fetchSportsInGroup = async (groupId: string) => {
     setLoading(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sport, {
+      const res = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
         body: {
-          perPage: 50,
+          perPage: 100,
           pageNumber: 1,
           groupId: groupId,
         },

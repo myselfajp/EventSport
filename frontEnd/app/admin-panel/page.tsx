@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMe } from "../hooks/useAuth";
 import { fetchJSON } from "../lib/api";
 import { EP } from "../lib/endpoints";
-import { useState } from "react";
+import UsersManagement from "../../components/admin/UsersManagement";
+import CoachCertificateApproval from "../../components/admin/CoachCertificateApproval";
+import EnumManagement from "../../components/admin/EnumManagement";
+
+type TabType = "users" | "coaches" | "enums";
 
 export default function AdminPanelPage() {
   const router = useRouter();
   const { data: user, isLoading } = useMe();
   const [adminData, setAdminData] = useState<any>(null);
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>("users");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -65,15 +70,52 @@ export default function AdminPanelPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-6">
             Admin Panel
           </h1>
-          <div className="mt-8">
-            <p className="text-xl text-gray-700 dark:text-slate-300">Hello World</p>
+
+          <div className="border-b border-gray-200 dark:border-slate-700 mb-6">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab("users")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "users"
+                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                }`}
+              >
+                Users
+              </button>
+              <button
+                onClick={() => setActiveTab("coaches")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "coaches"
+                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                }`}
+              >
+                Coach Certificates
+              </button>
+              <button
+                onClick={() => setActiveTab("enums")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "enums"
+                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                }`}
+              >
+                Enum Management
+              </button>
+            </nav>
+          </div>
+
+          <div className="mt-6">
+            {activeTab === "users" && <UsersManagement />}
+            {activeTab === "coaches" && <CoachCertificateApproval />}
+            {activeTab === "enums" && <EnumManagement />}
           </div>
         </div>
       </div>
     </div>
   );
 }
-
