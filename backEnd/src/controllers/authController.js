@@ -125,12 +125,16 @@ export const signOut = async (req, res, next) => {
         }
 
         await revokeRefreshToken(req.user._id, req.cookies.refresh_token);
-        res.clearCookie('refresh_token', {
+        const clearCookieOptions = {
             httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            domain: process.env.COOKIE_DOMAIN,
-        });
+            secure: false,
+            sameSite: 'lax',
+        };
+        const cookieDomain = process.env.COOKIE_DOMAIN;
+        if (cookieDomain && !cookieDomain.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+            clearCookieOptions.domain = cookieDomain;
+        }
+        res.clearCookie('refresh_token', clearCookieOptions);
         res.status(200).json({ message: 'Logged out successfully' });
     } catch (err) {
         next(err);

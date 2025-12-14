@@ -145,13 +145,14 @@ export const revokeRefreshToken = async (userId, refreshToken) => {
 export function sendTokens(res, tokens, { setAccessHeader = true } = {}) {
     const cookieOptions = {
         httpOnly: true,
-        secure: true,
-        sameSite: 'none',
+        secure: false,
+        sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
-    if (process.env.COOKIE_DOMAIN) {
-        cookieOptions.domain = process.env.COOKIE_DOMAIN;
+    const cookieDomain = process.env.COOKIE_DOMAIN;
+    if (cookieDomain && !cookieDomain.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+        cookieOptions.domain = cookieDomain;
     }
 
     res.cookie('refresh_token', tokens.refreshToken, cookieOptions);
