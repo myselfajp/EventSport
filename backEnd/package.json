@@ -1,0 +1,37 @@
+{
+  "name": "sportsevents",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohamadtnmr/sportsevents.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mohamadtnmr/sportsevents/issues"
+  },
+  "homepage": "https://github.com/mohamadtnmr/sportsevents#readme",
+  "description": "",
+  "dependencies": {
+    "@prisma/client": "^6.12.0",
+    "argon2": "^0.43.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "csurf": "^1.11.0",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.5",
+    "multer": "^2.0.2",
+    "prisma": "^6.12.0",
+    "zod": "^4.0.8"
+  }
+}

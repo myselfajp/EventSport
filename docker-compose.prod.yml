@@ -1,0 +1,76 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: eventSport_mongodb_prod
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-sportsevents}
+    volumes:
+      - mongodb_data_prod:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eventSport_network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backEnd
+      dockerfile: Dockerfile
+    container_name: eventSport_backend_prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=${MONGODB_URI:-mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB:-sportsevents}?authSource=admin}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ADMIN_FIRST_NAME=${ADMIN_FIRST_NAME}
+      - ADMIN_LAST_NAME=${ADMIN_LAST_NAME}
+      - ADMIN_PHONE=${ADMIN_PHONE}
+      - ADMIN_AGE=${ADMIN_AGE}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./backEnd/uploads:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - eventSport_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontEnd
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE}
+        - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE}
+    container_name: eventSport_frontend_prod
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE}
+      - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE}
+    ports:
+      - "${FRONTEND_PORT:-3001}:3001"
+    depends_on:
+      - backend
+    networks:
+      - eventSport_network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data_prod:
+
+networks:
+  eventSport_network:
+    driver: bridge
