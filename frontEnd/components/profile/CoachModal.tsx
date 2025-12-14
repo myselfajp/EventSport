@@ -116,7 +116,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
     try {
       const [branchesRes, sportGroupsRes, coachDetailsRes] = await Promise.all([
         fetchJSON(`${EP.COACH.getCurrentBranches}`, { method: "GET" }),
-        fetchJSON(EP.REFERENCE.sportGroup, {
+        fetchJSON(EP.REFERENCE.sportGroup.get, {
           method: "POST",
           body: { perPage: 100, pageNumber: 1 },
         }),
@@ -173,7 +173,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
         if (uniqueSportGroups.length > 0) {
           const allSports: Sport[] = [];
           for (const groupId of uniqueSportGroups) {
-            const sportsRes = await fetchJSON(EP.REFERENCE.sport, {
+            const sportsRes = await fetchJSON(EP.REFERENCE.sport.get, {
               method: "POST",
               body: {
                 perPage: 50,
@@ -196,9 +196,9 @@ const CoachModal: React.FC<CoachModalProps> = ({
   const fetchSportGroups = async () => {
     setLoading(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sportGroup, {
+      const res = await fetchJSON(EP.REFERENCE.sportGroup.get, {
         method: "POST",
-        body: { perPage: 50, pageNumber: 1 },
+        body: { perPage: 100, pageNumber: 1 },
       });
 
       if (res.success && res.data) {
@@ -214,7 +214,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
   const fetchSportsInGroup = async (groupId: string) => {
     setLoading(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sport, {
+      const res = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
         body: {
           perPage: 50,

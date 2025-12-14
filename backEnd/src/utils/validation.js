@@ -150,6 +150,15 @@ export const editUserSchema = z
                         : { message: 'Invalid phone number.' },
             })
             .optional(),
+        email: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Email is required.' }
+                        : { message: 'Invalid email.' },
+            })
+            .email('Provide a valid email address.')
+            .optional(),
         age: z
             .date({
                 error: (iss) =>
@@ -200,13 +209,14 @@ export const editUserSchema = z
             data.firstName !== undefined ||
             data.lastName !== undefined ||
             data.phone !== undefined ||
+            data.email !== undefined ||
             data.age !== undefined ||
             data.photo !== undefined ||
             data.newPassword !== undefined ||
             data.oldPassword !== undefined,
         {
             message:
-                'At least one of first name, last name, phone, age, photo, new password, old password must be provided.',
+                'At least one of first name, last name, phone, email, age, photo, new password, old password must be provided.',
             path: [], // set to [] to attach error to the global object
         }
     );

@@ -108,7 +108,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   // Fetch Sport Groups
   useEffect(() => {
     if (isOpen) {
-      fetchJSON(EP.REFERENCE.sportGroup, {
+      fetchJSON(EP.REFERENCE.sportGroup.get, {
         method: "POST",
         body: { perPage: 100, pageNumber: 1 },
       }).then((res) => {

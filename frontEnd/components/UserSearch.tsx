@@ -46,7 +46,7 @@ const UserSearch: React.FC<UserSearchProps> = ({
     setIsLoadingSports(true);
     setIsLoadingSportGroups(true);
     try {
-      const response: SportResponse = await fetchJSON(EP.REFERENCE.sport, {
+      const response: SportResponse = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
         body: {},
       });

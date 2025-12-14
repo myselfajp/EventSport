@@ -34,7 +34,7 @@ export async function getSports(
   perPage: number = 100,
   search: string = ""
 ) {
-  const res = await apiFetch(EP.REFERENCE.sport, {
+  const res = await apiFetch(EP.REFERENCE.sport.get, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

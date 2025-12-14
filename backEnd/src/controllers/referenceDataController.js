@@ -142,6 +142,32 @@ export const getSportGroup = async (req, res, next) => {
     }
 };
 
+export const updateSportGroup = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+        const sportGroupId = mongoObjectId.parse(req.params.sportGroupId);
+        const result = name.parse(req.body?.name);
+
+        const updatedSportGroup = await SportGroup.findByIdAndUpdate(
+            sportGroupId,
+            { name: result },
+            { new: true }
+        );
+        if (!updatedSportGroup) throw new AppError(404);
+
+        await Sport.updateMany({ group: sportGroupId }, { groupName: result });
+
+        res.status(200).json({
+            success: true,
+            data: updatedSportGroup,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const deleteSportGroup = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== 0) {
@@ -239,6 +265,34 @@ export const getSport = async (req, res, next) => {
     }
 };
 
+export const updateSport = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const sportId = mongoObjectId.parse(req.params.sportId);
+        const result = name.parse(req.body?.name);
+
+        const sport = await Sport.findById(sportId);
+        if (!sport) throw new AppError(404);
+
+        const updatedSport = await Sport.findByIdAndUpdate(
+            sportId,
+            { name: result },
+            { new: true }
+        );
+        if (!updatedSport) throw new AppError(404);
+
+        res.status(200).json({
+            success: true,
+            data: updatedSport,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const deleteSport = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== 0) {
@@ -289,8 +343,8 @@ export const getEventStyle = async (req, res, next) => {
         });
         const query = search
             ? {
-                  $or: [{ name: { $regex: search, $options: 'i' } }],
-              }
+                $or: [{ name: { $regex: search, $options: 'i' } }],
+            }
             : {};
 
         const eventStyles = await EventStyle.find(query)

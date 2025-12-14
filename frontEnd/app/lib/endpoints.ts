@@ -40,10 +40,31 @@ export const EP = {
   },
   ADMIN: {
     panel: `${ADMIN_API}/panel`,
+    users: {
+      getAll: `${ADMIN_API}/users`,
+      create: `${ADMIN_API}/users/create`,
+      update: (userId: string) => `${ADMIN_API}/users/${userId}`,
+      delete: (userId: string) => `${ADMIN_API}/users/${userId}`,
+    },
+    coaches: {
+      pending: `${ADMIN_API}/coaches/pending`,
+      approve: (branchId: string) => `${ADMIN_API}/coaches/branches/${branchId}/approve`,
+      reject: (branchId: string) => `${ADMIN_API}/coaches/branches/${branchId}/reject`,
+    },
   },
   REFERENCE: {
-    sportGroup: `${REFERENCE_DATA_API}/get-sport-group`,
-    sport: `${REFERENCE_DATA_API}/get-sport`,
+    sportGroup: {
+      get: `${REFERENCE_DATA_API}/get-sport-group`,
+      create: `${REFERENCE_DATA_API}/create-sport-group`,
+      update: (sportGroupId: string) => `${REFERENCE_DATA_API}/update-sport-group/${sportGroupId}`,
+      delete: (sportGroupId: string) => `${REFERENCE_DATA_API}/delete-sport-group/${sportGroupId}`,
+    },
+    sport: {
+      get: `${REFERENCE_DATA_API}/get-sport`,
+      create: (sportGroupId: string) => `${REFERENCE_DATA_API}/create-sport/${sportGroupId}`,
+      update: (sportId: string) => `${REFERENCE_DATA_API}/update-sport/${sportId}`,
+      delete: (sportId: string) => `${REFERENCE_DATA_API}/delete-sport/${sportId}`,
+    },
     sportGoal: `${REFERENCE_DATA_API}/get-sport-goal`,
     sportGoalById: (sportGoalId: string) =>
       `${REFERENCE_DATA_API}/get-sport-goal/${sportGoalId}`,

@@ -272,7 +272,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     setIsLoadingSports(true);
     setIsLoadingSportGroups(true);
     try {
-      const response: SportResponse = await fetchJSON(EP.REFERENCE.sport, {
+      const response: SportResponse = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
         body: {},
       });

@@ -42,7 +42,7 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
       const actualSportId =
         typeof sportId === "string" ? sportId : sportId?._id || sportId;
 
-      const response: SportResponse = await fetchJSON(EP.REFERENCE.sport, {
+      const response: SportResponse = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
         body: { sport: actualSportId },
       });

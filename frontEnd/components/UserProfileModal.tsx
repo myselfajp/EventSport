@@ -185,7 +185,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         user.participant?.mainSport &&
         (!context || context === "participant")
       ) {
-        const sportResponse = await fetchJSON(EP.REFERENCE.sportGroup, {
+        const sportResponse = await fetchJSON(EP.REFERENCE.sportGroup.get, {
           method: "POST",
           body: { sport: user.participant.mainSport },
         });
