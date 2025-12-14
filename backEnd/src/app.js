@@ -27,15 +27,36 @@ app.set('trust proxy', 1);
 
 app.use(securityHeaders);
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : [
+        'http://127.0.0.1:3000',
+        'http://localhost:3000',
+        'http://127.0.0.1:3001',
+        'http://localhost:3001',
+        'https://64vqzjg1-3001.inc1.devtunnels.ms'
+    ];
+
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 app.use(
     cors({
-        origin: [
-            'http://127.0.0.1:3000',
-            'http://localhost:3000',
-            'http://127.0.0.1:3001',
-            'http://localhost:3001',
-            'https://64vqzjg1-3001.inc1.devtunnels.ms'
-        ],
+        origin: (origin, callback) => {
+            if (!origin) {
+                callback(null, true);
+                return;
+            }
+            
+            if (allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else if (isDevelopment) {
+                console.warn(`CORS: Allowing origin in development: ${origin}`);
+                callback(null, true);
+            } else {
+                console.warn(`CORS blocked origin: ${origin}`);
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         methods: ['GET', 'POST', 'PUT', 'DELETE'],
         credentials: true,
         exposedHeaders: ['Authorization'],
