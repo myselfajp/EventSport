@@ -63,38 +63,6 @@ export function getCSRFToken(): string | null {
   return null;
 }
 
-export async function initializeCSRFToken(): Promise<void> {
-  if (typeof window === "undefined") return;
-  const existingToken = getCSRFToken();
-  if (existingToken) return;
-  
-  try {
-    const response = await fetch(EP.AUTH.me, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Accept": "application/json",
-      },
-    });
-    
-    let attempts = 0;
-    while (attempts < 20) {
-      const token = getCSRFToken();
-      if (token) {
-        return;
-      }
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
-    }
-    
-    if (!getCSRFToken()) {
-      console.warn("CSRF token not found after initialization attempt");
-    }
-  } catch (error) {
-    console.error("Error initializing CSRF token:", error);
-  }
-}
-
 export async function apiFetch(
   url: string,
   options: RequestInit = {},
@@ -116,15 +84,9 @@ export async function apiFetch(
   const needsCSRF = options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH";
   
   if (needsCSRF) {
-    let csrfToken = getCSRFToken();
-    if (!csrfToken) {
-      await initializeCSRFToken();
-      csrfToken = getCSRFToken();
-    }
+    const csrfToken = getCSRFToken();
     if (csrfToken) {
       headers.set("x-csrf-token", csrfToken);
-    } else {
-      console.error("CSRF token not available for request:", url);
     }
   }
 
@@ -148,11 +110,7 @@ export async function apiFetch(
       
       const retryNeedsCSRF = options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH";
       if (retryNeedsCSRF) {
-        let csrfToken = getCSRFToken();
-        if (!csrfToken) {
-          await initializeCSRFToken();
-          csrfToken = getCSRFToken();
-        }
+        const csrfToken = getCSRFToken();
         if (csrfToken) {
           retryHeaders.set("x-csrf-token", csrfToken);
         }
