@@ -48,26 +48,42 @@ export const EP = {
     },
     coaches: {
       pending: `${ADMIN_API}/coaches/pending`,
-      approve: (branchId: string) => `${ADMIN_API}/coaches/branches/${branchId}/approve`,
-      reject: (branchId: string) => `${ADMIN_API}/coaches/branches/${branchId}/reject`,
+      approve: (branchId: string) =>
+        `${ADMIN_API}/coaches/branches/${branchId}/approve`,
+      reject: (branchId: string) =>
+        `${ADMIN_API}/coaches/branches/${branchId}/reject`,
     },
   },
   REFERENCE: {
     sportGroup: {
       get: `${REFERENCE_DATA_API}/get-sport-group`,
       create: `${REFERENCE_DATA_API}/create-sport-group`,
-      update: (sportGroupId: string) => `${REFERENCE_DATA_API}/update-sport-group/${sportGroupId}`,
-      delete: (sportGroupId: string) => `${REFERENCE_DATA_API}/delete-sport-group/${sportGroupId}`,
+      update: (sportGroupId: string) =>
+        `${REFERENCE_DATA_API}/update-sport-group/${sportGroupId}`,
+      delete: (sportGroupId: string) =>
+        `${REFERENCE_DATA_API}/delete-sport-group/${sportGroupId}`,
     },
     sport: {
       get: `${REFERENCE_DATA_API}/get-sport`,
-      create: (sportGroupId: string) => `${REFERENCE_DATA_API}/create-sport/${sportGroupId}`,
-      update: (sportId: string) => `${REFERENCE_DATA_API}/update-sport/${sportId}`,
-      delete: (sportId: string) => `${REFERENCE_DATA_API}/delete-sport/${sportId}`,
+      create: (sportGroupId: string) =>
+        `${REFERENCE_DATA_API}/create-sport/${sportGroupId}`,
+      update: (sportId: string) =>
+        `${REFERENCE_DATA_API}/update-sport/${sportId}`,
+      delete: (sportId: string) =>
+        `${REFERENCE_DATA_API}/delete-sport/${sportId}`,
     },
-    sportGoal: `${REFERENCE_DATA_API}/get-sport-goal`,
-    sportGoalById: (sportGoalId: string) =>
-      `${REFERENCE_DATA_API}/get-sport-goal/${sportGoalId}`,
+    sportGoal: {
+      get: `${REFERENCE_DATA_API}/get-sport-goal`,
+      create: `${REFERENCE_DATA_API}/create-sport-goal`,
+      delete: (sportGoalId: string) =>
+        `${REFERENCE_DATA_API}/delete-sport-goal/${sportGoalId}`,
+    },
+    eventStyle: {
+      get: `${REFERENCE_DATA_API}/get-event-style`,
+      create: `${REFERENCE_DATA_API}/create-event-style`,
+      delete: (eventStyleId: string) =>
+        `${REFERENCE_DATA_API}/delete-event-style/${eventStyleId}`,
+    },
   },
   PARTICIPANT: {
     createProfile: `${PARTICIPANT_DATA_API}/create-profile`,

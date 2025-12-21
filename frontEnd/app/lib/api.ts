@@ -43,16 +43,56 @@ export async function tryRefreshToken(): Promise<boolean> {
   }
 }
 
-function getCSRFToken(): string | null {
+export function getCSRFToken(): string | null {
   if (typeof document === "undefined") return null;
-  const cookies = document.cookie.split(";");
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split("=");
-    if (name === "csrf-token") {
-      return decodeURIComponent(value);
+  try {
+    const cookies = document.cookie.split(";");
+    for (const cookie of cookies) {
+      const trimmed = cookie.trim();
+      const equalIndex = trimmed.indexOf("=");
+      if (equalIndex === -1) continue;
+      const name = trimmed.substring(0, equalIndex);
+      const value = trimmed.substring(equalIndex + 1);
+      if (name === "csrf-token") {
+        return decodeURIComponent(value);
+      }
     }
+  } catch (e) {
+    console.error("Error reading CSRF token:", e);
   }
   return null;
+}
+
+export async function initializeCSRFToken(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const existingToken = getCSRFToken();
+  if (existingToken) return;
+  
+  try {
+    const response = await fetch(EP.AUTH.me, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Accept": "application/json",
+      },
+    });
+    
+    let attempts = 0;
+    while (attempts < 20) {
+      const token = getCSRFToken();
+      if (token) {
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+    
+    if (!getCSRFToken()) {
+      console.warn("CSRF token not found after initialization attempt");
+    }
+  } catch (error) {
+    console.error("Error initializing CSRF token:", error);
+  }
 }
 
 export async function apiFetch(
@@ -73,9 +113,19 @@ export async function apiFetch(
     }
   }
 
-  const csrfToken = getCSRFToken();
-  if (csrfToken && (options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH")) {
-    headers.set("x-csrf-token", csrfToken);
+  const needsCSRF = options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH";
+  
+  if (needsCSRF) {
+    let csrfToken = getCSRFToken();
+    if (!csrfToken) {
+      await initializeCSRFToken();
+      csrfToken = getCSRFToken();
+    }
+    if (csrfToken) {
+      headers.set("x-csrf-token", csrfToken);
+    } else {
+      console.error("CSRF token not available for request:", url);
+    }
   }
 
   let res = await fetch(url, {
@@ -96,9 +146,16 @@ export async function apiFetch(
       const t = tokenStore.get();
       if (t) retryHeaders.set("Authorization", `Bearer ${t}`);
       
-      const csrfToken = getCSRFToken();
-      if (csrfToken && (options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH")) {
-        retryHeaders.set("x-csrf-token", csrfToken);
+      const retryNeedsCSRF = options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH";
+      if (retryNeedsCSRF) {
+        let csrfToken = getCSRFToken();
+        if (!csrfToken) {
+          await initializeCSRFToken();
+          csrfToken = getCSRFToken();
+        }
+        if (csrfToken) {
+          retryHeaders.set("x-csrf-token", csrfToken);
+        }
       }
       
       res = await fetch(url, {
