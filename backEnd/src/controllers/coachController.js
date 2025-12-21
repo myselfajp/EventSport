@@ -306,7 +306,7 @@ export const editEvent = async (req, res, next) => {
         }
 
         const data = req.body.data ? JSON.parse(req.body.data) : req.body;
-        const updateData: any = {};
+        const updateData = {};
 
         // Parse dates if provided
         if (data.startTime) {
