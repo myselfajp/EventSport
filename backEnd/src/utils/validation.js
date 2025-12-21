@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 const passwordMin = 8;
 const passwordMax = 50;
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
 const hexRegex = /^#([0-9A-F]{6}|[0-9A-F]{3})$/i;
 const MongoObjectIdRegex = /^[a-fA-F\d]{24}$/;
 
@@ -97,11 +96,7 @@ export const signupSchema = z.object({
                     : { message: 'Invalid input.' },
         })
         .min(passwordMin, `Password must be at least ${passwordMin} characters`)
-        .max(passwordMax, `Password must be at most ${passwordMax} characters`)
-        .regex(
-            passwordRegex,
-            `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-        ),
+        .max(passwordMax, `Password must be at most ${passwordMax} characters`),
 
     age: z.date({
         error: (iss) =>
@@ -184,10 +179,6 @@ export const editUserSchema = z
             })
             .min(passwordMin, `New password must be at least ${passwordMin} characters`)
             .max(passwordMax, `New password must be at most ${passwordMax} characters`)
-            .regex(
-                passwordRegex,
-                `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-            )
             .optional(),
         oldPassword: z
             .string({
@@ -198,10 +189,6 @@ export const editUserSchema = z
             })
             .min(passwordMin, `Old password must be at least ${passwordMin} characters`)
             .max(passwordMax, `Old password must be at most ${passwordMax} characters`)
-            .regex(
-                passwordRegex,
-                `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-            )
             .optional(),
     })
     .refine(
