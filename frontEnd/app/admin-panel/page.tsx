@@ -8,8 +8,9 @@ import { EP } from "../lib/endpoints";
 import UsersManagement from "../../components/admin/UsersManagement";
 import CoachCertificateApproval from "../../components/admin/CoachCertificateApproval";
 import EnumManagement from "../../components/admin/EnumManagement";
+import EventsManagement from "../../components/admin/EventsManagement";
 
-type TabType = "users" | "coaches" | "enums";
+type TabType = "users" | "coaches" | "enums" | "events";
 
 export default function AdminPanelPage() {
   const router = useRouter();
@@ -106,6 +107,16 @@ export default function AdminPanelPage() {
               >
                 Enum Management
               </button>
+              <button
+                onClick={() => setActiveTab("events")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "events"
+                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                }`}
+              >
+                Events
+              </button>
             </nav>
           </div>
 
@@ -113,6 +124,7 @@ export default function AdminPanelPage() {
             {activeTab === "users" && <UsersManagement />}
             {activeTab === "coaches" && <CoachCertificateApproval />}
             {activeTab === "enums" && <EnumManagement />}
+            {activeTab === "events" && <EventsManagement />}
           </div>
         </div>
       </div>

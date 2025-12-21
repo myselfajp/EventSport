@@ -117,6 +117,7 @@ export const EP = {
     editProfileAndBranch: `${COACH_DATA_API}/edit-branch`,
     editCoach: `${COACH_DATA_API}/edit-coach`,
     createEvent: `${COACH_DATA_API}/create-event`,
+    editEvent: (eventId: string) => `${COACH_DATA_API}/edit-event/${eventId}`,
     getCurrentBranches: `${COACH_DATA_API}/current-branches`,
     getCoachDetails: `${COACH_DATA_API}/get-by-detail`,
     getCoachById: (coachId: string) =>

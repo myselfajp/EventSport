@@ -22,6 +22,15 @@ router.post(
     coachController.createEvent
 );
 
+router.post(
+    '/edit-event/:eventId',
+    uploadFile({
+        mode: 'fields',
+        fields: [{ name: 'event-photo', optional: true }, { name: 'event-banner', optional: true }],
+        optional: true,
+    }),
+    coachController.editEvent
+);
 router.delete('/delete-event/:eventId', coachController.deleteEvent);
 
 router.post('/join-backup-coach/:eventId', coachController.joinBackupCoach);

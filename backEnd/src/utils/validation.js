@@ -584,6 +584,8 @@ export const createEventSchema = z
         }
     );
 
+export const editEventSchema = createEventSchema.partial();
+
 // clubGroup
 export const createGroupSchema = z.object({
     name: z.string({

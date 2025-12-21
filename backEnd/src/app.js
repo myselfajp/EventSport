@@ -76,8 +76,8 @@ app.get('/mid', authMiddleware, (req, res) => {
 });
 
 app.use('/api/v1/auth', validateCSRFToken, refreshRouter);
-app.post('/api/v1/auth/sign-in', authRateLimiter, validateCSRFToken, authController.signIn);
-app.post('/api/v1/auth/sign-up', signupRateLimiter, validateCSRFToken, authController.signUp);
+app.post('/api/v1/auth/sign-in', validateCSRFToken, authController.signIn);
+app.post('/api/v1/auth/sign-up', validateCSRFToken, authController.signUp);
 app.use('/api/v1/auth', validateCSRFToken, authMiddleware, authRouter);
 app.use('/api/v1/participant', authMiddleware, participantRouter);
 app.use('/api/v1/reference-data', authMiddleware, (req, res, next) => {
