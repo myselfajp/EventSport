@@ -9,6 +9,7 @@ interface AddEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  initialData?: any;
 }
 
 interface Club {
@@ -55,7 +56,9 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialData,
 }) => {
+  const isEditMode = !!initialData;
   const [formData, setFormData] = useState({
     name: "",
     club: "",
@@ -206,6 +209,46 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       setSalons([]);
     }
   }, [formData.facility]);
+
+  useEffect(() => {
+    if (initialData && isOpen) {
+      const startDate = initialData.startTime ? new Date(initialData.startTime).toISOString().split('T')[0] : '';
+      const startTime = initialData.startTime ? new Date(initialData.startTime).toTimeString().slice(0, 5) : '';
+      const endDate = initialData.endTime ? new Date(initialData.endTime).toISOString().split('T')[0] : '';
+      const endTime = initialData.endTime ? new Date(initialData.endTime).toTimeString().slice(0, 5) : '';
+
+      setFormData({
+        name: initialData.name || "",
+        club: initialData.club?._id || initialData.club || "",
+        group: initialData.group?._id || initialData.group || "",
+        style: initialData.style?._id || initialData.style || "",
+        sportGroup: initialData.sportGroup?._id || initialData.sportGroup || "",
+        sport: initialData.sport?._id || initialData.sport || "",
+        facility: initialData.facility?._id || initialData.facility || "",
+        salon: initialData.salon?._id || initialData.salon || "",
+        location: initialData.location || "",
+        startDate: startDate,
+        startTime: startTime,
+        endDate: endDate,
+        endTime: endTime,
+        capacity: initialData.capacity?.toString() || "",
+        level: initialData.level?.toString() || "",
+        type: initialData.type || "",
+        priceType: initialData.priceType || "",
+        participationFee: initialData.participationFee?.toString() || "",
+        equipment: initialData.equipment || "",
+        private: initialData.private || false,
+        isRecurring: initialData.isRecurring || false,
+      });
+
+      if (initialData.photo?.path) {
+        setPhotoPreview(`${EP.API_ASSETS_BASE}/${initialData.photo.path}`.replace(/\\/g, "/"));
+      }
+      if (initialData.banner?.path) {
+        setBannerPreview(`${EP.API_ASSETS_BASE}/${initialData.banner.path}`.replace(/\\/g, "/"));
+      }
+    }
+  }, [initialData, isOpen]);
 
   const fetchClubs = async () => {
     setLoadingClubs(true);
@@ -468,21 +511,25 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         localStorage.getItem("se_at")
       );
 
-      const response = await apiFetch(EP.COACH.createEvent, {
-        method: "POST",
+      const url = isEditMode && initialData?._id 
+        ? EP.COACH.editEvent(initialData._id)
+        : EP.COACH.createEvent;
+
+      const response = await apiFetch(url, {
+        method: isEditMode ? "POST" : "POST",
         body: formDataToSend,
       });
 
       const result = await response.json();
 
       if (result.success) {
-        alert("🎉 Event created successfully!");
+        alert(isEditMode ? "🎉 Event updated successfully!" : "🎉 Event created successfully!");
         handleClose();
         if (onSuccess) {
           onSuccess();
         }
       } else {
-        setError(result.message || "There was a problem creating the event");
+        setError(result.message || (isEditMode ? "There was a problem updating the event" : "There was a problem creating the event"));
       }
     } catch (err: any) {
       setError("There was a problem creating the event");
@@ -539,7 +586,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl mx-auto max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            Add a New Event
+            {isEditMode ? "Edit Event" : "Add a New Event"}
           </h2>
           <button
             onClick={handleClose}
@@ -1238,7 +1285,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               className="px-6 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isAnyLoading}
             >
-              {submitting ? "Creating..." : "Submit"}
+              {submitting ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update" : "Submit")}
             </button>
           </div>
         </form>

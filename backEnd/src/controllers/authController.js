@@ -349,6 +349,39 @@ export const editUser = async (req, res, next) => {
     }
 };
 
+export const editUserPhoto = async (req, res, next) => {
+    try {
+        if (!req.user) throw new AppError(401);
+
+        if (!req.fileMeta) {
+            throw new AppError(400, 'No photo provided');
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                photo: {
+                    path: req.fileMeta.path,
+                    originalName: req.fileMeta.originalName,
+                    mimeType: req.fileMeta.mimeType,
+                    size: req.fileMeta.size,
+                },
+            },
+            { new: true }
+        );
+
+        if (!updatedUser) throw new AppError(404);
+
+        res.status(200).json({
+            success: true,
+            message: 'Photo updated successfully',
+            data: updatedUser,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const refreshToken = async (req, res, next) => {
     try {
         const accessToken = req.headers.authorization?.split(' ')[1];

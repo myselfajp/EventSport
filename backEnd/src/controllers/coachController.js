@@ -288,22 +288,146 @@ export const createEvent = async (req, res, next) => {
     }
 };
 
-export const deleteEvent = async (req, res, next) => {
+export const editEvent = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
-            throw new AppError(!req.user ? 401 : 403);
+        if (!req.user) {
+            throw new AppError(401);
         }
 
         const user = req.user;
         const eventId = zodValidation.mongoObjectId.parse(req.params.eventId);
 
-        const eventExists = await Event.findById(groupId);
+        const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404, 'Event not found');
+
+        // Allow admin or event owner to edit
         if (!(eventExists.owner.equals(user._id) || user.role === 0)) {
-            await ClubGroup.findByIdAndDelete(eventId);
-        } else {
-            throw new AppError(403, 'You are not Event creator');
+            throw new AppError(403, 'You are not Event creator or admin');
         }
+
+        const data = req.body.data ? JSON.parse(req.body.data) : req.body;
+        const updateData: any = {};
+
+        // Parse dates if provided
+        if (data.startTime) {
+            updateData.startTime = new Date(data.startTime);
+        }
+        if (data.endTime) {
+            updateData.endTime = new Date(data.endTime);
+        }
+
+        // Validate and parse other fields
+        const result = zodValidation.editEventSchema.parse(data ?? {});
+
+        // Check if referenced data exists
+        if (result.sportGroup || result.sport || result.club || result.group || result.style) {
+            const checks = [];
+            if (result.club) checks.push({ id: result.club, model: Club, name: 'Club' });
+            if (result.group) checks.push({ id: result.group, model: ClubGroup, name: 'ClubGroup' });
+            if (result.sportGroup) checks.push({ id: result.sportGroup, model: SportGroup, name: 'SportGroup' });
+            if (result.sport) checks.push({ id: result.sport, model: Sport, name: 'Sport' });
+            if (result.style) checks.push({ id: result.style, model: EventStyle, name: 'EventStyle' });
+            if (result.salon) checks.push({ id: result.salon, model: Salon, name: 'Salon' });
+            if (result.facility) checks.push({ id: result.facility, model: Facility, name: 'Facility' });
+
+            if (checks.length > 0) {
+                const models = await Promise.all(
+                    checks.map(async ({ id, model, name }) => {
+                        const exists = await model.exists({ _id: new ObjectId(id) });
+                        return { name, exists: Boolean(exists) };
+                    })
+                );
+
+                const allValid = models.every((r) => r.exists);
+                if (!allValid) {
+                    const notFound = models.filter((r) => !r.exists).map((r) => r.name);
+                    throw new AppError(404, `${notFound.join(', ')} not found`);
+                }
+            }
+        }
+
+        // Update eventStyle if style is provided
+        if (result.style) {
+            const eventStyleData = await EventStyle.findById(result.style);
+            if (!eventStyleData) {
+                throw new AppError(404, 'EventStyle not found');
+            }
+            updateData.eventStyle = {
+                name: eventStyleData.name,
+                color: eventStyleData.color,
+            };
+        }
+
+        // Handle photos if provided
+        if (req.fileMeta && Object.keys(req.fileMeta).length > 0) {
+            if (req.fileMeta['event-banner']) {
+                const bannerData = Array.isArray(req.fileMeta['event-banner']) 
+                    ? req.fileMeta['event-banner'][0] 
+                    : req.fileMeta['event-banner'];
+                updateData.banner = bannerData;
+            }
+            if (req.fileMeta['event-photo']) {
+                const photoData = Array.isArray(req.fileMeta['event-photo']) 
+                    ? req.fileMeta['event-photo'][0] 
+                    : req.fileMeta['event-photo'];
+                updateData.photo = photoData;
+            }
+        }
+
+        // Handle private/secretId
+        if (result.private !== undefined) {
+            if (result.private && result.private === true && !eventExists.secretId) {
+                updateData.secretId = genSecret();
+            } else if (!result.private && eventExists.secretId) {
+                updateData.secretId = null;
+            }
+        }
+
+        // Handle priceType
+        if (result.priceType === 'Free') {
+            updateData.participationFee = 0;
+        }
+
+        // Merge all update data
+        Object.assign(updateData, result);
+        delete updateData.style; // Remove style as we use eventStyle
+
+        const updatedEvent = await Event.findByIdAndUpdate(
+            eventId,
+            { $set: updateData },
+            { new: true }
+        ).select('-secretId');
+
+        if (!updatedEvent) throw new AppError(404, 'Event not found');
+
+        res.status(200).json({
+            success: true,
+            message: 'Event updated successfully',
+            data: updatedEvent,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const deleteEvent = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw new AppError(401);
+        }
+
+        const user = req.user;
+        const eventId = zodValidation.mongoObjectId.parse(req.params.eventId);
+
+        const eventExists = await Event.findById(eventId);
+        if (!eventExists) throw new AppError(404, 'Event not found');
+        
+        // Allow admin or event owner to delete
+        if (!(eventExists.owner.equals(user._id) || user.role === 0)) {
+            throw new AppError(403, 'You are not Event creator or admin');
+        }
+
+        await Event.findByIdAndDelete(eventId);
 
         res.status(204).json({
             success: true,
