@@ -1,8 +1,9 @@
 "use client";
 
-import React, { Dispatch, SetStateAction, useState } from "react";
+import React, { Dispatch, SetStateAction, useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSignIn } from "@/app/hooks/useAuth";
+import { initializeCSRFToken, getCSRFToken } from "@/app/lib/api";
 
 interface LoginFormProps {
   onToggleForm: () => void;
@@ -20,8 +21,28 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const { mutate: signIn, isPending, error, data } = useSignIn();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    initializeCSRFToken();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    await initializeCSRFToken();
+    
+    let csrfToken = getCSRFToken();
+    let attempts = 0;
+    while (attempts < 10 && !csrfToken) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      csrfToken = getCSRFToken();
+      attempts++;
+    }
+    
+    if (!csrfToken) {
+      alert("Failed to initialize CSRF token. Please refresh the page.");
+      return;
+    }
+    
     signIn(
       { email, password },
       {

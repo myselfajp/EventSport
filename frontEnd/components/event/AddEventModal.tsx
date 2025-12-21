@@ -244,7 +244,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const fetchEventStyles = async () => {
     setLoadingStyles(true);
     try {
-      const res = await fetchJSON(EP.EVENT_STYLE.getEventStyle, {
+      const res = await fetchJSON(EP.REFERENCE.eventStyle.get, {
         method: "POST",
         body: { perPage: 100, pageNumber: 1 },
       });

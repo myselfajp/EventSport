@@ -219,7 +219,7 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const fetchSportGoals = async () => {
     setLoading(true);
     try {
-      const res = await fetchJSON(EP.REFERENCE.sportGoal, {
+      const res = await fetchJSON(EP.REFERENCE.sportGoal.get, {
         method: "POST",
         body: { perPage: 20, pageNumber: 1 },
       });
