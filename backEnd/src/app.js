@@ -80,7 +80,11 @@ app.post('/api/v1/auth/sign-in', authRateLimiter, validateCSRFToken, authControl
 app.post('/api/v1/auth/sign-up', signupRateLimiter, validateCSRFToken, authController.signUp);
 app.use('/api/v1/auth', validateCSRFToken, authMiddleware, authRouter);
 app.use('/api/v1/participant', authMiddleware, participantRouter);
-app.use('/api/v1/reference-data', authMiddleware, referenceDataRouter);
+app.use('/api/v1/reference-data', authMiddleware, (req, res, next) => {
+    console.log('Reference data router - URL:', req.url);
+    console.log('Reference data router - Method:', req.method);
+    next();
+}, referenceDataRouter);
 app.use('/api/v1/coach', authMiddleware, coachRouter);
 app.use('/api/v1/facility', authMiddleware, facilityRouter);
 app.use('/api/v1/company', authMiddleware, companyRouter);

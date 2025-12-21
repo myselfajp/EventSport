@@ -25,6 +25,12 @@ const sportSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        icon: {
+            path: { type: String },
+            originalName: { type: String },
+            mimeType: { type: String },
+            size: { type: Number },
+        },
     },
     { timestamps: true }
 );

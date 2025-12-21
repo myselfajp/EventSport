@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchJSON } from "../../app/lib/api";
+import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 
 interface SportGroup {
@@ -16,6 +16,12 @@ interface Sport {
   name: string;
   group: string;
   groupName: string;
+  icon?: {
+    path: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,6 +91,8 @@ export default function EnumManagement() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({ name: "", color: "#000000" });
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === "sports") {
@@ -266,13 +274,42 @@ export default function EnumManagement() {
     }
     setEditingSport(null);
     setFormData({ name: "", color: "#000000" });
+    setIconFile(null);
+    setIconPreview(null);
     setShowSportModal(true);
   };
 
   const handleEditSport = (sport: Sport) => {
     setEditingSport(sport);
     setFormData({ name: sport.name, color: "#000000" });
+    setIconFile(null);
+    if (sport.icon?.path) {
+      setIconPreview(getImageUrl(sport.icon.path) || null);
+    } else {
+      setIconPreview(null);
+    }
     setShowSportModal(true);
+  };
+
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.match(/image\/(png|jpg|jpeg)/)) {
+        setError("Allowed file types: png, jpg, jpeg");
+        return;
+      }
+      setIconFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setIconPreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeIcon = () => {
+    setIconFile(null);
+    setIconPreview(null);
   };
 
   const handleDeleteSport = async (sportId: string) => {
@@ -294,6 +331,18 @@ export default function EnumManagement() {
     }
   };
 
+  const getImageUrl = (path: string) => {
+    if (!path) return "";
+    // Convert path like "frontEnd/public/gog-icons/car.png" to "/gog-icons/car.png"
+    const normalizedPath = path.replace(/^.*\/public\//, "/").replace(/\\/g, "/");
+    // If path already starts with /gog-icons/, use it directly
+    if (normalizedPath.startsWith("/gog-icons/")) {
+      return normalizedPath;
+    }
+    // Otherwise use API_ASSETS_BASE
+    return `${EP.API_ASSETS_BASE}/${path}`.replace(/\\/g, "/");
+  };
+
   const handleSubmitSport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGroup) return;
@@ -304,13 +353,24 @@ export default function EnumManagement() {
         ? EP.REFERENCE.sport.update(editingSport._id)
         : EP.REFERENCE.sport.create(selectedGroup);
 
-      const response = await fetchJSON(url, {
+      const formDataToSend = new FormData();
+      formDataToSend.append("name", formData.name);
+      
+      if (iconFile) {
+        formDataToSend.append("icon", iconFile);
+      }
+
+      const res = await apiFetch(url, {
         method: editingSport ? "PUT" : "POST",
-        body: { name: formData.name },
+        body: formDataToSend,
       });
+
+      const response = await res.json();
 
       if (response?.success) {
         setShowSportModal(false);
+        setIconFile(null);
+        setIconPreview(null);
         if (selectedGroup) {
           fetchSports(selectedGroup);
         }
@@ -692,7 +752,14 @@ export default function EnumManagement() {
                         key={sport._id}
                         className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
                       >
-                        <div className="flex-1">
+                        <div className="flex-1 flex items-center gap-3">
+                          {sport.icon?.path && (
+                            <img
+                              src={getImageUrl(sport.icon.path)}
+                              alt={sport.name}
+                              className="w-6 h-6 object-contain brightness-0 dark:brightness-0 dark:invert"
+                            />
+                          )}
                           <span className="font-medium text-gray-900 dark:text-slate-100">
                             {sport.name}
                           </span>
@@ -1042,6 +1109,36 @@ export default function EnumManagement() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
                   placeholder="Enter sport name"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+                  Icon
+                </label>
+                {iconPreview && (
+                  <div className="mb-2 relative inline-block">
+                    <img
+                      src={iconPreview}
+                      alt="Icon preview"
+                      className="w-16 h-16 object-contain border border-gray-300 dark:border-slate-600 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeIcon}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleIconUpload}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Upload an icon image (PNG, JPG, JPEG). Leave empty to keep existing icon or have no icon.
+                </p>
               </div>
               <div className="flex gap-2">
                 <button

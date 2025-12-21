@@ -9,7 +9,7 @@ import EventsTable from "./event/EventsTable";
 import CoachCalendar from "./CoachCalendar";
 import FollowingsView from "./follow/FollowingsView";
 import FavoritesView from "./favorite/FavoritesView";
-import GogIconsBanner from "./GogIconsBanner";
+import SportsBanner from "./SportsBanner";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -41,6 +41,7 @@ const EventsDashboard = () => {
     sortBy: undefined as string | undefined,
     sortType: "asc" as "asc" | "desc",
     private: false,
+    sport: undefined as string | undefined,
   });
 
   const fetchEvents = useCallback(async () => {
@@ -63,6 +64,10 @@ const EventsDashboard = () => {
       }
 
       payload.private = filters.private;
+
+      if (filters.sport) {
+        payload.sport = filters.sport;
+      }
 
       const response = await fetchJSON(EP.EVENTS.getEvents, {
         method: "POST",
@@ -97,6 +102,7 @@ const EventsDashboard = () => {
     filters.sortBy,
     filters.sortType,
     filters.private,
+    filters.sport,
   ]);
 
   useEffect(() => {
@@ -118,6 +124,11 @@ const EventsDashboard = () => {
 
   const handlePrivateToggle = (isPrivate: boolean) => {
     setFilters((prev) => ({ ...prev, private: isPrivate }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
+
+  const handleSportFilter = (sportId: string | null) => {
+    setFilters((prev) => ({ ...prev, sport: sportId || undefined }));
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   };
 
@@ -192,9 +203,12 @@ const EventsDashboard = () => {
               </div>
             </div>
 
-            {/* GOG Icons Banner - Below banner - Only show on events page */}
+            {/* Sports Banner - Below banner - Only show on events page */}
             {!showCoachCalendar && !showFollowings && !showFavorites && (
-              <GogIconsBanner />
+              <SportsBanner
+                selectedSportId={filters.sport}
+                onSportClick={handleSportFilter}
+              />
             )}
 
             {/* Events Section */}

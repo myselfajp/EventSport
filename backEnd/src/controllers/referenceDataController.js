@@ -204,16 +204,28 @@ export const createSport = async (req, res, next) => {
             throw new AppError(!req.user ? 401 : 403);
         }
 
-        const result = name.parse(req.body?.name);
+        const sportName = req.body?.name;
+        if (!sportName) {
+            throw new AppError(400, 'Sport name is required');
+        }
+        const result = name.parse(sportName);
         const sportGroupId = mongoObjectId.parse(req.params.sportGroupId);
 
         const sportGroup = await SportGroup.findById(sportGroupId);
         if (!sportGroup) throw new AppError(404);
 
+        const iconData = req.fileMeta ? {
+            path: req.fileMeta.path,
+            originalName: req.fileMeta.originalName,
+            mimeType: req.fileMeta.mimeType,
+            size: req.fileMeta.size,
+        } : null;
+
         const createSport = await Sport.create({
             name: result,
             group: sportGroupId,
             groupName: sportGroup.name,
+            icon: iconData,
         });
         if (!createSport) throw new AppError(404);
 
@@ -228,8 +240,6 @@ export const createSport = async (req, res, next) => {
 
 export const getSport = async (req, res, next) => {
     try {
-        if (!req.user) throw new AppError(401);
-
         const { perPage, pageNumber, search, group, sport } = SearchQuerySchema.parse({
             perPage: req.body?.perPage,
             pageNumber: req.body?.pageNumber,
@@ -272,14 +282,34 @@ export const updateSport = async (req, res, next) => {
         }
 
         const sportId = mongoObjectId.parse(req.params.sportId);
-        const result = name.parse(req.body?.name);
+        const sportName = req.body?.name;
+        
+        console.log('updateSport - req.body:', req.body);
+        console.log('updateSport - sportName:', sportName);
+        console.log('updateSport - sportId:', sportId);
+        console.log('updateSport - req.fileMeta:', req.fileMeta);
+        
+        if (!sportName) {
+            throw new AppError(400, 'Sport name is required');
+        }
+        const result = name.parse(sportName);
 
         const sport = await Sport.findById(sportId);
         if (!sport) throw new AppError(404);
 
+        const updateData = { name: result };
+        if (req.fileMeta) {
+            updateData.icon = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
+
         const updatedSport = await Sport.findByIdAndUpdate(
             sportId,
-            { name: result },
+            updateData,
             { new: true }
         );
         if (!updatedSport) throw new AppError(404);

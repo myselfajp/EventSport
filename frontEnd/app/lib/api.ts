@@ -73,6 +73,12 @@ export async function apiFetch(
 ) {
   const headers = new Headers(options.headers || {});
   const sendAuth = !skipAuth;
+  const isFormData = options.body instanceof FormData;
+
+  // Don't set Content-Type for FormData, browser will set it with boundary
+  if (isFormData && headers.has("Content-Type")) {
+    headers.delete("Content-Type");
+  }
 
   if (sendAuth) {
     const t = tokenStore.get();
