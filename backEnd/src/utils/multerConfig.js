@@ -33,3 +33,31 @@ export const createMulter = () => {
         },
     });
 };
+
+export const createIconMulter = () => {
+    const storage = multer.diskStorage({
+        destination: (req, file, cb) => {
+            const uploadPath = path.join('frontEnd', 'public', 'gog-icons');
+            fs.mkdirSync(uploadPath, { recursive: true });
+            cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+            const ext = path.extname(file.originalname);
+            const baseName = path.basename(file.originalname, ext);
+            const sanitizedName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_');
+            const fileName = `${sanitizedName}${ext}`;
+            cb(null, fileName);
+        },
+    });
+
+    return multer({
+        storage,
+        limits: { fileSize: allowedSize },
+        fileFilter: (req, file, cb) => {
+            if (!allowed.includes(file.mimetype)) {
+                return cb(new multer.MulterError('UNEXPECTED_FILE'), false);
+            }
+            cb(null, true);
+        },
+    });
+};
