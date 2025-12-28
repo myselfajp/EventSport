@@ -1,5 +1,6 @@
 import express from 'express';
 const router = express.Router();
+import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 import * as adminController from '../controllers/adminController.js';
 
 router.get('/panel', adminController.getAdminPanel);
@@ -20,5 +21,20 @@ router.get('/users/:userId/coach-details', adminController.getCoachDetails);
 router.get('/users/:userId/participant-details', adminController.getParticipantDetails);
 router.get('/users/:userId/facility-details', adminController.getFacilityDetails);
 router.get('/users/:userId/club-details', adminController.getClubDetails);
+
+// User Profile Edit
+router.get('/users/:userId/coach-branches', adminController.getCoachBranches);
+router.get('/users/:userId/participant-profile', adminController.getParticipantProfile);
+router.post(
+    '/users/:userId/coach-profile',
+    uploadFile({ mode: 'array', fieldName: 'coach-certificate', optional: true }),
+    adminController.updateCoachProfile
+);
+router.post('/users/:userId/participant-profile', adminController.updateParticipantProfile);
+router.put(
+    '/users/:userId/facility/:facilityId',
+    uploadFile({ fieldName: 'facility-photo', optional: true }),
+    adminController.updateFacilityProfile
+);
 
 export default router;

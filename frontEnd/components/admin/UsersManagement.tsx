@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchJSON } from "../../app/lib/api";
+import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
+import CoachModal from "../profile/CoachModal";
+import ParticipantModal from "../profile/ParticipantModal";
+import FacilityModal from "../profile/FacilityModal";
 
 interface User {
   _id: string;
@@ -55,6 +58,11 @@ export default function UsersManagement() {
   const [detailsData, setDetailsData] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showCoachModal, setShowCoachModal] = useState(false);
+  const [showParticipantModal, setShowParticipantModal] = useState(false);
+  const [showFacilityModal, setShowFacilityModal] = useState(false);
+  const [editingProfileUser, setEditingProfileUser] = useState<User | null>(null);
+  const [editingFacility, setEditingFacility] = useState<any>(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -130,6 +138,21 @@ export default function UsersManagement() {
       role: user.role,
     });
     setShowModal(true);
+  };
+
+  const handleEditProfile = (user: User) => {
+    setEditingProfileUser(user);
+    if (user.coach) {
+      setShowCoachModal(true);
+    } else if (user.participant) {
+      setShowParticipantModal(true);
+    } else if (user.facility && user.facility.length > 0) {
+      // For facility, we need to fetch the facility details first
+      // For now, we'll just open the modal with the first facility
+      // In a real scenario, you might want to show a list to select which facility to edit
+      setEditingFacility(user.facility[0]);
+      setShowFacilityModal(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -439,7 +462,7 @@ export default function UsersManagement() {
                       </>
                     )}
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <button
                           onClick={() => handleViewDetails(user)}
                           className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
@@ -450,8 +473,16 @@ export default function UsersManagement() {
                           onClick={() => handleEdit(user)}
                           className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
                         >
-                          Edit
+                          Edit User
                         </button>
+                        {(user.coach || user.participant || (user.facility && user.facility.length > 0)) && (
+                          <button
+                            onClick={() => handleEditProfile(user)}
+                            className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+                          >
+                            Edit Profile
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(user._id)}
                           className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -770,7 +801,121 @@ export default function UsersManagement() {
           </div>
         </div>
       )}
+
+      {/* Profile Edit Modals */}
+      {editingProfileUser && editingProfileUser.coach && (
+        <AdminCoachModal
+          isOpen={showCoachModal}
+          onClose={() => {
+            setShowCoachModal(false);
+            setEditingProfileUser(null);
+          }}
+          userId={editingProfileUser._id}
+          onSuccess={() => {
+            fetchUsers();
+            setShowCoachModal(false);
+            setEditingProfileUser(null);
+          }}
+        />
+      )}
+
+      {editingProfileUser && editingProfileUser.participant && (
+        <AdminParticipantModal
+          isOpen={showParticipantModal}
+          onClose={() => {
+            setShowParticipantModal(false);
+            setEditingProfileUser(null);
+          }}
+          userId={editingProfileUser._id}
+          onSuccess={() => {
+            fetchUsers();
+            setShowParticipantModal(false);
+            setEditingProfileUser(null);
+          }}
+        />
+      )}
+
+      {editingProfileUser && editingFacility && (
+        <AdminFacilityModal
+          isOpen={showFacilityModal}
+          onClose={() => {
+            setShowFacilityModal(false);
+            setEditingProfileUser(null);
+            setEditingFacility(null);
+          }}
+          userId={editingProfileUser._id}
+          facilityId={editingFacility._id || editingFacility}
+          initialData={editingFacility}
+          onSuccess={() => {
+            fetchUsers();
+            setShowFacilityModal(false);
+            setEditingProfileUser(null);
+            setEditingFacility(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Admin Coach Modal Wrapper
+function AdminCoachModal({ isOpen, onClose, userId, onSuccess }: { isOpen: boolean; onClose: () => void; userId: string; onSuccess: () => void }) {
+  const handleSubmit = async (formData: any) => {
+    // CoachModal now handles admin mode internally
+    onSuccess();
+  };
+
+  return (
+    <CoachModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      adminUserId={userId}
+    />
+  );
+}
+
+// Admin Participant Modal Wrapper
+function AdminParticipantModal({ isOpen, onClose, userId, onSuccess }: { isOpen: boolean; onClose: () => void; userId: string; onSuccess: () => void }) {
+  const handleSubmit = async (formData: any) => {
+    // ParticipantModal now handles admin mode internally
+    onSuccess();
+  };
+
+  return (
+    <ParticipantModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      adminUserId={userId}
+    />
+  );
+}
+
+// Admin Facility Modal Wrapper
+function AdminFacilityModal({ isOpen, onClose, userId, facilityId, initialData, onSuccess }: { isOpen: boolean; onClose: () => void; userId: string; facilityId: string; initialData: any; onSuccess: () => void }) {
+  const handleSubmit = async (formData: FormData) => {
+    try {
+      const res = await apiFetch(EP.ADMIN.users.updateFacilityProfile(userId, facilityId), {
+        method: "PUT",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success) {
+        onSuccess();
+      }
+    } catch (err: any) {
+      console.error("Error updating facility profile:", err);
+    }
+  };
+
+  return (
+    <FacilityModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      initialData={initialData}
+    />
   );
 }
 

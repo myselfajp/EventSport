@@ -11,6 +11,7 @@ interface ParticipantModalProps {
   onClose: () => void;
   onSubmit: (formData: ParticipantFormData) => void;
   renderInline?: boolean;
+  adminUserId?: string; // For admin editing other users' profiles
 }
 
 interface ParticipantFormData {
@@ -42,9 +43,10 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   onClose,
   onSubmit,
   renderInline = false,
+  adminUserId,
 }) => {
   const { data: user, isLoading: userLoading } = useMe();
-  const participantId = user?.participant;
+  const participantId = adminUserId ? null : user?.participant; // Don't use current user's participant if admin mode
 
   const [formData, setFormData] = useState<ParticipantFormData>({
     sportGroup: "",
@@ -81,10 +83,10 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const isVisible = renderInline ? true : isOpen;
 
   useEffect(() => {
-    if (isVisible && !userLoading) {
+    if (isVisible && (!userLoading || adminUserId)) {
       loadData();
     }
-  }, [isVisible, participantId, userLoading]);
+  }, [isVisible, participantId, userLoading, adminUserId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -106,7 +108,10 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const loadData = async () => {
     setInitializing(true);
     try {
-      if (participantId) {
+      if (adminUserId) {
+        await fetchParticipantDataAdmin();
+        setIsEditMode(true);
+      } else if (participantId) {
         await fetchParticipantData();
         setIsEditMode(true);
       } else {
@@ -114,6 +119,46 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
       }
     } finally {
       setInitializing(false);
+    }
+  };
+
+  const fetchParticipantDataAdmin = async () => {
+    if (!adminUserId) return;
+
+    try {
+      const res = await fetchJSON(EP.ADMIN.users.getParticipantProfile(adminUserId), {
+        method: "GET",
+      });
+
+      if (res.success && res.data) {
+        const participantData = res.data.participant || res.data;
+
+        const mainSportId = participantData.mainSport || "";
+        const sportGroupId = participantData.mainSportGroup || "";
+        const sportGoalId = participantData.sportGoal || "";
+        const skillLevel = participantData.skillLevel || 5;
+
+        const sportGroupName = participantData.mainSportGroupName || "";
+        const sportName = participantData.mainSportName || "";
+        const goalName = participantData.sportGoalName || "";
+
+        setSelectedSportGroupName(sportGroupName);
+        setSelectedSportName(sportName);
+        setSelectedGoalName(goalName);
+
+        setFormData({
+          sportGroup: sportGroupId,
+          mainSport: mainSportId,
+          skillLevel: skillLevel,
+          sportGoal: sportGoalId,
+        });
+
+        if (sportGroupId) {
+          await fetchSportsInGroup(sportGroupId);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching participant data (admin):", err);
     }
   };
 
@@ -300,7 +345,9 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
 
     setLoading(true);
     try {
-      const endpoint = isEditMode
+      const endpoint = adminUserId
+        ? EP.ADMIN.users.updateParticipantProfile(adminUserId)
+        : isEditMode
         ? EP.PARTICIPANT.editProfile
         : EP.PARTICIPANT.createProfile;
 

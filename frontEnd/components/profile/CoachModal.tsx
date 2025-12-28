@@ -10,6 +10,7 @@ interface CoachModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (formData: CoachFormData) => void;
+  adminUserId?: string; // For admin editing other users' profiles
 }
 
 interface SportGroup {
@@ -51,9 +52,10 @@ const CoachModal: React.FC<CoachModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  adminUserId,
 }) => {
   const { data: user, isLoading: userLoading } = useMe();
-  const coachId = user?.coach;
+  const coachId = adminUserId ? null : user?.coach; // Don't use current user's coach if admin mode
 
   const [formData, setFormData] = useState<CoachFormData>({
     branches: [],
@@ -75,10 +77,10 @@ const CoachModal: React.FC<CoachModalProps> = ({
   const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
-    if (isOpen && !userLoading) {
+    if (isOpen && (!userLoading || adminUserId)) {
       loadData();
     }
-  }, [isOpen, coachId, userLoading]);
+  }, [isOpen, coachId, userLoading, adminUserId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -99,7 +101,10 @@ const CoachModal: React.FC<CoachModalProps> = ({
   const loadData = async () => {
     setInitializing(true);
     try {
-      if (coachId) {
+      if (adminUserId) {
+        await fetchCoachDataAdmin();
+        setIsEditMode(true);
+      } else if (coachId) {
         await fetchCoachData();
         setIsEditMode(true);
       } else {
@@ -107,6 +112,81 @@ const CoachModal: React.FC<CoachModalProps> = ({
       }
     } finally {
       setInitializing(false);
+    }
+  };
+
+  const fetchCoachDataAdmin = async () => {
+    if (!adminUserId) return;
+
+    try {
+      const [branchesRes, sportGroupsRes] = await Promise.all([
+        fetchJSON(EP.ADMIN.users.getCoachBranches(adminUserId), { method: "GET" }),
+        fetchJSON(EP.REFERENCE.sportGroup.get, {
+          method: "POST",
+          body: { perPage: 100, pageNumber: 1 },
+        }),
+      ]);
+
+      if (branchesRes.success && branchesRes.data) {
+        const sportGroupsData = sportGroupsRes.data || [];
+        setSportGroups(sportGroupsData);
+
+        const branchesData = branchesRes.data.branches || [];
+        const branches: Branch[] = branchesData.map(
+          (branch: any, index: number) => {
+            const sportGroupId =
+              sportGroupsData.find(
+                (sg: SportGroup) => sg.name === branch.sportGroup
+              )?._id || "";
+
+            return {
+              _id: branch._id,
+              sport: branch.sport || "",
+              sportGroup: sportGroupId,
+              branchOrder: branch.branchOrder || index + 1,
+              level: branch.level || 5,
+              certificate: null,
+              certificatePreview: null,
+              sportName: branch.sportName || "",
+              sportGroupName: branch.sportGroup || "",
+              existingCertificate: branch.certificate
+                ? {
+                    path: branch.certificate.path,
+                    originalName: branch.certificate.originalName,
+                    mimeType: branch.certificate.mimeType,
+                    size: branch.certificate.size,
+                  }
+                : undefined,
+            };
+          }
+        );
+
+        const about = branchesRes.data.about || "";
+        setFormData({ branches, about });
+
+        const uniqueSportGroups = [
+          ...new Set(branches.map((b) => b.sportGroup).filter(Boolean)),
+        ];
+        if (uniqueSportGroups.length > 0) {
+          const allSports: Sport[] = [];
+          for (const groupId of uniqueSportGroups) {
+            const sportsRes = await fetchJSON(EP.REFERENCE.sport.get, {
+              method: "POST",
+              body: {
+                perPage: 50,
+                pageNumber: 1,
+                groupId: groupId,
+              },
+            });
+            if (sportsRes.success && sportsRes.data) {
+              allSports.push(...sportsRes.data);
+            }
+          }
+          setSports(allSports);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching coach data (admin):", err);
     }
   };
 
@@ -376,7 +456,11 @@ const CoachModal: React.FC<CoachModalProps> = ({
         }
       });
 
-      const res = await apiFetch(EP.COACH.createProfileAndBranch, {
+      const endpoint = adminUserId
+        ? EP.ADMIN.users.updateCoachProfile(adminUserId)
+        : EP.COACH.createProfileAndBranch;
+
+      const res = await apiFetch(endpoint, {
         method: "POST",
         body: formDataToSend,
       });
@@ -385,7 +469,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
 
       if (json.success) {
         // Also update the 'about' field if it has changed
-        if (formData.about) {
+        if (formData.about && !adminUserId) {
           await apiFetch(EP.COACH.editCoach, {
             method: "POST",
             headers: {
