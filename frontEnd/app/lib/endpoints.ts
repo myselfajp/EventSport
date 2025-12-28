@@ -44,6 +44,10 @@ export const EP = {
       create: `${ADMIN_API}/users/create`,
       update: (userId: string) => `${ADMIN_API}/users/${userId}`,
       delete: (userId: string) => `${ADMIN_API}/users/${userId}`,
+      coachDetails: (userId: string) => `${ADMIN_API}/users/${userId}/coach-details`,
+      participantDetails: (userId: string) => `${ADMIN_API}/users/${userId}/participant-details`,
+      facilityDetails: (userId: string) => `${ADMIN_API}/users/${userId}/facility-details`,
+      clubDetails: (userId: string) => `${ADMIN_API}/users/${userId}/club-details`,
     },
     coaches: {
       pending: `${ADMIN_API}/coaches/pending`,

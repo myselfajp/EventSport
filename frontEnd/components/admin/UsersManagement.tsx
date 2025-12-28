@@ -17,10 +17,32 @@ interface User {
   isPhoneVerified: boolean;
   participant?: any;
   coach?: any;
+  facility?: any[];
+  summary?: {
+    coach?: {
+      certificateCount: number;
+      eventsCount: number;
+      sports?: Array<{ name: string; groupName: string }>;
+    };
+    participant?: {
+      joinedEventsCount: number;
+    };
+    facility?: {
+      facilityCount: number;
+      salonsCount: number;
+    };
+    club?: {
+      clubCount: number;
+      groupsCount: number;
+    };
+  };
   createdAt: string;
 }
 
+type ProfileTab = 'participant' | 'coach' | 'facility';
+
 export default function UsersManagement() {
+  const [activeTab, setActiveTab] = useState<ProfileTab>('participant');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -28,6 +50,10 @@ export default function UsersManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [detailsData, setDetailsData] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -40,8 +66,13 @@ export default function UsersManagement() {
   });
 
   useEffect(() => {
+    setPage(1);
     fetchUsers();
-  }, [page, search]);
+  }, [activeTab, search]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [page]);
 
   const fetchUsers = async () => {
     try {
@@ -50,6 +81,7 @@ export default function UsersManagement() {
       const body: any = {
         perPage: 10,
         pageNumber: page,
+        profileType: activeTab,
       };
       if (search) {
         body.search = search;
@@ -157,6 +189,83 @@ export default function UsersManagement() {
     }
   };
 
+  const handleViewDetails = async (user: User) => {
+    setSelectedUser(user);
+    setShowDetailsModal(true);
+    setLoadingDetails(true);
+    setDetailsData(null);
+
+    try {
+      const details: any = {};
+
+      if (user.coach) {
+        try {
+          const coachRes = await fetchJSON(EP.ADMIN.users.coachDetails(user._id), {
+            method: "GET",
+          });
+          if (coachRes?.success) {
+            details.coach = coachRes.data;
+          }
+        } catch (err) {
+          console.error("Failed to fetch coach details:", err);
+        }
+      }
+
+      if (user.participant) {
+        try {
+          const participantRes = await fetchJSON(EP.ADMIN.users.participantDetails(user._id), {
+            method: "GET",
+          });
+          if (participantRes?.success) {
+            details.participant = participantRes.data;
+          }
+        } catch (err) {
+          console.error("Failed to fetch participant details:", err);
+        }
+      }
+
+      if (user.facility && user.facility.length > 0) {
+        try {
+          const facilityRes = await fetchJSON(EP.ADMIN.users.facilityDetails(user._id), {
+            method: "GET",
+          });
+          if (facilityRes?.success) {
+            details.facility = facilityRes.data;
+          }
+        } catch (err) {
+          console.error("Failed to fetch facility details:", err);
+        }
+      }
+
+      if (user.coach) {
+        try {
+          const clubRes = await fetchJSON(EP.ADMIN.users.clubDetails(user._id), {
+            method: "GET",
+          });
+          if (clubRes?.success) {
+            details.club = clubRes.data;
+          }
+        } catch (err) {
+          console.error("Failed to fetch club details:", err);
+        }
+      }
+
+      setDetailsData(details);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch details");
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const getProfileSummary = (user: User) => {
+    const parts: string[] = [];
+    if (user.coach) parts.push("Coach");
+    if (user.participant) parts.push("Participant");
+    if (user.facility && user.facility.length > 0) parts.push(`Facility Owner (${user.facility.length})`);
+    return parts.length > 0 ? parts.join(", ") : "Regular User";
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -171,10 +280,45 @@ export default function UsersManagement() {
         </button>
       </div>
 
+      <div className="border-b border-gray-200 dark:border-slate-700">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('participant')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'participant'
+                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            Participants
+          </button>
+          <button
+            onClick={() => setActiveTab('coach')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'coach'
+                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            Coaches
+          </button>
+          <button
+            onClick={() => setActiveTab('facility')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'facility'
+                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            Facilities
+          </button>
+        </nav>
+      </div>
+
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder="Search users..."
+          placeholder={`Search ${activeTab}s...`}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -207,9 +351,39 @@ export default function UsersManagement() {
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Phone
                   </th>
-                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
-                    Role
-                  </th>
+                  {activeTab === 'participant' && (
+                    <>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Main Sport
+                      </th>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Joined Events
+                      </th>
+                    </>
+                  )}
+                  {activeTab === 'coach' && (
+                    <>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Certificates
+                      </th>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Sports
+                      </th>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Events Created
+                      </th>
+                    </>
+                  )}
+                  {activeTab === 'facility' && (
+                    <>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Facilities Count
+                      </th>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Salons Count
+                      </th>
+                    </>
+                  )}
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Actions
                   </th>
@@ -217,7 +391,7 @@ export default function UsersManagement() {
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user._id}>
+                  <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       {user.firstName} {user.lastName}
                     </td>
@@ -227,20 +401,60 @@ export default function UsersManagement() {
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       {user.phone}
                     </td>
-                    <td className="border border-gray-300 dark:border-slate-600 p-2">
-                      {user.role === 0 ? "Admin" : "User"}
-                    </td>
+                    {activeTab === 'participant' && (
+                      <>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.participant?.mainSport && typeof user.participant.mainSport === 'object' && user.participant.mainSport.name 
+                            ? user.participant.mainSport.name 
+                            : '-'}
+                        </td>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.summary?.participant?.joinedEventsCount || 0}
+                        </td>
+                      </>
+                    )}
+                    {activeTab === 'coach' && (
+                      <>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.summary?.coach?.certificateCount || 0}
+                        </td>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.summary?.coach?.sports && user.summary.coach.sports.length > 0
+                            ? user.summary.coach.sports.map((s: any) => s.name).join(', ')
+                            : '-'}
+                        </td>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.summary?.coach?.eventsCount || 0}
+                        </td>
+                      </>
+                    )}
+                    {activeTab === 'facility' && (
+                      <>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.summary?.facility?.facilityCount || 0}
+                        </td>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          {user.summary?.facility?.salonsCount || 0}
+                        </td>
+                      </>
+                    )}
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handleViewDetails(user)}
+                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                        >
+                          Details
+                        </button>
+                        <button
                           onClick={() => handleEdit(user)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(user._id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
                         >
                           Delete
                         </button>
@@ -396,6 +610,163 @@ export default function UsersManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDetailsModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+                User Details: {selectedUser.firstName} {selectedUser.lastName}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedUser(null);
+                  setDetailsData(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            {loadingDetails ? (
+              <div className="text-center py-8">Loading details...</div>
+            ) : (
+              <div className="space-y-6">
+                {detailsData?.coach && (
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Coach Profile</h4>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        <span className="font-medium">Certificates:</span> {detailsData.coach.certificateCount}
+                      </p>
+                      <p>
+                        <span className="font-medium">Events Created (until today):</span> {detailsData.coach.eventsCount}
+                      </p>
+                      {detailsData.coach.sports && detailsData.coach.sports.length > 0 && (
+                        <div>
+                          <span className="font-medium">Sports:</span>
+                          <ul className="list-disc list-inside ml-2 mt-1">
+                            {detailsData.coach.sports.map((sport: any) => (
+                              <li key={sport._id}>
+                                {sport.name} ({sport.groupName})
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {detailsData?.participant && (
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Participant Profile</h4>
+                    <div className="space-y-2 text-sm">
+                      {detailsData.participant.mainSport && (
+                        <p>
+                          <span className="font-medium">Main Sport:</span> {detailsData.participant.mainSport.name} ({detailsData.participant.mainSport.groupName})
+                        </p>
+                      )}
+                      {detailsData.participant.events && detailsData.participant.events.length > 0 && (
+                        <div>
+                          <span className="font-medium">Joined Events ({detailsData.participant.events.length}):</span>
+                          <ul className="list-disc list-inside ml-2 mt-1 max-h-40 overflow-y-auto">
+                            {detailsData.participant.events.map((event: any) => (
+                              <li key={event._id}>
+                                {event.name} - {event.sport?.name} ({new Date(event.startTime).toLocaleDateString()})
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {detailsData?.facility && (
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Facility Owner Profile</h4>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        <span className="font-medium">Total Facilities:</span> {detailsData.facility.facilityCount}
+                      </p>
+                      <p>
+                        <span className="font-medium">Total Salons:</span> {detailsData.facility.totalSalons}
+                      </p>
+                      {detailsData.facility.facilities && detailsData.facility.facilities.length > 0 && (
+                        <div>
+                          <span className="font-medium">Facilities:</span>
+                          <ul className="list-disc list-inside ml-2 mt-1 space-y-2">
+                            {detailsData.facility.facilities.map((facility: any) => (
+                              <li key={facility._id}>
+                                <div className="font-medium">{facility.name}</div>
+                                <div className="ml-4 text-xs text-gray-600 dark:text-slate-400">
+                                  Sport: {facility.mainSport?.name} | Salons: {facility.salonCount}
+                                  {facility.salons && facility.salons.length > 0 && (
+                                    <ul className="list-disc list-inside ml-2 mt-1">
+                                      {facility.salons.map((salon: any) => (
+                                        <li key={salon._id}>{salon.name} - {salon.sport?.name}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {detailsData?.club && (
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Club Owner Profile</h4>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        <span className="font-medium">Total Clubs:</span> {detailsData.club.clubCount}
+                      </p>
+                      <p>
+                        <span className="font-medium">Total Groups:</span> {detailsData.club.totalGroups}
+                      </p>
+                      {detailsData.club.clubs && detailsData.club.clubs.length > 0 && (
+                        <div>
+                          <span className="font-medium">Clubs:</span>
+                          <ul className="list-disc list-inside ml-2 mt-1 space-y-2">
+                            {detailsData.club.clubs.map((club: any) => (
+                              <li key={club._id}>
+                                <div className="font-medium">{club.name}</div>
+                                <div className="ml-4 text-xs text-gray-600 dark:text-slate-400">
+                                  Groups: {club.groupCount}
+                                  {club.groups && club.groups.length > 0 && (
+                                    <ul className="list-disc list-inside ml-2 mt-1">
+                                      {club.groups.map((group: any) => (
+                                        <li key={group._id}>{group.name}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!detailsData?.coach && !detailsData?.participant && !detailsData?.facility && !detailsData?.club && (
+                  <div className="text-center py-8 text-gray-500 dark:text-slate-400">
+                    No profile details available for this user.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
