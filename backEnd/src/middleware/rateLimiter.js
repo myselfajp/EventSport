@@ -32,7 +32,6 @@ export const generalRateLimiter = rateLimit({
     skip: (req) => {
         return req.path.startsWith('/uploads') ||
             req.method === 'GET' ||
-            req.path.startsWith('/api/v1/auth/refresh') ||
             req.path.startsWith('/api/v1/admin') ||
             req.path.startsWith('/api/v1/reference-data');
     },

@@ -6,7 +6,6 @@ import referenceDataRouter from './routes/referenceDataRouter.js';
 import coachRouter from './routes/couchRouter.js';
 import facilityRouter from './routes/facilityRouter.js';
 import companyRouter from './routes/companyRouter.js';
-import refreshRouter from './routes/refreshRouter.js';
 import getDataRouter from './routes/getDataRouter.js';
 import adminRouter from './routes/adminRouter.js';
 import { authMiddleware } from './middleware/authMiddleware.js';
@@ -75,9 +74,8 @@ app.get('/mid', authMiddleware, (req, res) => {
     res.json({ message: `hello user ${req.user.username}` });
 });
 
-app.use('/api/v1/auth', validateCSRFToken, refreshRouter);
-app.post('/api/v1/auth/sign-in', validateCSRFToken, authController.signIn);
-app.post('/api/v1/auth/sign-up', validateCSRFToken, authController.signUp);
+app.post('/api/v1/auth/sign-in', authRateLimiter, validateCSRFToken, authController.signIn);
+app.post('/api/v1/auth/sign-up', signupRateLimiter, validateCSRFToken, authController.signUp);
 app.use('/api/v1/auth', validateCSRFToken, authMiddleware, authRouter);
 app.use('/api/v1/participant', authMiddleware, participantRouter);
 app.use('/api/v1/reference-data', authMiddleware, (req, res, next) => {

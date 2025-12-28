@@ -1,6 +1,5 @@
 "use client";
 
-import { EP } from "./endpoints";
 import { tokenStore } from "./token-store";
 
 export function extractTokenFromResponse(res: Response) {
@@ -13,35 +12,6 @@ export function extractTokenFromResponse(res: Response) {
   return token;
 }
 
-export async function tryRefreshToken(): Promise<boolean> {
-  try {
-    const headers = new Headers();
-    const csrfToken = getCSRFToken();
-    if (csrfToken) {
-      headers.set("x-csrf-token", csrfToken);
-    }
-
-    const res = await fetch(EP.AUTH.refresh, {
-      method: "POST",
-      headers,
-      credentials: "include",
-    });
-    if (!res.ok) return false;
-
-    const fromHeader = extractTokenFromResponse(res);
-    if (fromHeader) {
-      tokenStore.set(fromHeader);
-      return true;
-    }
-    const body = await res.json().catch(() => ({} as any));
-    const t = body?.accessToken || body?.data?.accessToken || null;
-    if (!t) return false;
-    tokenStore.set(t);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function getCSRFToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -108,30 +78,7 @@ export async function apiFetch(
   }
 
   if (res.status === 401 && sendAuth) {
-    const ok = await tryRefreshToken();
-    if (ok) {
-      const retryHeaders = new Headers(options.headers || {});
-      const t = tokenStore.get();
-      if (t) retryHeaders.set("Authorization", `Bearer ${t}`);
-      
-      const retryNeedsCSRF = options.method === "POST" || options.method === "PUT" || options.method === "DELETE" || options.method === "PATCH";
-      if (retryNeedsCSRF) {
-        const csrfToken = getCSRFToken();
-        if (csrfToken) {
-          retryHeaders.set("x-csrf-token", csrfToken);
-        }
-      }
-      
-      res = await fetch(url, {
-        ...options,
-        headers: retryHeaders,
-        credentials: withCredentials ? "include" : "omit",
-      });
-      const rotated2 = extractTokenFromResponse(res);
-      if (rotated2) tokenStore.set(rotated2);
-    } else {
-      tokenStore.clear();
-    }
+    tokenStore.clear();
   }
 
   return res;

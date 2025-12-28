@@ -20,10 +20,7 @@ const userSchema = new mongoose.Schema(
             unique: true,
         },
         photo: {
-            path: { type: String },
-            originalName: { type: String },
-            mimeType: { type: String },
-            size: { type: Number },
+            type: String,
         },
         age: {
             type: Date,
