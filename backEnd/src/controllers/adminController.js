@@ -412,12 +412,30 @@ export const getCoachDetails = async (req, res, next) => {
 
         const coachId = user.coach._id;
 
-        const approvedBranches = await Branch.find({
+        const allBranches = await Branch.find({
             coach: coachId,
-            status: 'Approved',
-        }).populate('sport', 'name groupName');
+        })
+            .populate('sport', 'name groupName')
+            .sort({ createdAt: -1 })
+            .lean();
 
+        const approvedBranches = allBranches.filter((b) => b.status === 'Approved');
         const certificateCount = approvedBranches.length;
+
+        const branches = allBranches.map((branch) => ({
+            _id: branch._id,
+            sport: {
+                _id: branch.sport._id,
+                name: branch.sport.name,
+                groupName: branch.sport.groupName,
+            },
+            level: branch.level,
+            branchOrder: branch.branchOrder,
+            status: branch.status,
+            certificate: branch.certificate,
+            createdAt: branch.createdAt,
+        }));
+
         const sports = approvedBranches.map((branch) => ({
             _id: branch.sport._id,
             name: branch.sport.name,
@@ -438,6 +456,7 @@ export const getCoachDetails = async (req, res, next) => {
                 certificateCount,
                 sports,
                 eventsCount,
+                branches,
             },
         });
     } catch (err) {
