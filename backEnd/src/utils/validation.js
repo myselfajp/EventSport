@@ -298,6 +298,9 @@ export const SearchQuerySchema = z
         // Search
         search: z.string().optional(),
 
+        // Profile Type Filter
+        profileType: z.enum(['participant', 'coach', 'facility']).optional(),
+
         // Sorting
         sortBy: z.string().optional(),
         sortType: z.enum(['asc', 'desc']).optional().default('asc'),
