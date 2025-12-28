@@ -15,8 +15,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
   onLogin,
   loginError,
 }) => {
-  const [email, setEmail] = useState("its@gmail.com");
-  const [password, setPassword] = useState("Aa@123456");
+  const [email, setEmail] = useState("admin@eventsport.com");
+  const [password, setPassword] = useState("Admin123!@#");
   const [showPassword, setShowPassword] = useState(false);
   const { mutate: signIn, isPending, error, data } = useSignIn();
 
@@ -135,10 +135,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
         </p>
         <div className="space-y-1">
           <p className="text-xs text-gray-600 dark:text-slate-400">
-            <span className="font-medium">Email:</span> its@gmail.com
+            <span className="font-medium">Email:</span> admin@eventsport.com
           </p>
           <p className="text-xs text-gray-600 dark:text-slate-400">
-            <span className="font-medium">Password:</span> Aa@123456
+            <span className="font-medium">Password:</span> Admin123!@#
           </p>
         </div>
       </div>
