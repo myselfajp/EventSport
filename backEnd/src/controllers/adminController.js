@@ -90,7 +90,7 @@ export const getAllUsers = async (req, res, next) => {
                     const approvedBranches = await Branch.find({
                         coach: coachId,
                         status: 'Approved',
-                    }).populate('sport', 'name groupName').lean();
+                    }).populate('sport', 'name groupName icon').lean();
                     
                     const approvedBranchesCount = approvedBranches.length;
                     const sports = approvedBranches.map((branch) => ({
@@ -302,7 +302,7 @@ export const getPendingCoaches = async (req, res, next) => {
                 path: 'coach',
                 select: 'name isVerified',
             })
-            .populate('sport', 'name groupName')
+            .populate('sport', 'name groupName icon')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -353,7 +353,7 @@ export const approveCertificate = async (req, res, next) => {
             { new: true }
         )
             .populate('coach')
-            .populate('sport', 'name');
+            .populate('sport', 'name icon');
 
         if (!branch) {
             throw new AppError(404, 'Branch not found');
@@ -406,7 +406,7 @@ export const rejectCertificate = async (req, res, next) => {
             { new: true }
         )
             .populate('coach')
-            .populate('sport', 'name');
+            .populate('sport', 'name icon');
 
         if (!branch) {
             throw new AppError(404, 'Branch not found');
@@ -452,7 +452,7 @@ export const getCoachDetails = async (req, res, next) => {
         const allBranches = await Branch.find({
             coach: coachId,
         })
-            .populate('sport', 'name groupName')
+            .populate('sport', 'name groupName icon')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -465,6 +465,7 @@ export const getCoachDetails = async (req, res, next) => {
                 _id: branch.sport._id,
                 name: branch.sport.name,
                 groupName: branch.sport.groupName,
+                icon: branch.sport.icon,
             },
             level: branch.level,
             branchOrder: branch.branchOrder,
@@ -571,7 +572,7 @@ export const getFacilityDetails = async (req, res, next) => {
         const salons = await Salon.find({
             facility: { $in: facilityIds },
         })
-            .populate('sport', 'name groupName')
+            .populate('sport', 'name groupName icon')
             .populate('sportGroup', 'name')
             .lean();
 
@@ -685,7 +686,7 @@ export const getCoachBranches = async (req, res, next) => {
             .sort({ branchOrder: 1 })
             .populate({
                 path: 'sport',
-                select: 'name groupName',
+                select: 'name groupName icon',
             })
             .lean();
 
@@ -694,6 +695,7 @@ export const getCoachBranches = async (req, res, next) => {
             sportName: branch.sport?.name,
             sportGroup: branch.sport?.groupName,
             sport: branch.sport?._id,
+            sportIcon: branch.sport?.icon,
         }));
 
         const coach = await Coach.findById(user.coach._id);

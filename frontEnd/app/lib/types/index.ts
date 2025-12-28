@@ -193,6 +193,12 @@ export interface CoachDetails {
       _id: string;
       name: string;
       groupName: string;
+      icon?: {
+        path: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+      };
     };
     branchOrder: number;
     level: number;

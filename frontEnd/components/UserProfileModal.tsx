@@ -241,7 +241,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const getImageUrl = (path: string) => {
-    return `${EP.API_ASSETS_BASE}/${path}`.replace(/\\/g, "/");
+    if (!path) return "";
+    // Use API_ASSETS_BASE with the path from database
+    // If path starts with /, use it directly, otherwise add /
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
   };
 
   const isOwnerOrCreator = (resource: any, type: "club" | "group") => {
@@ -491,10 +495,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               key={branch._id}
                               className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/30 rounded-lg"
                             >
-                              {branch.certificate ? (
+                              {branch.sport.icon?.path ? (
                                 <img
-                                  src={`${EP.API_ASSETS_BASE}${branch.certificate.path}`}
-                                  alt="Branch Certificate"
+                                  src={getImageUrl(branch.sport.icon.path)}
+                                  alt={branch.sport.name}
                                   className="w-12 h-12 object-cover rounded-lg border dark:border-gray-600"
                                 />
                               ) : (

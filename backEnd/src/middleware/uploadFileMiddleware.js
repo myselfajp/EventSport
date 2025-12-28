@@ -1,5 +1,5 @@
 import { AppError } from '../utils/appError.js';
-import { createMulter, createIconMulter } from '../utils/multerConfig.js';
+import { createMulter } from '../utils/multerConfig.js';
 const uploadTimeout = 30000;
 
 export const uploadFile = (options) => {
@@ -78,49 +78,3 @@ export const uploadFile = (options) => {
     };
 };
 
-export const uploadIcon = (options) => {
-    const { fieldName, optional = false } = options;
-
-    const upload = createIconMulter();
-    const handler = upload.single(fieldName);
-
-    return (req, res, next) => {
-        console.log('uploadIcon middleware - URL:', req.url);
-        console.log('uploadIcon middleware - Method:', req.method);
-        console.log('uploadIcon middleware - fieldName:', fieldName);
-        
-        if (!req.user) {
-            console.log('uploadIcon middleware - No user found');
-            throw new AppError(401);
-        }
-
-        const timeoutId = setTimeout(() => {
-            next(new AppError(408, 'File upload timeout'));
-        }, uploadTimeout);
-
-        handler(req, res, (err) => {
-            clearTimeout(timeoutId);
-
-            if (err) {
-                console.log('uploadIcon middleware - Error:', err);
-                return next(err);
-            }
-
-            console.log('uploadIcon middleware - req.file:', req.file);
-            console.log('uploadIcon middleware - req.body:', req.body);
-
-            if (!optional && !req.file) {
-                console.log('uploadIcon middleware - No file provided and not optional');
-                return next(new AppError(400, 'No file provided'));
-            }
-
-            if (req.file) {
-                const { path, originalname, mimetype, size } = req.file;
-                req.fileMeta = { path, originalName: originalname, mimeType: mimetype, size };
-                console.log('uploadIcon middleware - req.fileMeta:', req.fileMeta);
-            }
-
-            next();
-        });
-    };
-};
