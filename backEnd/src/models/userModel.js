@@ -68,24 +68,6 @@ const userSchema = new mongoose.Schema(
             type: Number,
             default: 1,
         },
-        refreshTokens: [
-            {
-                token: {
-                    type: String,
-                    required: true,
-                },
-                createdAt: {
-                    type: Date,
-                    default: Date.now,
-                },
-                deviceInfo: {
-                    type: String,
-                },
-                ipAddress: {
-                    type: String,
-                },
-            },
-        ],
         failedLoginAttempts: {
             type: Number,
             default: 0,
@@ -100,28 +82,6 @@ const userSchema = new mongoose.Schema(
         lastLoginIp: {
             type: String,
         },
-        activityLog: [
-            {
-                action: {
-                    type: String,
-                    required: true,
-                },
-                ipAddress: {
-                    type: String,
-                },
-                userAgent: {
-                    type: String,
-                },
-                timestamp: {
-                    type: Date,
-                    default: Date.now,
-                },
-                success: {
-                    type: Boolean,
-                    default: true,
-                },
-            },
-        ],
     },
     { timestamps: true }
 );

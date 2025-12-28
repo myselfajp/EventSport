@@ -45,7 +45,7 @@ export const getAllUsers = async (req, res, next) => {
         }
 
         const users = await User.find(query)
-            .select('-password -refreshTokens -activityLog -failedLoginAttempts -accountLockedUntil')
+            .select('-password -failedLoginAttempts -accountLockedUntil')
             .populate('participant', 'name mainSport skillLevel')
             .populate('coach', 'name isVerified')
             .skip((pageNumber - 1) * perPage)
@@ -143,7 +143,7 @@ export const updateUser = async (req, res, next) => {
         }
 
         const updatedUser = await User.findByIdAndUpdate(userId, result, { new: true })
-            .select('-password -refreshTokens -activityLog -failedLoginAttempts -accountLockedUntil');
+            .select('-password -failedLoginAttempts -accountLockedUntil');
 
         if (!updatedUser) {
             throw new AppError(404, 'User not found');
