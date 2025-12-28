@@ -10,8 +10,7 @@ import {
     editUserSchema,
 } from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
-import { generateTokens, revokeRefreshToken } from '../utils/jwtHelper.js';
-import { refreshAccessToken, sendTokens } from '../utils/jwtHelper.js';
+import { generateTokens, sendTokens } from '../utils/jwtHelper.js';
 import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '../middleware/accountLockout.js';
 import { logActivity } from '../utils/activityLogger.js';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
@@ -57,7 +56,7 @@ export const signUp = async (req, res, next) => {
 
         const { password: pass, ...userWithoutPassword } = user.toObject();
 
-        const tokens = await generateTokens(user.id, ipAddress, userAgent);
+        const tokens = await generateTokens(user.id);
 
         sendTokens(res, tokens);
 
@@ -104,7 +103,7 @@ export const signIn = async (req, res, next) => {
 
         const { password, ...user } = getUser.toObject();
 
-        const tokens = await generateTokens(user._id, ipAddress, userAgent);
+        const tokens = await generateTokens(user._id);
 
         sendTokens(res, tokens);
 
@@ -120,21 +119,10 @@ export const signIn = async (req, res, next) => {
 
 export const signOut = async (req, res, next) => {
     try {
-        if (!req.user || !req.cookies.refresh_token) {
+        if (!req.user) {
             throw new AppError(403);
         }
 
-        await revokeRefreshToken(req.user._id, req.cookies.refresh_token);
-        const clearCookieOptions = {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-        };
-        const cookieDomain = process.env.COOKIE_DOMAIN;
-        if (cookieDomain && !cookieDomain.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-            clearCookieOptions.domain = cookieDomain;
-        }
-        res.clearCookie('refresh_token', clearCookieOptions);
         res.status(200).json({ message: 'Logged out successfully' });
     } catch (err) {
         next(err);
@@ -307,7 +295,6 @@ export const editUser = async (req, res, next) => {
             }
 
             result.password = await argon2.hash(result.newPassword);
-            result.$unset = { refreshToken: 1 };
             PasswordChanged = true;
             delete result.oldPassword;
             delete result.newPassword;
@@ -330,13 +317,6 @@ export const editUser = async (req, res, next) => {
         }
 
         if (PasswordChanged) {
-            await User.findByIdAndUpdate(req.user._id, { $set: { refreshTokens: [] } });
-            res.clearCookie('refresh_token', {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                domain: process.env.COOKIE_DOMAIN,
-            });
             await logActivity(req.user._id, 'PASSWORD_CHANGED', req, true);
         }
         res.status(200).json({
@@ -349,70 +329,3 @@ export const editUser = async (req, res, next) => {
     }
 };
 
-export const editUserPhoto = async (req, res, next) => {
-    try {
-        if (!req.user) throw new AppError(401);
-
-        if (!req.fileMeta) {
-            throw new AppError(400, 'No photo provided');
-        }
-
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user._id,
-            {
-                photo: {
-                    path: req.fileMeta.path,
-                    originalName: req.fileMeta.originalName,
-                    mimeType: req.fileMeta.mimeType,
-                    size: req.fileMeta.size,
-                },
-            },
-            { new: true }
-        );
-
-        if (!updatedUser) throw new AppError(404);
-
-        res.status(200).json({
-            success: true,
-            message: 'Photo updated successfully',
-            data: updatedUser,
-        });
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const refreshToken = async (req, res, next) => {
-    try {
-        const accessToken = req.headers.authorization?.split(' ')[1];
-        const refreshToken = req.cookies.refresh_token;
-
-        if (!accessToken || !refreshToken) {
-            throw new AppError(401, 'Access token and refresh token are required');
-        }
-
-        try {
-            const tokens = await refreshAccessToken(accessToken, refreshToken, req);
-
-            if (tokens.tokensPair === 'both') {
-                sendTokens(res, tokens, { setAccessHeader: false });
-            }
-
-            res.set('Authorization', `Bearer ${tokens.accessToken}`);
-            res.status(201).json({
-                success: true,
-            });
-        } catch (refreshErr) {
-            // Refresh failed, clear cookies
-            res.clearCookie('refresh_token', {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                domain: process.env.COOKIE_DOMAIN,
-            });
-            next(refreshErr);
-        }
-    } catch (err) {
-        next(err);
-    }
-};

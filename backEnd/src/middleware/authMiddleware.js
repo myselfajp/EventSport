@@ -12,7 +12,6 @@ export const authMiddleware = async (req, res, next) => {
         }
 
         try {
-            // Try to verify access token first
             const decoded = verifyAccessToken(accessToken);
             const user = await User.findById(decoded.userId);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { EP } from "./endpoints";
-import { apiFetch, tryRefreshToken, extractTokenFromResponse } from "./api";
+import { apiFetch, extractTokenFromResponse } from "./api";
 import { tokenStore } from "./token-store";
 
 export type User = any;
@@ -15,20 +15,6 @@ export async function getMe(): Promise<User | null> {
     tokenStore.set(token);
   }
   
-  if (res.status === 401) {
-    const ok = await tryRefreshToken();
-    if (!ok) return null;
-    const retry = await apiFetch(EP.AUTH.me, { method: "GET" });
-    
-    const retryToken = extractTokenFromResponse(retry);
-    if (retryToken) {
-      tokenStore.set(retryToken);
-    }
-    
-    if (!retry.ok) return null;
-    const rb = await retry.json().catch(() => ({}));
-    return rb?.data ?? null;
-  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body?.success === false) return null;
   return body?.data ?? null;
