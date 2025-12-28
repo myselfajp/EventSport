@@ -172,4 +172,12 @@ export const EP = {
   },
   EVENT_STYLE: { getEventStyle: `${API_V1_BASE}/get-event-style` },
   EVENTS: { getEvents: `${API_V1_BASE}/get-event` },
+  NOTIFICATIONS: {
+    getAll: `${API_V1_BASE}/notifications`,
+    getUnreadCount: `${API_V1_BASE}/notifications/unread-count`,
+    markAsRead: (notificationId: string) => `${API_V1_BASE}/notifications/${notificationId}/read`,
+    markAllAsRead: `${API_V1_BASE}/notifications/read-all`,
+    delete: (notificationId: string) => `${API_V1_BASE}/notifications/${notificationId}`,
+    create: `${API_V1_BASE}/notifications/create`, // Admin only
+  },
 };
