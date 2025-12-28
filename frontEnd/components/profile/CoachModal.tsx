@@ -768,20 +768,29 @@ const CoachModal: React.FC<CoachModalProps> = ({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Level (1-10) <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={branch.level}
-                          onChange={(e) => {
-                            const value = Number(e.target.value);
-                            if (value >= 1 && value <= 10) {
-                              updateBranch(index, "level", value);
-                            }
-                          }}
-                          className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-600 dark:text-white"
-                          disabled={loading || initializing}
-                        />
+                        <div className="space-y-2">
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={branch.level}
+                            onChange={(e) => {
+                              const value = Number(e.target.value);
+                              if (value >= 1 && value <= 10) {
+                                updateBranch(index, "level", value);
+                              }
+                            }}
+                            className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={loading || initializing}
+                          />
+                          <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                            <span>Beginner (1)</span>
+                            <span className="font-medium text-cyan-600 dark:text-cyan-400">
+                              Level {branch.level}
+                            </span>
+                            <span>Pro (10)</span>
+                          </div>
+                        </div>
                       </div>
 
                       <div>
