@@ -8,6 +8,7 @@ import facilityRouter from './routes/facilityRouter.js';
 import companyRouter from './routes/companyRouter.js';
 import getDataRouter from './routes/getDataRouter.js';
 import adminRouter from './routes/adminRouter.js';
+import notificationRouter from './routes/notificationRouter.js';
 import { authMiddleware } from './middleware/authMiddleware.js';
 import { adminMiddleware } from './middleware/adminMiddleware.js';
 import globalErrorHandler from './middleware/errorHandler.js';
@@ -87,6 +88,7 @@ app.use('/api/v1/coach', authMiddleware, coachRouter);
 app.use('/api/v1/facility', authMiddleware, facilityRouter);
 app.use('/api/v1/company', authMiddleware, companyRouter);
 app.use('/api/v1/admin', validateCSRFToken, authMiddleware, adminMiddleware, adminRouter);
+app.use('/api/v1/notifications', authMiddleware, notificationRouter);
 app.use('/api/v1', getDataRouter);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

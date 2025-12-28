@@ -16,6 +16,7 @@ import { SearchQuerySchema, mongoObjectId, signupSchema, editUserSchema } from '
 import * as zodValidation from '../utils/validation.js';
 import argon2 from 'argon2';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
+import { notifyCertificateApproved, notifyCertificateRejected } from '../utils/notificationHelper.js';
 
 export const getAdminPanel = async (req, res, next) => {
     try {
@@ -350,7 +351,9 @@ export const approveCertificate = async (req, res, next) => {
             branchId,
             { status: 'Approved' },
             { new: true }
-        ).populate('coach');
+        )
+            .populate('coach')
+            .populate('sport', 'name');
 
         if (!branch) {
             throw new AppError(404, 'Branch not found');
@@ -363,6 +366,22 @@ export const approveCertificate = async (req, res, next) => {
                 const allApproved = allBranches.every((b) => b.status === 'Approved');
                 if (allApproved) {
                     await Coach.findByIdAndUpdate(coach._id, { isVerified: true });
+                }
+            }
+
+            // Find user who owns this coach
+            const user = await User.findOne({ coach: branch.coach._id });
+            if (user) {
+                try {
+                    await notifyCertificateApproved(
+                        user._id,
+                        branch._id,
+                        branch.sport?.name || 'Unknown Sport',
+                        branch.level
+                    );
+                } catch (notifErr) {
+                    console.error('Failed to create notification:', notifErr);
+                    // Don't fail the request if notification fails
                 }
             }
         }
@@ -385,10 +404,28 @@ export const rejectCertificate = async (req, res, next) => {
             branchId,
             { status: 'Rejected' },
             { new: true }
-        );
+        )
+            .populate('coach')
+            .populate('sport', 'name');
 
         if (!branch) {
             throw new AppError(404, 'Branch not found');
+        }
+
+        // Find user who owns this coach
+        const user = await User.findOne({ coach: branch.coach._id });
+        if (user) {
+            try {
+                await notifyCertificateRejected(
+                    user._id,
+                    branch._id,
+                    branch.sport?.name || 'Unknown Sport',
+                    branch.level
+                );
+            } catch (notifErr) {
+                console.error('Failed to create notification:', notifErr);
+                // Don't fail the request if notification fails
+            }
         }
 
         res.status(200).json({
