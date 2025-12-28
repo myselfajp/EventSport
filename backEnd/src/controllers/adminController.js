@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { unlink } from 'fs/promises';
 import User from '../models/userModel.js';
 import Coach from '../models/coachModel.js';
 import Branch from '../models/branchModel.js';
@@ -9,8 +10,10 @@ import Facility from '../models/facilityModel.js';
 import Salon from '../models/salonModel.js';
 import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
+import { Sport } from '../models/referenceDataModel.js';
 import { AppError } from '../utils/appError.js';
 import { SearchQuerySchema, mongoObjectId, signupSchema, editUserSchema } from '../utils/validation.js';
+import * as zodValidation from '../utils/validation.js';
 import argon2 from 'argon2';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 
@@ -607,6 +610,285 @@ export const getClubDetails = async (req, res, next) => {
                 clubs: clubsWithGroups,
                 totalGroups: groups.length,
             },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getCoachBranches = async (req, res, next) => {
+    try {
+        const userId = mongoObjectId.parse(req.params.userId);
+        const user = await User.findById(userId).populate('coach');
+
+        if (!user || !user.coach) {
+            throw new AppError(404, 'User or coach profile not found');
+        }
+
+        const branches = await Branch.find({ coach: user.coach._id })
+            .sort({ branchOrder: 1 })
+            .populate({
+                path: 'sport',
+                select: 'name groupName',
+            })
+            .lean();
+
+        const result = branches.map((branch) => ({
+            ...branch,
+            sportName: branch.sport?.name,
+            sportGroup: branch.sport?.groupName,
+            sport: branch.sport?._id,
+        }));
+
+        const coach = await Coach.findById(user.coach._id);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                branches: result,
+                about: coach?.about || '',
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateCoachProfile = async (req, res, next) => {
+    try {
+        const userId = mongoObjectId.parse(req.params.userId);
+        const user = await User.findById(userId).populate('coach');
+
+        if (!user || !user.coach) {
+            throw new AppError(404, 'User or coach profile not found');
+        }
+
+        const data = JSON.parse(req.body.data);
+        const result = zodValidation.createCoachSchema.parse(data);
+
+        const branchesNeedingPhotos = result.filter((branch) => !branch.certificate);
+
+        if (branchesNeedingPhotos.length > 0 && !req.fileMeta) {
+            throw new AppError(400, 'No certificates uploaded for branches requiring photos');
+        }
+
+        if (branchesNeedingPhotos.length !== (req.fileMeta?.length || 0)) {
+            throw new AppError(
+                400,
+                'Number of uploaded photos and branches requiring photos do not match'
+            );
+        }
+
+        const coachId = user.coach._id;
+
+        const processedBranches = await Promise.all(
+            result.map(async (branchData) => {
+                const sportExists = await Sport.findById(branchData.sport);
+                if (!sportExists) throw new AppError(404, `Sport not found: ${branchData.sport}`);
+
+                let certificate;
+
+                if (!branchData.certificate) {
+                    const file = req.fileMeta.find((f) => {
+                        const match = f.originalName.match(/sportId=([0-9a-f]{24})/i);
+                        return (
+                            match &&
+                            String(match[1]).toLowerCase() ===
+                            String(branchData.sport).toLowerCase()
+                        );
+                    });
+
+                    if (!file) {
+                        throw new AppError(
+                            400,
+                            `No certificate uploaded for sport ${branchData.sport}`
+                        );
+                    }
+
+                    certificate = file;
+                } else {
+                    if (!branchData.certificate.originalName) {
+                        throw new AppError(
+                            400,
+                            `Certificate originalName required for sport ${branchData.sport}`
+                        );
+                    }
+
+                    const match =
+                        branchData.certificate.originalName.match(/sportId=([0-9a-f]{24})/i);
+                    if (
+                        !match ||
+                        String(match[1]).toLowerCase() !== String(branchData.sport).toLowerCase()
+                    ) {
+                        throw new AppError(
+                            400,
+                            `Certificate originalName does not match sport ID for sport ${branchData.sport}`
+                        );
+                    }
+
+                    certificate = branchData.certificate;
+                }
+
+                return { ...branchData, certificate };
+            })
+        );
+
+        const existingBranches = await Branch.find({ coach: coachId });
+
+        const sportsNeedingNewPhotos = branchesNeedingPhotos.map((b) => b.sport);
+        for (const branch of existingBranches) {
+            if (
+                sportsNeedingNewPhotos.includes(branch.sport.toString()) &&
+                branch.certificate?.path
+            ) {
+                try {
+                    await unlink(branch.certificate.path);
+                } catch (err) {
+                    console.warn(`Failed to delete old certificate file: ${branch.certificate.path}`, err);
+                }
+            }
+        }
+
+        await Branch.deleteMany({ coach: coachId });
+
+        const newBranches = await Branch.insertMany(
+            processedBranches.map((branch) => ({ coach: coachId, ...branch }))
+        );
+
+        if (req.body.about !== undefined) {
+            await Coach.findByIdAndUpdate(coachId, { about: req.body.about });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Coach profile updated successfully',
+            data: newBranches,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getParticipantProfile = async (req, res, next) => {
+    try {
+        const userId = mongoObjectId.parse(req.params.userId);
+        const user = await User.findById(userId).populate({
+            path: 'participant',
+            populate: [
+                {
+                    path: 'mainSport',
+                    select: 'name groupName group',
+                },
+                {
+                    path: 'sportGoal',
+                    select: 'name',
+                },
+            ],
+        });
+
+        if (!user || !user.participant) {
+            throw new AppError(404, 'User or participant profile not found');
+        }
+
+        const participant = user.participant;
+        const mainSport = participant.mainSport;
+        const sportGoal = participant.sportGoal;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                participant: {
+                    _id: participant._id,
+                    mainSport: mainSport?._id || mainSport,
+                    mainSportName: mainSport?.name || '',
+                    mainSportGroup: mainSport?.group || '',
+                    mainSportGroupName: mainSport?.groupName || '',
+                    skillLevel: participant.skillLevel,
+                    sportGoal: sportGoal?._id || participant.sportGoal,
+                    sportGoalName: sportGoal?.name || '',
+                },
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateParticipantProfile = async (req, res, next) => {
+    try {
+        const userId = mongoObjectId.parse(req.params.userId);
+        const user = await User.findById(userId).populate('participant');
+
+        if (!user || !user.participant) {
+            throw new AppError(404, 'User or participant profile not found');
+        }
+
+        const result = zodValidation.editParticipantSchema.parse({
+            mainSport: req.body?.mainSport,
+            skillLevel: req.body?.skillLevel,
+            sportGoal: req.body?.sportGoal,
+        });
+
+        const editParticipant = await Participant.findByIdAndUpdate(
+            user.participant._id,
+            { ...result },
+            { new: true }
+        );
+
+        if (!editParticipant) throw new AppError(404);
+
+        res.status(200).json({
+            success: true,
+            message: 'Participant profile updated successfully',
+            data: editParticipant,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateFacilityProfile = async (req, res, next) => {
+    try {
+        const userId = mongoObjectId.parse(req.params.userId);
+        const facilityId = mongoObjectId.parse(req.params.facilityId);
+        const user = await User.findById(userId);
+
+        if (!user || !user.facility || !user.facility.some((f) => f.equals(facilityId))) {
+            throw new AppError(404, 'User or facility not found');
+        }
+
+        const result = zodValidation.editFacilitySchema.parse(req.body);
+        if (Object.keys(result).length === 0 && !req.fileMeta) {
+            throw new AppError(400, 'At least one field must be provided.');
+        }
+
+        const facilityExists = await Facility.exists({ _id: facilityId });
+        if (!facilityExists) throw new AppError(404, 'Facility not found');
+
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+
+        if (req.fileMeta) {
+            result.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
+
+        const updatedFacility = await Facility.findByIdAndUpdate(
+            facilityId,
+            { $set: result },
+            { new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Facility updated successfully',
+            data: updatedFacility,
         });
     } catch (err) {
         next(err);

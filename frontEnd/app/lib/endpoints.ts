@@ -48,6 +48,11 @@ export const EP = {
       participantDetails: (userId: string) => `${ADMIN_API}/users/${userId}/participant-details`,
       facilityDetails: (userId: string) => `${ADMIN_API}/users/${userId}/facility-details`,
       clubDetails: (userId: string) => `${ADMIN_API}/users/${userId}/club-details`,
+      getCoachBranches: (userId: string) => `${ADMIN_API}/users/${userId}/coach-branches`,
+      getParticipantProfile: (userId: string) => `${ADMIN_API}/users/${userId}/participant-profile`,
+      updateCoachProfile: (userId: string) => `${ADMIN_API}/users/${userId}/coach-profile`,
+      updateParticipantProfile: (userId: string) => `${ADMIN_API}/users/${userId}/participant-profile`,
+      updateFacilityProfile: (userId: string, facilityId: string) => `${ADMIN_API}/users/${userId}/facility/${facilityId}`,
     },
     coaches: {
       pending: `${ADMIN_API}/coaches/pending`,
