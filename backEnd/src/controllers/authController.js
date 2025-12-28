@@ -12,7 +12,6 @@ import {
 import { AppError } from '../utils/appError.js';
 import { generateTokens, sendTokens } from '../utils/jwtHelper.js';
 import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '../middleware/accountLockout.js';
-import { logActivity } from '../utils/activityLogger.js';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 
 export const signUp = async (req, res, next) => {
@@ -51,8 +50,6 @@ export const signUp = async (req, res, next) => {
             ...userData,
             password: hashedPassword,
         });
-
-        await logActivity(user._id, 'SIGNUP_SUCCESS', req, true);
 
         const { password: pass, ...userWithoutPassword } = user.toObject();
 
@@ -93,13 +90,11 @@ export const signIn = async (req, res, next) => {
         if (!getUser || !(await argon2.verify(getUser.password, result.password))) {
             if (getUser) {
                 await handleFailedLogin(getUser);
-                await logActivity(getUser._id, 'LOGIN_FAILED', req, false);
             }
             throw new AppError(401, 'Invalid email or password');
         }
 
         await handleSuccessfulLogin(getUser, ipAddress);
-        await logActivity(getUser._id, 'LOGIN_SUCCESS', req, true);
 
         const { password, ...user } = getUser.toObject();
 
@@ -216,8 +211,6 @@ export const getUser = async (req, res, next) => {
             $project: {
                 password: 0,
                 role: 0,
-                refreshTokens: 0,
-                activityLog: 0,
                 failedLoginAttempts: 0,
                 accountLockedUntil: 0,
             },
@@ -317,7 +310,6 @@ export const editUser = async (req, res, next) => {
         }
 
         if (PasswordChanged) {
-            await logActivity(req.user._id, 'PASSWORD_CHANGED', req, true);
         }
         res.status(200).json({
             success: true,
