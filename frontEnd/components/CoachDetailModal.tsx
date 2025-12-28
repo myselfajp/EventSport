@@ -65,6 +65,12 @@ interface CoachResponseData {
       _id: string;
       name: string;
       groupName: string;
+      icon?: {
+        path: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+      };
     };
     branchOrder: number;
     level: number;
@@ -139,7 +145,10 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
 
   const getImageUrl = (path?: string) => {
     if (!path) return null;
-    return `${EP.API_ASSETS_BASE}/${path}`.replace(/\\/g, "/");
+    // Use API_ASSETS_BASE with the path from database
+    // If path starts with /, use it directly, otherwise add /
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
   };
 
   const calculateAge = (dateString?: string) => {
@@ -326,6 +335,15 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                         key={item._id}
                         className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
                       >
+                        {item.sport.icon?.path && (
+                          <div className="mb-3">
+                            <img
+                              src={getImageUrl(item.sport.icon.path)!}
+                              alt={item.sport.name}
+                              className="w-full h-32 object-cover rounded-lg"
+                            />
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mb-3">
                           <span className="font-semibold text-gray-900 dark:text-white">
                             {item.sport.name}

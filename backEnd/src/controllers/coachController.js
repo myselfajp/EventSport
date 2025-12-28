@@ -186,7 +186,7 @@ export const currentBranches = async (req, res, next) => {
             .sort({ branchOrder: 1 })
             .populate({
                 path: 'sport',
-                select: 'name groupName', // only bring back the needed fields
+                select: 'name groupName icon', // only bring back the needed fields
             })
             .lean();
         if (!branches) throw new AppError(404, 'This branch does not exist');
@@ -1034,7 +1034,7 @@ export const getCoachDetails = async (req, res, next) => {
         const clubGroup = await ClubGroup.find({ owner: coachId });
         const branch = await Branch.find({ coach: coachId }).populate({
             path: 'sport',
-            select: 'name groupName',
+            select: 'name groupName icon',
         });
         const event = await Event.find({
             $or: [{ owner: user._id }, { backupCoach: user._id }],

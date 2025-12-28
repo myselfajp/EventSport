@@ -1,6 +1,6 @@
 import express from 'express';
 import * as referenceDataController from '../controllers/referenceDataController.js';
-import { uploadIcon } from '../middleware/uploadFileMiddleware.js';
+import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 const router = express.Router();
 // sportGoal
 router.post('/create-sport-goal/', referenceDataController.createSportGoal);
@@ -12,12 +12,12 @@ router.post('/get-sport-group/', referenceDataController.getSportGroup);
 router.put('/update-sport-group/:sportGroupId', referenceDataController.updateSportGroup);
 router.delete('/delete-sport-group/:sportGroupId', referenceDataController.deleteSportGroup);
 // sport
-router.post('/create-sport/:sportGroupId', uploadIcon({ fieldName: 'icon', optional: true }), referenceDataController.createSport);
+router.post('/create-sport/:sportGroupId', uploadFile({ fieldName: 'icon', optional: true }), referenceDataController.createSport);
 router.put('/update-sport/:sportId', (req, res, next) => {
     console.log('Route matched - update-sport');
     console.log('Route params:', req.params);
     next();
-}, uploadIcon({ fieldName: 'icon', optional: true }), referenceDataController.updateSport);
+}, uploadFile({ fieldName: 'icon', optional: true }), referenceDataController.updateSport);
 router.post('/get-sport/', referenceDataController.getSport);
 router.delete('/delete-sport/:sportId', referenceDataController.deleteSport);
 // eventStyle

@@ -20,14 +20,10 @@ interface Sport {
 
 const getImageUrl = (path: string) => {
   if (!path) return "";
-  // Convert path like "frontEnd/public/gog-icons/car.png" to "/gog-icons/car.png"
-  const normalizedPath = path.replace(/^.*\/public\//, "/").replace(/\\/g, "/");
-  // If path already starts with /gog-icons/, use it directly
-  if (normalizedPath.startsWith("/gog-icons/")) {
-    return normalizedPath;
-  }
-  // Otherwise use API_ASSETS_BASE
-  return `${EP.API_ASSETS_BASE}/${path}`.replace(/\\/g, "/");
+  // Use API_ASSETS_BASE with the path from database
+  // If path starts with /, use it directly, otherwise add /
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
 };
 
 interface SportsBannerProps {
