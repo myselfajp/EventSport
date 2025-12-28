@@ -673,14 +673,14 @@ export default function UsersManagement() {
                     <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Coach Profile</h4>
                     <div className="space-y-2 text-sm">
                       <p>
-                        <span className="font-medium">Certificates:</span> {detailsData.coach.certificateCount}
+                        <span className="font-medium">Approved Certificates:</span> {detailsData.coach.certificateCount}
                       </p>
                       <p>
                         <span className="font-medium">Events Created (until today):</span> {detailsData.coach.eventsCount}
                       </p>
                       {detailsData.coach.sports && detailsData.coach.sports.length > 0 && (
                         <div>
-                          <span className="font-medium">Sports:</span>
+                          <span className="font-medium">Approved Sports:</span>
                           <ul className="list-disc list-inside ml-2 mt-1">
                             {detailsData.coach.sports.map((sport: any) => (
                               <li key={sport._id}>
@@ -688,6 +688,60 @@ export default function UsersManagement() {
                               </li>
                             ))}
                           </ul>
+                        </div>
+                      )}
+                      {detailsData.coach.branches && detailsData.coach.branches.length > 0 && (
+                        <div className="mt-4">
+                          <span className="font-medium">All Certificates:</span>
+                          <div className="mt-2 space-y-2">
+                            {detailsData.coach.branches.map((branch: any) => {
+                              const getStatusColor = (status: string) => {
+                                switch (status) {
+                                  case 'Approved':
+                                    return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+                                  case 'Rejected':
+                                    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+                                  case 'Pending':
+                                    return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+                                  default:
+                                    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+                                }
+                              };
+
+                              return (
+                                <div
+                                  key={branch._id}
+                                  className="border border-gray-200 dark:border-slate-600 rounded-lg p-3 bg-gray-50 dark:bg-slate-700"
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="font-medium">
+                                        {branch.sport.name} ({branch.sport.groupName})
+                                      </div>
+                                      <div className="text-xs text-gray-600 dark:text-slate-400 mt-1">
+                                        Level: {branch.level} | Order: {branch.branchOrder}
+                                      </div>
+                                      {branch.certificate && (
+                                        <a
+                                          href={`${EP.API_ASSETS_BASE}${branch.certificate.path.startsWith('/') ? branch.certificate.path : `/${branch.certificate.path}`}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-cyan-600 hover:underline mt-1 inline-block"
+                                        >
+                                          View Certificate
+                                        </a>
+                                      )}
+                                    </div>
+                                    <span
+                                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(branch.status)}`}
+                                    >
+                                      {branch.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
