@@ -516,7 +516,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyan-100 to-cyan-200 dark:from-cyan-900 dark:to-cyan-800">
                               <div className="text-center">
                                 <User className="w-12 h-12 text-cyan-500 dark:text-cyan-400 mx-auto mb-2" />
-                                <div className="text-xs font-medium text-cyan-700 dark:text-cyan-300">Group</div>
+                                <div className="text-xs font-medium text-cyan-700 dark:text-cyan-300">Sport Community</div>
                               </div>
                             </div>
                           )}
@@ -542,7 +542,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 italic">
-                    No groups found.
+                    No sport communities found.
                   </div>
                 )}
               </div>

@@ -594,7 +594,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         <div className="mb-6">
                           <h5 className="text-md font-medium text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                             <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            Owned Club Groups ({coachDetails.clubGroup.length})
+                            Owned Sport Communities ({coachDetails.clubGroup.length})
                           </h5>
                           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {coachDetails.clubGroup.map((group) => (

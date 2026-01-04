@@ -163,7 +163,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
 
     if (!initialData) {
       if (!formData.club) newErrors.club = "Club is required";
-      if (!formData.name) newErrors.name = "Group Name is required";
+      if (!formData.name) newErrors.name = "Sport Community Name is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -236,7 +236,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            {initialData ? "Edit Group" : "Add Group"}
+            {initialData ? "Edit Sport Community" : "Add Sport Community"}
           </h2>
           <button
             onClick={handleClose}
@@ -257,7 +257,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
                 Success!
               </h3>
               <p className="text-gray-500 dark:text-gray-400">
-                Group saved successfully.
+                Sport community saved successfully.
               </p>
             </div>
           ) : (
@@ -314,13 +314,13 @@ const GroupModal: React.FC<GroupModalProps> = ({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Group Name {!initialData && <span className="text-red-500">*</span>}
+                      Sport Community Name {!initialData && <span className="text-red-500">*</span>}
                     </label>
                     <input
                       type="text"
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
-                      placeholder="Enter group name"
+                      placeholder="Enter sport community name"
                       className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
                         errors.name ? "border-red-300 focus:ring-red-200 dark:border-red-500" : "border-gray-200 dark:border-gray-600 focus:ring-cyan-500"
                       }`}
@@ -336,7 +336,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
                     <textarea
                       value={formData.description}
                       onChange={(e) => handleInputChange("description", e.target.value)}
-                      placeholder="Enter group description"
+                      placeholder="Enter sport community description"
                       rows={5}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                       disabled={isLoading}
@@ -347,7 +347,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
                 {/* Right Column - Photo */}
                 <div className="flex flex-col">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Group Photo
+                    Sport Community Photo
                   </label>
                   <div className="flex-1 flex items-center justify-center">
                     <div className="w-full">
@@ -356,7 +356,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
                           <div className="flex flex-col items-center space-y-3">
                             <img
                               src={photoPreview}
-                              alt="Group preview"
+                              alt="Sport community preview"
                               className="h-48 w-full object-cover rounded-lg"
                             />
                           </div>
