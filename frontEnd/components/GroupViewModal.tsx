@@ -48,7 +48,7 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-700">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Group Details</h2>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Sport Community Details</h2>
             {group.isApproved && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/50 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800">
                 <Users className="w-3.5 h-3.5" />
@@ -66,7 +66,7 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Group Photo */}
+          {/* Sport Community Photo */}
           {group.photo?.path && (
             <div className="flex justify-center">
               <img
@@ -81,7 +81,7 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                Group Name
+                Sport Community Name
               </label>
               <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200">
                 {group.name}

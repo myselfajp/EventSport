@@ -236,7 +236,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Group
+                  Sport Community
                 </label>
                 <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
                   {event.group?.name || "-"}

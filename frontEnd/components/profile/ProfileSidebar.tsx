@@ -1116,11 +1116,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     </div>
                     <div>
                       <div className="font-medium text-gray-800 dark:text-white text-sm">
-                        My Groups
+                        My Sport Communities
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {myGroups.length}{" "}
-                        {myGroups.length === 1 ? "group" : "groups"}
+                        {myGroups.length === 1 ? "sport community" : "sport communities"}
                       </div>
                     </div>
                   </div>
@@ -1670,7 +1670,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                My Groups
+                My Sport Communities
               </h2>
               <div className="flex items-center gap-2">
                 <button
@@ -1678,7 +1678,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   <Layers className="w-4 h-4" />
-                  <span>Add Group</span>
+                  <span>Add Sport Community</span>
                 </button>
                 <button
                   onClick={() => setIsGroupsListOpen(false)}
@@ -1694,9 +1694,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               {myGroups.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Layers className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                  <p className="text-sm mb-2">No groups yet</p>
+                  <p className="text-sm mb-2">No sport communities yet</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    You haven't created any groups
+                    You haven't created any sport communities
                   </p>
                 </div>
               ) : (

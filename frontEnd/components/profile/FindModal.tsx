@@ -1652,7 +1652,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                             </div>
                             <div className="flex gap-1 mt-1">
                               <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 text-xs rounded-full">
-                                Group
+                                Sport Community
                               </span>
                               {group.isApproved && (
                                 <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 text-xs rounded-full">

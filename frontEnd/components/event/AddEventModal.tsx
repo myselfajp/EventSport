@@ -740,7 +740,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 <div className="relative dropdown-container">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Group <span className="text-red-500">*</span>
+                    Sport Community <span className="text-red-500">*</span>
                   </label>
                   <button
                     type="button"
@@ -756,7 +756,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       {loadingGroups
                         ? "Loading..."
                         : getSelectedName(formData.group, groups) ||
-                          "Select group"}
+                          "Select sport community"}
                     </span>
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
