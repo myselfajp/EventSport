@@ -33,5 +33,6 @@ router.post(
     participantController.endPhoto
 );
 router.get('/get-by-detail/:participantId', participantController.getParticipantDetails);
+router.get('/follows', participantController.getFollows);
 
 export default router;

@@ -52,7 +52,7 @@ router.delete('/delete-group/:groupId', coachController.deleteGroup);
 
 // club
 router.post(
-    '/create-club/',
+    '/create-club',
     uploadFile({ fieldName: 'club-photo', optional: true }),
     coachController.createClub
 );

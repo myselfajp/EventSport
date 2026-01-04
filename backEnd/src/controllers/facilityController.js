@@ -13,16 +13,20 @@ export const createFacility = async (req, res, next) => {
         }
 
         const user = req.user;
-        const result = zodValidation.createFacilitySchema.parse(req.body);
+        const data = JSON.parse(req.body.data);
+        const result = zodValidation.createFacilitySchema.parse(data);
         const sportExists = await Sport.exists({ _id: result.mainSport });
         if (!sportExists) throw new AppError(404, 'MainSport not found');
 
-        result.photo = {
-            path: req.fileMeta.path,
-            originalName: req.fileMeta.originalName,
-            mimeType: req.fileMeta.mimeType,
-            size: req.fileMeta.size,
-        };
+        if (req.fileMeta) {
+            result.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
+
         const newFacility = await Facility.create({ ...result });
 
         // Add facility to user's facility array

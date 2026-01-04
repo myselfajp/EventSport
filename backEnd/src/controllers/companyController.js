@@ -13,12 +13,14 @@ export const createCompany = async (req, res, next) => {
         const user = req.user;
         const result = zodValidation.createCompanySchema.parse(req.body);
 
-        result.photo = {
-            path: req.fileMeta.path,
-            originalName: req.fileMeta.originalName,
-            mimeType: req.fileMeta.mimeType,
-            size: req.fileMeta.size,
-        };
+        if (req.fileMeta) {
+            result.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
 
         const newCompany = await Company.create({ ...result });
 

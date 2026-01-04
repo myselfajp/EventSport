@@ -229,8 +229,8 @@ export const createEvent = async (req, res, next) => {
 
         // check if data exist
         const checks = [
-            { id: result.club, model: Club, name: 'Club' },
-            { id: result.group, model: ClubGroup, name: 'ClubGroup' },
+            ...(result.club ? [{ id: result.club, model: Club, name: 'Club' }] : []),
+            ...(result.group ? [{ id: result.group, model: ClubGroup, name: 'ClubGroup' }] : []),
             { id: result.sportGroup, model: SportGroup, name: 'SportGroup' },
             { id: result.sport, model: Sport, name: 'sport' },
             ...(result.salon ? [{ id: result.salon, model: Salon, name: 'Salon' }] : []),
@@ -585,14 +585,14 @@ export const createClub = async (req, res, next) => {
         if (result.coaches.length > 0) {
             const checks = await Promise.all(
                 result.coaches.map(async (id) => {
-                    const exists = await User.exists({ coach: new ObjectId(id) });
+                    const exists = await User.exists({ _id: new ObjectId(id) });
                     return { id, exists: Boolean(exists) };
                 })
             );
             const allValid = checks.every((r) => r.exists);
             if (!allValid) {
                 const notFound = checks.filter((r) => !r.exists).map((r) => r.id);
-                throw new AppError(404, `Coach with id: ${notFound.join(', ')} not found`);
+                throw new AppError(404, `User with id: ${notFound.join(', ')} not found`);
             }
         }
 
@@ -644,14 +644,14 @@ export const editClub = async (req, res, next) => {
         if (result.coaches.length > 0) {
             const checks = await Promise.all(
                 result.coaches.map(async (id) => {
-                    const exists = await User.exists({ coach: new ObjectId(id) });
+                    const exists = await User.exists({ _id: new ObjectId(id) });
                     return { id, exists: Boolean(exists) };
                 })
             );
             const allValid = checks.every((r) => r.exists);
             if (!allValid) {
                 const notFound = checks.filter((r) => !r.exists).map((r) => r.id);
-                throw new AppError(404, `Coach with id: ${notFound.join(', ')} not found`);
+                throw new AppError(404, `User with id: ${notFound.join(', ')} not found`);
             }
         }
 

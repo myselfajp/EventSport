@@ -25,12 +25,10 @@ const eventSchema = new mongoose.Schema(
         club: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Club',
-            required: true,
         },
         group: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'ClubGroup',
-            required: true,
         },
         startTime: {
             type: Date,
