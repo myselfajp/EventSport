@@ -57,6 +57,7 @@ import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import FacilityDetailsModal from "./FacilityDetailsModal";
 import UserProfileModal from "@/components/UserProfileModal";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import UserEditModal from "./UserEditModal";
 import { EP } from "@/app/lib/endpoints";
 import { defaultFavorites, useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
@@ -92,6 +93,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isClubsListOpen, setIsClubsListOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isGroupsListOpen, setIsGroupsListOpen] = useState(false);
+  const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
 
   const { data: allFacilities = [] } = useQuery({
     queryKey: ["facilities"],
@@ -1125,6 +1127,26 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
                 </button>
               )}
+
+              <button
+                onClick={() => setIsUserEditModalOpen(true)}
+                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between mt-4"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
+                    <Edit className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-800 dark:text-white text-sm">
+                      Edit Account Info
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Update name, email, phone, password
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+              </button>
             </div>
           </div>
         </div>
@@ -1835,6 +1857,12 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       <FindModal
         isOpen={isFindModalOpen}
         onClose={() => setIsFindModalOpen(false)}
+      />
+
+      {/* User Edit Modal */}
+      <UserEditModal
+        isOpen={isUserEditModalOpen}
+        onClose={() => setIsUserEditModalOpen(false)}
       />
     </div>
   );
