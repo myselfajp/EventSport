@@ -12,7 +12,6 @@ import Notification from '../models/notificationModel.js';
  * @param {Number} options.targetRole - Role number (for scope='role')
  * @param {Array} options.targetUsers - Array of user IDs (for scope='group')
  * @param {String} options.priority - 'low', 'normal', 'high', 'urgent'
- * @param {String} options.actionUrl - URL to navigate when clicked
  * @param {String} options.icon - Icon name
  * @param {Date} options.expiresAt - Expiration date
  * @param {String} options.createdBy - User ID who created this notification
@@ -29,7 +28,6 @@ export const createNotification = async (options) => {
         targetRole,
         targetUsers,
         priority = 'normal',
-        actionUrl,
         icon,
         expiresAt,
         createdBy,
@@ -65,9 +63,6 @@ export const createNotification = async (options) => {
         notificationData.targetUsers = targetUsers;
     }
 
-    if (actionUrl) {
-        notificationData.actionUrl = actionUrl;
-    }
 
     if (icon) {
         notificationData.icon = icon;
@@ -104,7 +99,6 @@ export const notifyEventCreated = async (eventId, eventName, coachId, coachName,
             },
             targetUsers: userIds,
             priority: 'normal',
-            actionUrl: `/events/${eventId}`,
             icon: 'calendar',
         });
     } else {
@@ -121,7 +115,6 @@ export const notifyEventCreated = async (eventId, eventName, coachId, coachName,
                 eventName,
             },
             priority: 'normal',
-            actionUrl: `/events/${eventId}`,
             icon: 'calendar',
         });
     }
@@ -143,7 +136,6 @@ export const notifyCertificateApproved = async (userId, branchId, sportName, lev
         },
         userId,
         priority: 'high',
-        actionUrl: '/profile/coach',
         icon: 'check-circle',
     });
 };
@@ -164,7 +156,6 @@ export const notifyCertificateRejected = async (userId, branchId, sportName, lev
         },
         userId,
         priority: 'normal',
-        actionUrl: '/profile/coach',
         icon: 'x-circle',
     });
 };
@@ -184,7 +175,6 @@ export const notifyReservationApproved = async (userId, eventId, eventName) => {
         },
         userId,
         priority: 'normal',
-        actionUrl: `/events/${eventId}`,
         icon: 'check-circle',
     });
 };
@@ -204,7 +194,6 @@ export const notifyReservationRejected = async (userId, eventId, eventName) => {
         },
         userId,
         priority: 'normal',
-        actionUrl: `/events/${eventId}`,
         icon: 'x-circle',
     });
 };
@@ -225,7 +214,6 @@ export const notifyReservationReminder = async (userId, eventId, eventName, star
         },
         userId,
         priority: 'high',
-        actionUrl: `/events/${eventId}`,
         icon: 'bell',
         expiresAt: new Date(startTime),
     });

@@ -327,9 +327,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               {/* User Avatar and Basic Info */}
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center">
-                  {user.photo ? (
+                  {user.photo?.path ? (
                     <img
-                      src={`${EP.API_ASSETS_BASE}${user.photo}`}
+                      src={`${EP.API_ASSETS_BASE}/${user.photo.path}`}
                       alt={`${user.firstName} ${user.lastName}`}
                       className="w-20 h-20 rounded-full object-cover"
                     />

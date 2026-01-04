@@ -14,7 +14,12 @@ interface User {
   email: string;
   phone: string;
   age: string;
-  photo?: string;
+  photo?: {
+    path: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  };
   role: number;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;

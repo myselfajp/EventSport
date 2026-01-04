@@ -278,9 +278,9 @@ const UserSearch: React.FC<UserSearchProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center">
-                      {user.photo ? (
+                      {user.photo?.path ? (
                         <img
-                          src={user.photo}
+                          src={`${EP.API_ASSETS_BASE}/${user.photo.path}`}
                           alt={`${user.firstName} ${user.lastName}`}
                           className="w-10 h-10 rounded-full object-cover"
                         />

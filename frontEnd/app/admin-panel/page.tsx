@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Home } from "lucide-react";
 import { useMe } from "../hooks/useAuth";
 import { fetchJSON } from "../lib/api";
 import { EP } from "../lib/endpoints";
@@ -72,9 +73,18 @@ export default function AdminPanelPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-8">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-6">
-            Admin Panel
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">
+              Admin Panel
+            </h1>
+            <button
+              onClick={() => router.push("/")}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:-translate-y-0.5"
+            >
+              <Home className="w-4 h-4" />
+              Back to Site
+            </button>
+          </div>
 
           <div className="border-b border-gray-200 dark:border-slate-700 mb-6">
             <nav className="flex space-x-8">

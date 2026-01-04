@@ -205,9 +205,6 @@ const Header: React.FC<HeaderProps> = ({
                           if (!notification.isRead) {
                             handleMarkAsRead(notification._id);
                           }
-                          if (notification.actionUrl) {
-                            window.location.href = notification.actionUrl;
-                          }
                         }}
                         className={`p-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition-colors ${
                           !notification.isRead

@@ -33,7 +33,7 @@ export const EP = {
     signUp: `${AUTH_API}/sign-up`,
     signOut: `${AUTH_API}/sign-out`,
     me: `${AUTH_API}/get-current-user`,
-    editUserPhoto: `${AUTH_API}/edit-user-photo`,
+    editUser: `${AUTH_API}/edit-user`,
     getUsers: `${AUTH_API}/get-user`,
     getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,
   },

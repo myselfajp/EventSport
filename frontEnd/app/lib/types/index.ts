@@ -55,7 +55,12 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   __v?: number;
-  photo?: string;
+  photo?: {
+    path: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  };
 }
 
 export interface UserSearchFilters {
@@ -158,7 +163,12 @@ export interface CoachDetails {
     __v?: number;
     role: number;
     participant?: string;
-    photo?: string;
+    photo?: {
+      path: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+    };
   }>;
   club: Array<any>; // Could be defined more specifically if needed
   clubGroup: Array<{

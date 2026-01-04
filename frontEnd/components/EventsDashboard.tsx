@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { X, Menu, Calendar, Zap } from "lucide-react";
+import { X, Menu, Calendar, Zap, Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
 import Header from "./Header";
@@ -15,6 +16,7 @@ import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
 
 const EventsDashboard = () => {
+  const router = useRouter();
   const { data: user } = useMe();
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
@@ -199,6 +201,15 @@ const EventsDashboard = () => {
                     <Zap className="w-4 h-4" />
                     Create Event
                   </button>
+                  {user?.role === 0 && (
+                    <button
+                      onClick={() => router.push("/admin-panel")}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:-translate-y-0.5"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Admin Panel
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
