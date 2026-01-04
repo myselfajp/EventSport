@@ -326,6 +326,8 @@ export const SearchQuerySchema = z
         facility: z.string().regex(MongoObjectIdRegex, 'FacilityId must be a valid ID').optional(),
         salon: z.string().regex(MongoObjectIdRegex, 'SalonId must be a valid ID').optional(),
         isVerified: z.boolean().optional(),
+        creator: z.string().regex(MongoObjectIdRegex, 'CreatorId must be a valid ID').optional(),
+        owner: z.string().regex(MongoObjectIdRegex, 'OwnerId must be a valid ID').optional(),
     })
     .strict();
 
@@ -451,7 +453,8 @@ export const createEventSchema = z
                         ? { message: 'Club id required.' }
                         : { message: 'Invalid club id.' },
             })
-            .regex(MongoObjectIdRegex, 'Provide a valid club ID.'),
+            .regex(MongoObjectIdRegex, 'Provide a valid club ID.')
+            .optional(),
         group: z
             .string({
                 error: (iss) =>
@@ -459,7 +462,8 @@ export const createEventSchema = z
                         ? { message: 'Group id required.' }
                         : { message: 'Invalid Group id.' },
             })
-            .regex(MongoObjectIdRegex, 'Provide a valid club ID.'),
+            .regex(MongoObjectIdRegex, 'Provide a valid club ID.')
+            .optional(),
         startTime: z.date({
             error: (iss) =>
                 iss.input === undefined

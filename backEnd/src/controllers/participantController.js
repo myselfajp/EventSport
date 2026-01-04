@@ -927,6 +927,75 @@ export const endPhoto = async (req, res, next) => {
     }
 };
 
+export const getFollows = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const { type, page = 1, limit = 100 } = req.query;
+
+        const query = { follower: user._id };
+
+        // Optionally filter by type
+        if (type && ['coach', 'facility', 'company', 'club', 'group'].includes(type)) {
+            if (type === 'group') {
+                query.followingClubGroup = { $exists: true, $ne: null };
+            } else if (type === 'coach') {
+                query.followingCoach = { $exists: true, $ne: null };
+            } else if (type === 'facility') {
+                query.followingFacility = { $exists: true, $ne: null };
+            } else if (type === 'company') {
+                query.followingCompany = { $exists: true, $ne: null };
+            } else if (type === 'club') {
+                query.followingClub = { $exists: true, $ne: null };
+            }
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const follows = await Follow.find(query)
+            .populate({
+                path: 'followingCoach',
+                populate: {
+                    path: 'coach',
+                    select: 'name membershipLevel point isVerified'
+                },
+                select: 'firstName lastName photo coach'
+            })
+            .populate({
+                path: 'followingFacility',
+                select: 'name address photo'
+            })
+            .populate({
+                path: 'followingCompany',
+                select: 'name photo'
+            })
+            .populate({
+                path: 'followingClub',
+                select: 'name photo'
+            })
+            .populate({
+                path: 'followingClubGroup',
+                select: 'name photo clubName'
+            })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                follows,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getParticipantDetails = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);

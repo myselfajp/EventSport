@@ -429,8 +429,6 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
     if (
       !formData.name ||
-      !formData.club ||
-      !formData.group ||
       !formData.style ||
       !formData.sportGroup ||
       !formData.sport ||
@@ -697,7 +695,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative dropdown-container">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Club <span className="text-red-500">*</span>
+                    Club
                   </label>
                   <button
                     type="button"
@@ -740,7 +738,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 <div className="relative dropdown-container">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Sport Community <span className="text-red-500">*</span>
+                    Sport Community
                   </label>
                   <button
                     type="button"

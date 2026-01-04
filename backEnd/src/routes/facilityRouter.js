@@ -6,7 +6,7 @@ const router = express.Router();
 // facility
 router.post(
     '/create-facility',
-    uploadFile({ fieldName: 'facility-photo' }),
+    uploadFile({ fieldName: 'facility-photo', optional: true }),
     facilityController.createFacility
 );
 router.put(

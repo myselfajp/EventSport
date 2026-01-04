@@ -31,6 +31,13 @@ router.post(
     })
 );
 
+router.post(
+    '/get-group-by-coach',
+    createSearchController(ClubGroup, {
+        searchFields: ['name', 'clubName'],
+    })
+);
+
 // facility
 router.post(
     '/get-facility',

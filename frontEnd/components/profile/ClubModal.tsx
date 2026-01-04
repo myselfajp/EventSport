@@ -147,20 +147,53 @@ const ClubModal: React.FC<ClubModalProps> = ({
       if (initialData.coaches && initialData.coaches.length > 0) {
         loadCoachesData(initialData.coaches);
       }
+      
+      // Load president data if editing
+      if (initialData.president) {
+        loadPresidentData(initialData.president);
+      }
     } else {
       resetForm();
     }
   }, [initialData, isOpen]);
 
-  const loadCoachesData = async (coachIds: string[]) => {
+  const loadPresidentData = async (userId: string) => {
     try {
-      const promises = coachIds.map(id =>
-        fetchJSON(EP.COACH.getCoachById(id), { method: "GET" })
+      const response = await fetchJSON(EP.AUTH.getUserById(userId), { method: "GET" });
+      if (response?.success && response?.data) {
+        const user = response.data;
+        setPresidentSearch(`${user.firstName} ${user.lastName}`);
+      }
+    } catch (err) {
+      console.error("Error loading president data:", err);
+    }
+  };
+
+  const loadCoachesData = async (userIds: string[]) => {
+    try {
+      const promises = userIds.map(id =>
+        fetchJSON(EP.AUTH.getUserById(id), { method: "GET" })
       );
       const results = await Promise.all(promises);
       const coachesData = results
         .filter(r => r?.success && r?.data)
-        .map(r => r.data);
+        .map(r => {
+          const user = r.data;
+          // Transform user data to CoachSearchResult format
+          // getUserById populates coach, so user.coach is an object (or null)
+          const coachId = user.coach?._id || "";
+          return {
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            coach: {
+              _id: coachId,
+              membershipLevel: user.coach?.membershipLevel,
+              isVerified: user.coach?.isVerified,
+            }
+          };
+        });
       setSelectedCoachesData(coachesData);
     } catch (err) {
       console.error("Error loading coaches data:", err);
@@ -216,32 +249,32 @@ const ClubModal: React.FC<ClubModalProps> = ({
   };
 
   const selectPresident = (coach: CoachSearchResult) => {
-    handleInputChange("president", coach.coach._id);
+    handleInputChange("president", coach._id);
     setPresidentSearch(`${coach.firstName} ${coach.lastName}`);
     setShowPresidentDropdown(false);
   };
 
   const toggleCoach = (coach: CoachSearchResult) => {
     const currentCoaches = formData.coaches || [];
-    const coachId = coach.coach._id;
+    const userId = coach._id; // Use User ID, not Coach ID
     
-    if (currentCoaches.includes(coachId)) {
-      handleInputChange("coaches", currentCoaches.filter(id => id !== coachId));
-      setSelectedCoachesData(prev => prev.filter(c => c.coach._id !== coachId));
+    if (currentCoaches.includes(userId)) {
+      handleInputChange("coaches", currentCoaches.filter(id => id !== userId));
+      setSelectedCoachesData(prev => prev.filter(c => c._id !== userId));
     } else {
-      handleInputChange("coaches", [...currentCoaches, coachId]);
+      handleInputChange("coaches", [...currentCoaches, userId]);
       setSelectedCoachesData(prev => [...prev, coach]);
     }
   };
 
-  const removeCoach = (coachId: string) => {
-    handleInputChange("coaches", formData.coaches.filter(id => id !== coachId));
-    setSelectedCoachesData(prev => prev.filter(c => c.coach._id !== coachId));
+  const removeCoach = (userId: string) => {
+    handleInputChange("coaches", formData.coaches.filter(id => id !== userId));
+    setSelectedCoachesData(prev => prev.filter(c => c._id !== userId));
   };
 
-  const getCoachName = (coachId: string) => {
-    const coach = selectedCoachesData.find(c => c.coach._id === coachId);
-    return coach ? `${coach.firstName} ${coach.lastName}` : coachId;
+  const getCoachName = (userId: string) => {
+    const coach = selectedCoachesData.find(c => c._id === userId);
+    return coach ? `${coach.firstName} ${coach.lastName}` : userId;
   };
 
   const validateForm = () => {
@@ -481,12 +514,12 @@ const ClubModal: React.FC<ClubModalProps> = ({
                                 type="button"
                                 onClick={() => toggleCoach(coach)}
                                 className={`w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2 ${
-                                  formData.coaches.includes(coach.coach._id) ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300' : 'dark:text-white'
+                                  formData.coaches.includes(coach._id) ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300' : 'dark:text-white'
                                 }`}
                               >
                                 <input
                                   type="checkbox"
-                                  checked={formData.coaches.includes(coach.coach._id)}
+                                  checked={formData.coaches.includes(coach._id)}
                                   readOnly
                                   className="w-4 h-4 text-cyan-500 border-gray-300 dark:border-gray-600 rounded"
                                 />

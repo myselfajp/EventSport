@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.post(
     '/create-company',
-    uploadFile({ fieldName: 'company-photo' }),
+    uploadFile({ fieldName: 'company-photo', optional: true }),
     companyController.createCompany
 );
 router.put(
