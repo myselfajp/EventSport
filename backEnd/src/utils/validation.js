@@ -167,14 +167,6 @@ export const editUserSchema = z
                         : { message: 'Invalid age.' },
             })
             .optional(),
-        photo: z
-            .string({
-                error: (iss) =>
-                    iss.input === undefined
-                        ? { message: 'photo is required.' }
-                        : { message: 'Invalid input.' },
-            })
-            .optional(),
         newPassword: z
             .string({
                 error: (iss) =>
@@ -203,6 +195,12 @@ export const editUserSchema = z
                 `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
             )
             .optional(),
+        photo: z
+            .string()
+            .optional(),
+        deletePhoto: z
+            .string()
+            .optional(),
     })
     .refine(
         (data) =>
@@ -213,10 +211,11 @@ export const editUserSchema = z
             data.age !== undefined ||
             data.photo !== undefined ||
             data.newPassword !== undefined ||
-            data.oldPassword !== undefined,
+            data.oldPassword !== undefined ||
+            data.deletePhoto !== undefined,
         {
             message:
-                'At least one of first name, last name, phone, email, age, photo, new password, old password must be provided.',
+                'At least one of first name, last name, phone, email, age, photo, new password, old password, or deletePhoto must be provided.',
             path: [], // set to [] to attach error to the global object
         }
     );

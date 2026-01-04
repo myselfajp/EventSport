@@ -714,6 +714,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     }));
     try {
       const formData = new FormData();
+      formData.append("deletePhoto", "true");
       await editUserPhoto(formData);
 
       // Optimistically update cache to remove photo

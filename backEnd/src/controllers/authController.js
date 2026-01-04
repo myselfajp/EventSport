@@ -267,7 +267,33 @@ export const editUser = async (req, res, next) => {
             body.age = new Date(body.age);
         }
 
+        // Add deletePhoto to body if it exists
+        if (req.body.deletePhoto) {
+            body.deletePhoto = req.body.deletePhoto;
+        }
+
+        // Add photo to body if file is being uploaded (for validation)
+        if (req.fileMeta) {
+            body.photo = 'uploaded'; // Just a marker for validation
+        }
+
         const result = editUserSchema.parse(body);
+
+        // Handle photo upload if file is provided
+        if (req.fileMeta) {
+            result.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        } else if (result.deletePhoto === 'true') {
+            // If deletePhoto flag is set, remove photo
+            result.photo = null;
+        }
+        
+        // Remove deletePhoto from result (it's only for validation)
+        delete result.deletePhoto;
 
         if (result.oldPassword || result.newPassword) {
             if (!result.oldPassword) {

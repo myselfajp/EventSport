@@ -10,7 +10,6 @@ export default function NotificationManagement() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [priority, setPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
-  const [actionUrl, setActionUrl] = useState("");
   const [icon, setIcon] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState("");
   
@@ -140,9 +139,6 @@ export default function NotificationManagement() {
         notificationData.targetUsers = targetUsers;
       }
 
-      if (actionUrl) {
-        notificationData.actionUrl = actionUrl;
-      }
 
       if (icon) {
         notificationData.icon = icon;
@@ -162,7 +158,6 @@ export default function NotificationManagement() {
         // Reset form
         setTitle("");
         setMessage("");
-        setActionUrl("");
         setExpiresAt("");
         setUserId("");
         setSelectedUserIds([]);
@@ -371,19 +366,6 @@ export default function NotificationManagement() {
           </select>
         </div>
 
-        {/* Action URL */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-            Action URL (Optional)
-          </label>
-          <input
-            type="text"
-            value={actionUrl}
-            onChange={(e) => setActionUrl(e.target.value)}
-            placeholder="/events/123"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
-          />
-        </div>
 
         {/* Icon */}
         <div>
@@ -431,7 +413,6 @@ export default function NotificationManagement() {
             onClick={() => {
               setTitle("");
               setMessage("");
-              setActionUrl("");
               setExpiresAt("");
               setUserId("");
               setSelectedUserIds([]);

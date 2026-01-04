@@ -388,7 +388,7 @@ export const deleteNotification = async (req, res, next) => {
 // Admin only: Create notification
 export const createNotification = async (req, res, next) => {
     try {
-        const { scope, type, title, message, data, userId, targetRole, targetUsers, priority, actionUrl, icon, expiresAt } = req.body;
+        const { scope, type, title, message, data, userId, targetRole, targetUsers, priority, icon, expiresAt } = req.body;
 
         if (!scope || !type || !title || !message) {
             throw new AppError(400, 'Missing required fields: scope, type, title, message');
@@ -419,10 +419,6 @@ export const createNotification = async (req, res, next) => {
                 throw new AppError(400, 'targetUsers array is required for group scope');
             }
             notificationData.targetUsers = targetUsers;
-        }
-
-        if (actionUrl) {
-            notificationData.actionUrl = actionUrl;
         }
 
         if (icon) {

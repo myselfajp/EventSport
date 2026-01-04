@@ -74,7 +74,7 @@ export async function signUp(payload: Record<string, any>) {
 
 export async function editUserPhoto(formData?: FormData) {
   const res = await apiFetch(
-    EP.AUTH.editUserPhoto,
+    EP.AUTH.editUser,
     {
       method: "POST",
       body: formData,

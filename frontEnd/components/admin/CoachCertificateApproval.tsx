@@ -29,7 +29,12 @@ interface Branch {
     lastName: string;
     email: string;
     phone: string;
-    photo?: string;
+    photo?: {
+      path: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+    };
   };
   createdAt: string;
 }
