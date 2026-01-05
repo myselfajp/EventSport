@@ -227,10 +227,14 @@ export const createEvent = async (req, res, next) => {
 
         const result = zodValidation.createEventSchema.parse(data ?? {});
 
+        // Convert empty strings to undefined for optional fields
+        if (result.club === '') result.club = undefined;
+        if (result.group === '') result.group = undefined;
+
         // check if data exist
         const checks = [
-            ...(result.club && result.club.trim() !== '' ? [{ id: result.club, model: Club, name: 'Club' }] : []),
-            ...(result.group && result.group.trim() !== '' ? [{ id: result.group, model: ClubGroup, name: 'ClubGroup' }] : []),
+            ...(result.club ? [{ id: result.club, model: Club, name: 'Club' }] : []),
+            ...(result.group ? [{ id: result.group, model: ClubGroup, name: 'ClubGroup' }] : []),
             { id: result.sportGroup, model: SportGroup, name: 'SportGroup' },
             { id: result.sport, model: Sport, name: 'sport' },
             ...(result.salon ? [{ id: result.salon, model: Salon, name: 'Salon' }] : []),
