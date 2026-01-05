@@ -447,22 +447,16 @@ export const createEventSchema = z
                     : { message: 'Invalid Name.' },
         }),
         club: z
-            .string({
-                error: (iss) =>
-                    iss.input === undefined
-                        ? { message: 'Club id required.' }
-                        : { message: 'Invalid club id.' },
-            })
-            .regex(MongoObjectIdRegex, 'Provide a valid club ID.')
+            .union([
+                z.string().regex(MongoObjectIdRegex, 'Provide a valid club ID.'),
+                z.literal(''),
+            ])
             .optional(),
         group: z
-            .string({
-                error: (iss) =>
-                    iss.input === undefined
-                        ? { message: 'Group id required.' }
-                        : { message: 'Invalid Group id.' },
-            })
-            .regex(MongoObjectIdRegex, 'Provide a valid club ID.')
+            .union([
+                z.string().regex(MongoObjectIdRegex, 'Provide a valid club ID.'),
+                z.literal(''),
+            ])
             .optional(),
         startTime: z.date({
             error: (iss) =>
