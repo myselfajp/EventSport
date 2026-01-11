@@ -38,7 +38,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const isCoach = user?.coach != null;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
-  const [weekEvents, setWeekEvents] = useState<any[]>([]);
+  const [selectedDateEvents, setSelectedDateEvents] = useState<any[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -64,26 +64,19 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Get start and end of month
-  const getMonthStartEnd = useCallback((date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const start = new Date(year, month, 1);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(year, month + 1, 0);
-    end.setHours(23, 59, 59, 999);
-    return { start, end };
-  }, []);
-
-  // Fetch events for the current month
-  const fetchMonthEvents = useCallback(async () => {
+  // Fetch events for a specific date
+  const fetchDateEvents = useCallback(async (date: Date) => {
     setIsLoadingEvents(true);
     try {
-      const { start, end } = getMonthStartEnd(currentDate);
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
       const response = await fetchJSON(EP.EVENTS.getEvents, {
         method: "POST",
         body: {
-          perPage: 1000, // Get all events for the month
+          perPage: 100,
           pageNumber: 1,
           sortBy: "startTime",
           sortType: "asc",
@@ -91,34 +84,61 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
       });
 
       if (response?.success && response?.data) {
-        // Filter events that fall within the month range
+        // Filter events for the specific date
         const filteredEvents = response.data.filter((event: any) => {
+          if (!event || !event.startTime) return false;
           const eventStart = new Date(event.startTime);
-          return eventStart >= start && eventStart <= end;
+          return (
+            eventStart.getDate() === date.getDate() &&
+            eventStart.getMonth() === date.getMonth() &&
+            eventStart.getFullYear() === date.getFullYear()
+          );
         });
-        setWeekEvents(filteredEvents);
+
+        // If there are more pages, fetch them
+        if (response.pagination && response.pagination.totalPages > 1) {
+          for (let page = 2; page <= response.pagination.totalPages; page++) {
+            try {
+              const nextResponse = await fetchJSON(EP.EVENTS.getEvents, {
+                method: "POST",
+                body: {
+                  perPage: 100,
+                  pageNumber: page,
+                  sortBy: "startTime",
+                  sortType: "asc",
+                },
+              });
+
+              if (nextResponse?.success && nextResponse?.data) {
+                const nextFiltered = nextResponse.data.filter((event: any) => {
+                  if (!event || !event.startTime) return false;
+                  const eventStart = new Date(event.startTime);
+                  return (
+                    eventStart.getDate() === date.getDate() &&
+                    eventStart.getMonth() === date.getMonth() &&
+                    eventStart.getFullYear() === date.getFullYear()
+                  );
+                });
+                filteredEvents.push(...nextFiltered);
+              }
+            } catch (err) {
+              console.error(`Error fetching page ${page}:`, err);
+              break;
+            }
+          }
+        }
+
+        setSelectedDateEvents(filteredEvents);
       } else {
-        setWeekEvents([]);
+        setSelectedDateEvents([]);
       }
     } catch (err) {
-      console.error("Error fetching month events:", err);
-      setWeekEvents([]);
+      console.error("Error fetching date events:", err);
+      setSelectedDateEvents([]);
     } finally {
       setIsLoadingEvents(false);
     }
-  }, [currentDate, getMonthStartEnd]);
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchMonthEvents();
-    }
-  }, [currentDate, isOpen, fetchMonthEvents]);
-
-  useEffect(() => {
-    if (onEventCreated) {
-      fetchMonthEvents();
-    }
-  }, [onEventCreated, fetchMonthEvents]);
+  }, []);
 
   // Get days of the month
   const getMonthDays = useCallback(() => {
@@ -151,32 +171,11 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
     return { days, startingDayOfWeek, daysInMonth, prevMonthDays };
   }, [currentDate]);
 
-  // Get events for a specific date
-  const getEventsForDate = useCallback(
-    (date: Date) => {
-      return weekEvents.filter((event) => {
-        const eventDate = new Date(event.startTime);
-        return (
-          eventDate.getDate() === date.getDate() &&
-          eventDate.getMonth() === date.getMonth() &&
-          eventDate.getFullYear() === date.getFullYear()
-        );
-      });
-    },
-    [weekEvents]
-  );
-
-  // Check if a date has events
-  const hasEvents = useCallback(
-    (date: Date) => {
-      return getEventsForDate(date).length > 0;
-    },
-    [getEventsForDate]
-  );
-
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
     setShowEventModal(true);
+    // Fetch events for the selected date
+    fetchDateEvents(date);
   };
 
   const handleToday = () => {
@@ -196,7 +195,6 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   };
 
   const monthDaysData = getMonthDays();
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
   const monthNames = [
     "January",
@@ -356,8 +354,6 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                   );
                 }
 
-                const dayEvents = getEventsForDate(day);
-                const hasEventsForDay = hasEvents(day);
                 const isToday =
                   day.toDateString() === new Date().toDateString();
 
@@ -366,8 +362,8 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     key={index}
                     onClick={() => handleDateClick(day)}
                     className={`relative text-center py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded cursor-pointer transition-colors ${
-                      hasEventsForDay ? "bg-cyan-50 dark:bg-cyan-900/20" : ""
-                    } ${isToday ? "ring-2 ring-cyan-500" : ""}`}
+                      isToday ? "ring-2 ring-cyan-500" : ""
+                    }`}
                   >
                     <div
                       className={`text-base font-semibold ${
@@ -378,25 +374,6 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     >
                       {day.getDate()}
                     </div>
-                    {dayEvents.length > 0 && (
-                      <div className="flex justify-center gap-0.5 mt-1">
-                        {dayEvents.slice(0, 3).map((event, idx) => (
-                          <div
-                            key={idx}
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{
-                              backgroundColor:
-                                event.eventStyle?.color || "#3b82f6",
-                            }}
-                          />
-                        ))}
-                        {dayEvents.length > 3 && (
-                          <div className="text-[8px] text-gray-500 dark:text-slate-400">
-                            +{dayEvents.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -506,6 +483,10 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
         isOpen={isAddEventModalOpen}
         onClose={() => setIsAddEventModalOpen(false)}
         onSuccess={() => {
+          // Refresh events for the selected date if modal is open
+          if (selectedDate) {
+            fetchDateEvents(selectedDate);
+          }
           if (onEventCreated) {
             onEventCreated();
           }
@@ -531,6 +512,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                 onClick={() => {
                   setShowEventModal(false);
                   setSelectedDate(null);
+                  setSelectedDateEvents([]);
                 }}
                 className="text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
               >
@@ -552,6 +534,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                       onClick={() => {
                         setShowEventModal(false);
                         setSelectedDate(null);
+                        setSelectedDateEvents([]);
                         setIsAddEventModalOpen(true);
                       }}
                       className="bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors mx-auto"
