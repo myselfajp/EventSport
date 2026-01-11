@@ -20,7 +20,7 @@ const EventsDashboard = () => {
   const { data: user } = useMe();
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1));
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [activeTab, setActiveTab] = useState("all");
   const [calendarView, setCalendarView] = useState("month");
   const [showCoachCalendar, setShowCoachCalendar] = useState(false);
