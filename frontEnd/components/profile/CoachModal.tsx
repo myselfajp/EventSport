@@ -657,29 +657,48 @@ const CoachModal: React.FC<CoachModalProps> = ({
                                 <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                                   Loading...
                                 </div>
-                              ) : sportGroups.length > 0 ? (
-                                sportGroups.map((group) => (
+                              ) : (
+                                <>
                                   <button
-                                    key={group._id}
                                     type="button"
                                     onClick={() => {
                                       updateBranch(
                                         index,
                                         "sportGroup",
-                                        group._id,
-                                        group.name
+                                        "",
+                                        ""
                                       );
                                       setActiveSportGroupDropdown(null);
                                     }}
-                                    className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors first:rounded-t-lg last:rounded-b-lg dark:text-white"
+                                    className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors first:rounded-t-lg text-gray-500 dark:text-gray-400 italic"
                                   >
-                                    {group.name}
+                                    Clear selection
                                   </button>
-                                ))
-                              ) : (
-                                <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                                  No sport groups available
-                                </div>
+                                  {sportGroups.length > 0 ? (
+                                    sportGroups.map((group) => (
+                                      <button
+                                        key={group._id}
+                                        type="button"
+                                        onClick={() => {
+                                          updateBranch(
+                                            index,
+                                            "sportGroup",
+                                            group._id,
+                                            group.name
+                                          );
+                                          setActiveSportGroupDropdown(null);
+                                        }}
+                                        className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors dark:text-white"
+                                      >
+                                        {group.name}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                                      No sport groups available
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}
@@ -726,33 +745,52 @@ const CoachModal: React.FC<CoachModalProps> = ({
                                   <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                                     Loading...
                                   </div>
-                                ) : sports.length > 0 ? (
-                                  sports
-                                    .filter(
-                                      (s) => s.group === branch.sportGroup
-                                    )
-                                    .map((sport) => (
-                                      <button
-                                        key={sport._id}
-                                        type="button"
-                                        onClick={() => {
-                                          updateBranch(
-                                            index,
-                                            "sport",
-                                            sport._id,
-                                            sport.name
-                                          );
-                                          setActiveSportDropdown(null);
-                                        }}
-                                        className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors first:rounded-t-lg last:rounded-b-lg dark:text-white"
-                                      >
-                                        {sport.name}
-                                      </button>
-                                    ))
                                 ) : (
-                                  <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                                    No sports in this group
-                                  </div>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        updateBranch(
+                                          index,
+                                          "sport",
+                                          "",
+                                          ""
+                                        );
+                                        setActiveSportDropdown(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors first:rounded-t-lg text-gray-500 dark:text-gray-400 italic"
+                                    >
+                                      Clear selection
+                                    </button>
+                                    {sports.length > 0 ? (
+                                      sports
+                                        .filter(
+                                          (s) => s.group === branch.sportGroup
+                                        )
+                                        .map((sport) => (
+                                          <button
+                                            key={sport._id}
+                                            type="button"
+                                            onClick={() => {
+                                              updateBranch(
+                                                index,
+                                                "sport",
+                                                sport._id,
+                                                sport.name
+                                              );
+                                              setActiveSportDropdown(null);
+                                            }}
+                                            className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors dark:text-white"
+                                          >
+                                            {sport.name}
+                                          </button>
+                                        ))
+                                    ) : (
+                                      <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                                        No sports in this group
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             )}

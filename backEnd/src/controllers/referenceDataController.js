@@ -274,7 +274,8 @@ export const getSport = async (req, res, next) => {
         });
         const query = {};
 
-        if (search) query.name = search;
+        // Use regex for partial match search (case-insensitive)
+        if (search) query.name = { $regex: search, $options: 'i' };
 
         if (group) query.group = group;
 

@@ -1,11 +1,28 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, Upload, ImageIcon, ChevronDown } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { X, Upload, ImageIcon, ChevronDown, Search } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { LEVEL_DEFINITIONS } from "@/app/lib/level-definitions";
 import LevelDefinitions from "@/components/LevelDefinitions";
+
+// Custom hook for debounce
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -106,6 +123,24 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const [showFacilityDropdown, setShowFacilityDropdown] = useState(false);
   const [showSalonDropdown, setShowSalonDropdown] = useState(false);
 
+  // Search queries for autocomplete
+  const [clubSearchQuery, setClubSearchQuery] = useState("");
+  const [groupSearchQuery, setGroupSearchQuery] = useState("");
+  const [styleSearchQuery, setStyleSearchQuery] = useState("");
+
+  // Refs for search inputs to maintain focus
+  const clubSearchRef = useRef<HTMLInputElement>(null);
+  const groupSearchRef = useRef<HTMLInputElement>(null);
+  const styleSearchRef = useRef<HTMLInputElement>(null);
+  const sportGroupSearchRef = useRef<HTMLInputElement>(null);
+  const sportSearchRef = useRef<HTMLInputElement>(null);
+  const facilitySearchRef = useRef<HTMLInputElement>(null);
+  const salonSearchRef = useRef<HTMLInputElement>(null);
+  const [sportGroupSearchQuery, setSportGroupSearchQuery] = useState("");
+  const [sportSearchQuery, setSportSearchQuery] = useState("");
+  const [facilitySearchQuery, setFacilitySearchQuery] = useState("");
+  const [salonSearchQuery, setSalonSearchQuery] = useState("");
+
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [loadingStyles, setLoadingStyles] = useState(false);
@@ -138,6 +173,14 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         setShowSportDropdown(false);
         setShowFacilityDropdown(false);
         setShowSalonDropdown(false);
+        // Reset search queries when closing dropdowns
+        setClubSearchQuery("");
+        setGroupSearchQuery("");
+        setStyleSearchQuery("");
+        setSportGroupSearchQuery("");
+        setSportSearchQuery("");
+        setFacilitySearchQuery("");
+        setSalonSearchQuery("");
       }
     };
 
@@ -164,53 +207,123 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     showSalonDropdown,
   ]);
 
+  // Debounced search queries
+  const debouncedClubSearch = useDebounce(clubSearchQuery, 300);
+  const debouncedGroupSearch = useDebounce(groupSearchQuery, 300);
+  const debouncedStyleSearch = useDebounce(styleSearchQuery, 300);
+  const debouncedSportGroupSearch = useDebounce(sportGroupSearchQuery, 300);
+  const debouncedSportSearch = useDebounce(sportSearchQuery, 300);
+  const debouncedFacilitySearch = useDebounce(facilitySearchQuery, 300);
+  const debouncedSalonSearch = useDebounce(salonSearchQuery, 300);
+
+  // Maintain focus on search inputs when data changes
   useEffect(() => {
-    if (showClubDropdown && clubs.length === 0) {
-      fetchClubs();
+    if (showClubDropdown && clubSearchRef.current) {
+      clubSearchRef.current.focus();
     }
-  }, [showClubDropdown]);
+  }, [clubs, showClubDropdown]);
 
   useEffect(() => {
-    if (formData.club && showGroupDropdown && groups.length === 0) {
-      fetchGroups(formData.club);
+    if (showGroupDropdown && groupSearchRef.current) {
+      groupSearchRef.current.focus();
     }
-  }, [formData.club, showGroupDropdown]);
+  }, [groups, showGroupDropdown]);
 
   useEffect(() => {
-    if (showStyleDropdown && eventStyles.length === 0) {
-      fetchEventStyles();
+    if (showStyleDropdown && styleSearchRef.current) {
+      styleSearchRef.current.focus();
     }
-  }, [showStyleDropdown]);
+  }, [eventStyles, showStyleDropdown]);
 
   useEffect(() => {
-    if (showSportGroupDropdown && sportGroups.length === 0) {
-      fetchSportGroups();
+    if (showSportGroupDropdown && sportGroupSearchRef.current) {
+      sportGroupSearchRef.current.focus();
     }
-  }, [showSportGroupDropdown]);
+  }, [sportGroups, showSportGroupDropdown]);
 
+  useEffect(() => {
+    if (showSportDropdown && sportSearchRef.current) {
+      sportSearchRef.current.focus();
+    }
+  }, [sports, showSportDropdown]);
+
+  useEffect(() => {
+    if (showFacilityDropdown && facilitySearchRef.current) {
+      facilitySearchRef.current.focus();
+    }
+  }, [facilities, showFacilityDropdown]);
+
+  useEffect(() => {
+    if (showSalonDropdown && salonSearchRef.current) {
+      salonSearchRef.current.focus();
+    }
+  }, [salons, showSalonDropdown]);
+
+  // Fetch clubs with search
+  useEffect(() => {
+    if (showClubDropdown) {
+      fetchClubs(debouncedClubSearch);
+    }
+  }, [showClubDropdown, debouncedClubSearch]);
+
+  // Fetch groups with search
+  useEffect(() => {
+    if (formData.club && showGroupDropdown) {
+      fetchGroups(formData.club, debouncedGroupSearch);
+    }
+  }, [formData.club, showGroupDropdown, debouncedGroupSearch]);
+
+  // Fetch event styles with search
+  useEffect(() => {
+    if (showStyleDropdown) {
+      fetchEventStyles(debouncedStyleSearch);
+    }
+  }, [showStyleDropdown, debouncedStyleSearch]);
+
+  // Fetch sport groups with search
+  useEffect(() => {
+    if (showSportGroupDropdown) {
+      fetchSportGroups(debouncedSportGroupSearch);
+    }
+  }, [showSportGroupDropdown, debouncedSportGroupSearch]);
+
+  // Track previous sportGroup to clear sport only when it changes
+  const prevSportGroupRef = useRef<string>("");
+
+  // Fetch sports with search
   useEffect(() => {
     if (formData.sportGroup) {
-      fetchSports(formData.sportGroup);
-      setFormData((prev) => ({ ...prev, sport: "" }));
+      fetchSports(formData.sportGroup, debouncedSportSearch);
+      // Clear sport only when sportGroup actually changes
+      if (prevSportGroupRef.current !== formData.sportGroup) {
+        setFormData((prev) => ({ ...prev, sport: "" }));
+        prevSportGroupRef.current = formData.sportGroup;
+      }
     } else {
       setSports([]);
+      setFormData((prev) => ({ ...prev, sport: "" }));
+      prevSportGroupRef.current = "";
     }
-  }, [formData.sportGroup]);
+  }, [formData.sportGroup, debouncedSportSearch]);
 
+  // Fetch facilities with search
   useEffect(() => {
-    if (showFacilityDropdown && facilities.length === 0) {
-      fetchFacilities();
+    if (showFacilityDropdown) {
+      fetchFacilities(debouncedFacilitySearch);
     }
-  }, [showFacilityDropdown]);
+  }, [showFacilityDropdown, debouncedFacilitySearch]);
 
+  // Fetch salons with search
   useEffect(() => {
-    if (formData.facility) {
-      fetchSalons(formData.facility);
-      setFormData((prev) => ({ ...prev, salon: "" }));
-    } else {
+    if (formData.facility && showSalonDropdown) {
+      fetchSalons(formData.facility, debouncedSalonSearch);
+    } else if (!formData.facility) {
       setSalons([]);
+      if (!showSalonDropdown) {
+        setFormData((prev) => ({ ...prev, salon: "" }));
+      }
     }
-  }, [formData.facility]);
+  }, [formData.facility, showSalonDropdown, debouncedSalonSearch]);
 
   useEffect(() => {
     if (initialData && isOpen) {
@@ -252,120 +365,173 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     }
   }, [initialData, isOpen]);
 
-  const fetchClubs = async () => {
+  const fetchClubs = async (search: string = "") => {
     setLoadingClubs(true);
     try {
       const res = await fetchJSON(EP.CLUB.getClub, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1 },
+        body: { 
+          perPage: 50, 
+          pageNumber: 1,
+          ...(search.trim().length >= 2 && { search: search.trim() })
+        },
       });
       if (res.success && res.data) {
         setClubs(res.data);
+      } else {
+        setClubs([]);
       }
     } catch (err) {
       console.error("Error fetching clubs:", err);
+      setClubs([]);
     } finally {
       setLoadingClubs(false);
     }
   };
 
-  const fetchGroups = async (clubId: string) => {
+  const fetchGroups = async (clubId: string, search: string = "") => {
     setLoadingGroups(true);
     try {
-      const res = await fetchJSON(`${EP.CLUB_GROUPS.getClubGroups}/${clubId}`, {
+      const res = await fetchJSON(`${EP.GROUP.getGroup}/${clubId}`, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1 },
+        body: { 
+          perPage: 50, 
+          pageNumber: 1,
+          ...(search.trim().length >= 2 && { search: search.trim() })
+        },
       });
       if (res.success && res.data) {
         setGroups(res.data);
+      } else {
+        setGroups([]);
       }
     } catch (err) {
       console.error("Error fetching groups:", err);
+      setGroups([]);
     } finally {
       setLoadingGroups(false);
     }
   };
 
-  const fetchEventStyles = async () => {
+  const fetchEventStyles = async (search: string = "") => {
     setLoadingStyles(true);
     try {
       const res = await fetchJSON(EP.REFERENCE.eventStyle.get, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1 },
+        body: { 
+          perPage: 50, 
+          pageNumber: 1,
+          ...(search.trim().length >= 2 && { search: search.trim() })
+        },
       });
       if (res.success && res.data) {
         setEventStyles(res.data);
+      } else {
+        setEventStyles([]);
       }
     } catch (err) {
       console.error("Error fetching event styles:", err);
+      setEventStyles([]);
     } finally {
       setLoadingStyles(false);
     }
   };
 
-  const fetchSportGroups = async () => {
+  const fetchSportGroups = async (search: string = "") => {
     setLoadingSportGroups(true);
     try {
+      const body: any = { 
+        perPage: 50, 
+        pageNumber: 1,
+      };
+      if (search.trim().length >= 2) {
+        body.search = search.trim();
+      }
       const res = await fetchJSON(EP.REFERENCE.sportGroup.get, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1 },
+        body,
       });
       if (res.success && res.data) {
         setSportGroups(res.data);
+      } else {
+        setSportGroups([]);
       }
     } catch (err) {
       console.error("Error fetching sport groups:", err);
+      setSportGroups([]);
     } finally {
       setLoadingSportGroups(false);
     }
   };
 
-  const fetchSports = async (groupId: string) => {
+  const fetchSports = async (groupId: string, search: string = "") => {
     setLoadingSports(true);
     try {
       const res = await fetchJSON(EP.REFERENCE.sport.get, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1, groupId },
+        body: {
+          perPage: 50,
+          pageNumber: 1,
+          groupId,
+          ...(search.trim().length >= 2 && { search: search.trim() })
+        },
       });
       if (res.success && res.data) {
         setSports(res.data);
+      } else {
+        setSports([]);
       }
     } catch (err) {
       console.error("Error fetching sports:", err);
+      setSports([]);
     } finally {
       setLoadingSports(false);
     }
   };
 
-  const fetchFacilities = async () => {
+  const fetchFacilities = async (search: string = "") => {
     setLoadingFacilities(true);
     try {
       const res = await fetchJSON(EP.FACILITY.getFacility, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1 },
+        body: { 
+          perPage: 50, 
+          pageNumber: 1,
+          ...(search.trim().length >= 2 && { search: search.trim() })
+        },
       });
       if (res.success && res.data) {
         setFacilities(res.data);
+      } else {
+        setFacilities([]);
       }
     } catch (err) {
       console.error("Error fetching facilities:", err);
+      setFacilities([]);
     } finally {
       setLoadingFacilities(false);
     }
   };
 
-  const fetchSalons = async (facilityId: string) => {
+  const fetchSalons = async (facilityId: string, search: string = "") => {
     setLoadingSalons(true);
     try {
       const res = await fetchJSON(`${EP.SALON.getSalon}/${facilityId}`, {
         method: "POST",
-        body: { perPage: 100, pageNumber: 1 },
+        body: { 
+          perPage: 50, 
+          pageNumber: 1,
+          ...(search.trim().length >= 2 && { search: search.trim() })
+        },
       });
       if (res.success && res.data) {
         setSalons(res.data);
+      } else {
+        setSalons([]);
       }
     } catch (err) {
       console.error("Error fetching salons:", err);
+      setSalons([]);
     } finally {
       setLoadingSalons(false);
     }
@@ -572,14 +738,22 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     setGroups([]);
     setSports([]);
     setSalons([]);
+    // Reset search queries
+    setClubSearchQuery("");
+    setGroupSearchQuery("");
+    setStyleSearchQuery("");
+    setSportGroupSearchQuery("");
+    setSportSearchQuery("");
+    setFacilitySearchQuery("");
+    setSalonSearchQuery("");
   };
-
-  if (!isOpen) return null;
 
   const getSelectedName = (id: string, list: any[], key = "name") => {
     const item = list.find((item) => item._id === id);
     return item ? item[key] : "";
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -705,7 +879,10 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={() => setShowClubDropdown(!showClubDropdown)}
+                    onClick={() => {
+                      setShowClubDropdown(!showClubDropdown);
+                      if (!showClubDropdown) setClubSearchQuery("");
+                    }}
                     disabled={isAnyLoading}
                     className="w-full px-4 py-2.5 text-sm text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed dark:text-white"
                   >
@@ -718,26 +895,64 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showClubDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {clubs.map((club) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={clubSearchRef}
+                            type="text"
+                            value={clubSearchQuery}
+                            onChange={(e) => setClubSearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search clubs..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={club._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("club", club._id);
+                            handleInputChange("club", "");
                             setFormData((prev) => ({ ...prev, group: "" }));
                             setGroups([]);
                             setShowClubDropdown(false);
+                            setClubSearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.club === club._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {club.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {clubs.length > 0 ? (
+                          clubs.map((club) => (
+                            <button
+                              key={club._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("club", club._id);
+                                setFormData((prev) => ({ ...prev, group: "" }));
+                                setGroups([]);
+                                setShowClubDropdown(false);
+                                setClubSearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.club === club._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              {club.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingClubs ? "Loading..." : "No clubs found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -751,6 +966,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     onClick={() => {
                       if (formData.club) {
                         setShowGroupDropdown(!showGroupDropdown);
+                        if (!showGroupDropdown) setGroupSearchQuery("");
                       }
                     }}
                     disabled={!formData.club || isAnyLoading}
@@ -765,24 +981,60 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showGroupDropdown && formData.club && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {groups.map((group) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={groupSearchRef}
+                            type="text"
+                            value={groupSearchQuery}
+                            onChange={(e) => setGroupSearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search groups..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={group._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("group", group._id);
+                            handleInputChange("group", "");
                             setShowGroupDropdown(false);
+                            setGroupSearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.group === group._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {group.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {groups.length > 0 ? (
+                          groups.map((group) => (
+                            <button
+                              key={group._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("group", group._id);
+                                setShowGroupDropdown(false);
+                                setGroupSearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.group === group._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              {group.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingGroups ? "Loading..." : "No groups found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -793,7 +1045,10 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={() => setShowStyleDropdown(!showStyleDropdown)}
+                    onClick={() => {
+                      setShowStyleDropdown(!showStyleDropdown);
+                      if (!showStyleDropdown) setStyleSearchQuery("");
+                    }}
                     disabled={isAnyLoading}
                     className="w-full px-4 py-2.5 text-sm text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed dark:text-white"
                   >
@@ -806,24 +1061,60 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showStyleDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {eventStyles.map((style) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={styleSearchRef}
+                            type="text"
+                            value={styleSearchQuery}
+                            onChange={(e) => setStyleSearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search styles..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={style._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("style", style._id);
+                            handleInputChange("style", "");
                             setShowStyleDropdown(false);
+                            setStyleSearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.style === style._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {style.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {eventStyles.length > 0 ? (
+                          eventStyles.map((style) => (
+                            <button
+                              key={style._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("style", style._id);
+                                setShowStyleDropdown(false);
+                                setStyleSearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.style === style._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              {style.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingStyles ? "Loading..." : "No styles found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -851,24 +1142,64 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showSportGroupDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {sportGroups.map((sg) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={sportGroupSearchRef}
+                            type="text"
+                            value={sportGroupSearchQuery}
+                            onChange={(e) => setSportGroupSearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search sport groups..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={sg._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("sportGroup", sg._id);
+                            handleInputChange("sportGroup", "");
+                            setFormData((prev) => ({ ...prev, sport: "" }));
+                            setSports([]);
                             setShowSportGroupDropdown(false);
+                            setSportGroupSearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.sportGroup === sg._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {sg.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {sportGroups.length > 0 ? (
+                          sportGroups.map((sg) => (
+                            <button
+                              key={sg._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("sportGroup", sg._id);
+                                setFormData((prev) => ({ ...prev, sport: "" }));
+                                setSports([]);
+                                setShowSportGroupDropdown(false);
+                                setSportGroupSearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.sportGroup === sg._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              {sg.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingSportGroups ? "Loading..." : "No sport groups found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -882,6 +1213,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     onClick={() => {
                       if (formData.sportGroup) {
                         setShowSportDropdown(!showSportDropdown);
+                        if (!showSportDropdown) setSportSearchQuery("");
                       }
                     }}
                     disabled={!formData.sportGroup || isAnyLoading}
@@ -896,24 +1228,60 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showSportDropdown && formData.sportGroup && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {sports.map((sport) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={sportSearchRef}
+                            type="text"
+                            value={sportSearchQuery}
+                            onChange={(e) => setSportSearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search sports..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={sport._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("sport", sport._id);
+                            handleInputChange("sport", "");
                             setShowSportDropdown(false);
+                            setSportSearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.sport === sport._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {sport.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {sports.length > 0 ? (
+                          sports.map((sport) => (
+                            <button
+                              key={sport._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("sport", sport._id);
+                                setShowSportDropdown(false);
+                                setSportSearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.sport === sport._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              {sport.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingSports ? "Loading..." : "No sports found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -930,9 +1298,10 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={() =>
-                      setShowFacilityDropdown(!showFacilityDropdown)
-                    }
+                    onClick={() => {
+                      setShowFacilityDropdown(!showFacilityDropdown);
+                      if (!showFacilityDropdown) setFacilitySearchQuery("");
+                    }}
                     disabled={isAnyLoading}
                     className="w-full px-4 py-2.5 text-sm text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed dark:text-white"
                   >
@@ -945,34 +1314,69 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showFacilityDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleInputChange("facility", "");
-                          setShowFacilityDropdown(false);
-                        }}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400"
-                      >
-                        None
-                      </button>
-                      {facilities.map((facility) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={facilitySearchRef}
+                            type="text"
+                            value={facilitySearchQuery}
+                            onChange={(e) => setFacilitySearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search facilities..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={facility._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("facility", facility._id);
+                            handleInputChange("facility", "");
+                            setFormData((prev) => ({ ...prev, salon: "" }));
+                            setSalons([]);
                             setShowFacilityDropdown(false);
+                            setFacilitySearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.facility === facility._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {facility.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {facilities.length > 0 ? (
+                          facilities.map((facility) => (
+                            <button
+                              key={facility._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("facility", facility._id);
+                                setShowFacilityDropdown(false);
+                                setFacilitySearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.facility === facility._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              <div>
+                                <div className="font-medium">{facility.name}</div>
+                                {facility.address && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {facility.address}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingFacilities ? "Loading..." : "No facilities found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -986,6 +1390,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     onClick={() => {
                       if (formData.facility) {
                         setShowSalonDropdown(!showSalonDropdown);
+                        if (!showSalonDropdown) setSalonSearchQuery("");
                       }
                     }}
                     disabled={!formData.facility || isAnyLoading}
@@ -1000,34 +1405,60 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
                   {showSalonDropdown && formData.facility && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleInputChange("salon", "");
-                          setShowSalonDropdown(false);
-                        }}
-                        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400"
-                      >
-                        None
-                      </button>
-                      {salons.map((salon) => (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            ref={salonSearchRef}
+                            type="text"
+                            value={salonSearchQuery}
+                            onChange={(e) => setSalonSearchQuery(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Search salons..."
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto max-h-48">
                         <button
-                          key={salon._id}
                           type="button"
                           onClick={() => {
-                            handleInputChange("salon", salon._id);
+                            handleInputChange("salon", "");
                             setShowSalonDropdown(false);
+                            setSalonSearchQuery("");
                           }}
-                          className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                            formData.salon === salon._id
-                              ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
+                          className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 italic"
                         >
-                          {salon.name}
+                          Clear selection
                         </button>
-                      ))}
+                        {salons.length > 0 ? (
+                          salons.map((salon) => (
+                            <button
+                              key={salon._id}
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("salon", salon._id);
+                                setShowSalonDropdown(false);
+                                setSalonSearchQuery("");
+                              }}
+                              className={`w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 ${
+                                formData.salon === salon._id
+                                  ? "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400"
+                                  : "text-gray-700 dark:text-gray-200"
+                              }`}
+                            >
+                              {salon.name}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            {loadingSalons ? "Loading..." : "No salons found"}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

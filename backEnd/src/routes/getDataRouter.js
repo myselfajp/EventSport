@@ -43,6 +43,7 @@ router.post(
     '/get-facility',
     createSearchController(Facility, {
         searchFields: ['name'],
+        allowedFilters: ['mainSport'],
     })
 );
 router.post(
