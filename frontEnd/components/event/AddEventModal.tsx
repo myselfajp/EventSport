@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { X, Upload, ImageIcon, ChevronDown } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { LEVEL_DEFINITIONS } from "@/app/lib/level-definitions";
+import LevelDefinitions from "@/components/LevelDefinitions";
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -634,7 +636,9 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">png, jpg, jpeg</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    png, jpg, jpeg · Suggested: 750×750 px
+                  </p>
                 </div>
 
                 <div className="md:col-span-2">
@@ -673,7 +677,9 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">png, jpg, jpeg</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    png, jpg, jpeg · Suggested: 1080×1920 px
+                  </p>
                 </div>
               </div>
 
@@ -1104,6 +1110,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </div>
               </div>
 
+              <LevelDefinitions />
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1133,16 +1141,11 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     required
                   >
                     <option value="">Select Level</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
-                    <option value="10">10</option>
+                    {LEVEL_DEFINITIONS.map(({ level, label }) => (
+                      <option key={level} value={level}>
+                        {level} – {label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

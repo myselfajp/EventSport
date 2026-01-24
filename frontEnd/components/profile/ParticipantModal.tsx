@@ -5,6 +5,8 @@ import { X, ChevronDown } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { fetchJSON } from "@/app/lib/api";
 import { useMe } from "@/app/hooks/useAuth";
+import { getLevelDefinition } from "@/app/lib/level-definitions";
+import LevelDefinitions from "@/components/LevelDefinitions";
 
 interface ParticipantModalProps {
   isOpen?: boolean;
@@ -71,14 +73,6 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const [selectedSportGroupName, setSelectedSportGroupName] = useState("");
   const [selectedSportName, setSelectedSportName] = useState("");
   const [selectedGoalName, setSelectedGoalName] = useState("");
-
-  const skillLevels = [
-    { value: 1, label: "Beginner (1-2)", range: [1, 2] },
-    { value: 3, label: "Beginner+ (3-4)", range: [3, 4] },
-    { value: 5, label: "Intermediate (5-6)", range: [5, 6] },
-    { value: 7, label: "Advanced (7-8)", range: [7, 8] },
-    { value: 9, label: "Professional (9-10)", range: [9, 10] },
-  ];
 
   const isVisible = renderInline ? true : isOpen;
 
@@ -420,11 +414,8 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   };
 
   const getSkillLevelLabel = () => {
-    const level = skillLevels.find(
-      (l) =>
-        formData.skillLevel >= l.range[0] && formData.skillLevel <= l.range[1]
-    );
-    return level ? level.label : `Level ${formData.skillLevel}`;
+    const def = getLevelDefinition(formData.skillLevel);
+    return def ? `${def.level} – ${def.label}: ${def.description}` : `Level ${formData.skillLevel}`;
   };
 
   if (!isVisible) return null;
@@ -574,6 +565,8 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
           )}
         </div>
 
+        <LevelDefinitions />
+
         {/* Skill Level Slider */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -592,11 +585,11 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
               disabled={loading || initializing}
             />
             <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-              <span>Beginner (1)</span>
-              <span className="font-medium text-cyan-600 dark:text-cyan-400">
+              <span>1 – Beginner</span>
+              <span className="font-medium text-cyan-600 dark:text-cyan-400 text-center max-w-[60%]">
                 {getSkillLevelLabel()}
               </span>
-              <span>Pro (10)</span>
+              <span>10 – Elite</span>
             </div>
           </div>
         </div>

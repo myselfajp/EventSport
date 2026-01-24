@@ -1,5 +1,22 @@
 import mongoose from 'mongoose';
 
+const termsAcceptedSchema = new mongoose.Schema(
+    {
+        versionId: { type: mongoose.Schema.Types.ObjectId, ref: 'LegalDocument', required: true },
+        acceptedAt: { type: Date, required: true, default: () => new Date() },
+    },
+    { _id: false }
+);
+
+const kvkkConsentSchema = new mongoose.Schema(
+    {
+        agreed: { type: Boolean, required: true },
+        versionId: { type: mongoose.Schema.Types.ObjectId, ref: 'LegalDocument', required: true },
+        consentedAt: { type: Date, required: true, default: () => new Date() },
+    },
+    { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
     {
         firstName: {
@@ -84,6 +101,14 @@ const userSchema = new mongoose.Schema(
         },
         lastLoginIp: {
             type: String,
+        },
+        termsAccepted: {
+            type: termsAcceptedSchema,
+            default: null,
+        },
+        kvkkConsent: {
+            type: kvkkConsentSchema,
+            default: null,
         },
     },
     { timestamps: true }

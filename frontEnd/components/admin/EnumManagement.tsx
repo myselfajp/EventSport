@@ -56,9 +56,11 @@ export default function EnumManagement() {
   
   const [sportGoals, setSportGoals] = useState<SportGoal[]>([]);
   const [showSportGoalModal, setShowSportGoalModal] = useState(false);
+  const [editingSportGoal, setEditingSportGoal] = useState<SportGoal | null>(null);
   
   const [eventStyles, setEventStyles] = useState<EventStyle[]>([]);
   const [showEventStyleModal, setShowEventStyleModal] = useState(false);
+  const [editingEventStyle, setEditingEventStyle] = useState<EventStyle | null>(null);
   
   const [eventTypes, setEventTypes] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
@@ -379,10 +381,16 @@ export default function EnumManagement() {
   };
 
   const handleCreateSportGoal = () => {
+    setEditingSportGoal(null);
     setFormData({ name: "", color: "#000000" });
     setShowSportGoalModal(true);
   };
 
+  const handleEditSportGoal = (goal: SportGoal) => {
+    setEditingSportGoal(goal);
+    setFormData({ ...formData, name: goal.name });
+    setShowSportGoalModal(true);
+  };
 
   const handleDeleteSportGoal = async (sportGoalId: string) => {
     if (!confirm("Are you sure you want to delete this sport goal?")) {
@@ -407,15 +415,19 @@ export default function EnumManagement() {
     e.preventDefault();
     try {
       setError("");
-      const url = EP.REFERENCE.sportGoal.create;
+      const isEdit = !!editingSportGoal;
+      const url = isEdit
+        ? EP.REFERENCE.sportGoal.edit(editingSportGoal!._id)
+        : EP.REFERENCE.sportGoal.create;
 
       const response = await fetchJSON(url, {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         body: { name: formData.name },
       });
 
       if (response?.success) {
         setShowSportGoalModal(false);
+        setEditingSportGoal(null);
         fetchSportGoals();
       } else {
         setError(response?.message || response?.error || "Failed to save sport goal");
@@ -426,10 +438,16 @@ export default function EnumManagement() {
   };
 
   const handleCreateEventStyle = () => {
+    setEditingEventStyle(null);
     setFormData({ name: "", color: "#000000" });
     setShowEventStyleModal(true);
   };
 
+  const handleEditEventStyle = (style: EventStyle) => {
+    setEditingEventStyle(style);
+    setFormData({ name: style.name, color: style.color });
+    setShowEventStyleModal(true);
+  };
 
   const handleDeleteEventStyle = async (eventStyleId: string) => {
     if (!confirm("Are you sure you want to delete this event style?")) {
@@ -454,15 +472,19 @@ export default function EnumManagement() {
     e.preventDefault();
     try {
       setError("");
-      const url = EP.REFERENCE.eventStyle.create;
+      const isEdit = !!editingEventStyle;
+      const url = isEdit
+        ? EP.REFERENCE.eventStyle.edit(editingEventStyle!._id)
+        : EP.REFERENCE.eventStyle.create;
 
       const response = await fetchJSON(url, {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         body: { name: formData.name, color: formData.color },
       });
 
       if (response?.success) {
         setShowEventStyleModal(false);
+        setEditingEventStyle(null);
         fetchEventStyles();
       } else {
         setError(response?.message || response?.error || "Failed to save event style");
@@ -822,12 +844,22 @@ export default function EnumManagement() {
                       <span className="font-medium text-gray-900 dark:text-slate-100">
                         {goal.name}
                       </span>
-                      <button
-                        onClick={() => handleDeleteSportGoal(goal._id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditSportGoal(goal)}
+                          className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSportGoal(goal._id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -875,12 +907,22 @@ export default function EnumManagement() {
                           {style.name}
                         </span>
                       </div>
-                      <button
-                        onClick={() => handleDeleteEventStyle(style._id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditEventStyle(style)}
+                          className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEventStyle(style._id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -1161,7 +1203,7 @@ export default function EnumManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-md">
             <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-slate-100">
-              Create Sport Goal
+              {editingSportGoal ? "Edit Sport Goal" : "Create Sport Goal"}
             </h3>
             <form onSubmit={handleSubmitSportGoal} className="space-y-4">
               <div>
@@ -1183,11 +1225,14 @@ export default function EnumManagement() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
                 >
-                  Create
+                  {editingSportGoal ? "Update" : "Create"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowSportGoalModal(false)}
+                  onClick={() => {
+                    setShowSportGoalModal(false);
+                    setEditingSportGoal(null);
+                  }}
                   className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                 >
                   Cancel
@@ -1203,7 +1248,7 @@ export default function EnumManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-md">
             <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-slate-100">
-              Create Event Style
+              {editingEventStyle ? "Edit Event Style" : "Create Event Style"}
             </h3>
             <form onSubmit={handleSubmitEventStyle} className="space-y-4">
               <div>
@@ -1250,11 +1295,14 @@ export default function EnumManagement() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
                 >
-                  Create
+                  {editingEventStyle ? "Update" : "Create"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowEventStyleModal(false)}
+                  onClick={() => {
+                    setShowEventStyleModal(false);
+                    setEditingEventStyle(null);
+                  }}
                   className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                 >
                   Cancel

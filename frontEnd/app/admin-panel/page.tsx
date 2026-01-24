@@ -11,8 +11,9 @@ import CoachCertificateApproval from "../../components/admin/CoachCertificateApp
 import EnumManagement from "../../components/admin/EnumManagement";
 import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
+import LegalManagement from "../../components/admin/LegalManagement";
 
-type TabType = "users" | "coaches" | "enums" | "events" | "notifications";
+type TabType = "users" | "coaches" | "enums" | "events" | "notifications" | "legal";
 
 export default function AdminPanelPage() {
   const router = useRouter();
@@ -138,6 +139,16 @@ export default function AdminPanelPage() {
               >
                 Notifications
               </button>
+              <button
+                onClick={() => setActiveTab("legal")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "legal"
+                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                }`}
+              >
+                Legal (KVKK & Terms)
+              </button>
             </nav>
           </div>
 
@@ -147,6 +158,7 @@ export default function AdminPanelPage() {
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
             {activeTab === "notifications" && <NotificationManagement />}
+            {activeTab === "legal" && <LegalManagement />}
           </div>
         </div>
       </div>

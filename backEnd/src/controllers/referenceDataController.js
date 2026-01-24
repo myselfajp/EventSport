@@ -66,6 +66,31 @@ export const getSportGoal = async (req, res, next) => {
     }
 };
 
+export const updateSportGoal = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const sportGoalId = mongoObjectId.parse(req.params.sportGoalId);
+        const result = name.parse(req.body?.name);
+
+        const updated = await SportGoal.findByIdAndUpdate(
+            sportGoalId,
+            { name: result },
+            { new: true }
+        );
+        if (!updated) throw new AppError(404);
+
+        res.status(200).json({
+            success: true,
+            data: updated,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const deleteSportGoal = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== 0) {
@@ -391,6 +416,32 @@ export const getEventStyle = async (req, res, next) => {
             perPage,
             pageNumber,
             totalPages: Math.ceil(total / perPage),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateEventStyle = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const eventStyleId = mongoObjectId.parse(req.params.eventStyleId);
+        const eventName = name.parse(req.body?.name);
+        const eventColor = color.parse(req.body?.color);
+
+        const updated = await EventStyle.findByIdAndUpdate(
+            eventStyleId,
+            { name: eventName, color: eventColor },
+            { new: true }
+        );
+        if (!updated) throw new AppError(404);
+
+        res.status(200).json({
+            success: true,
+            data: updated,
         });
     } catch (err) {
         next(err);

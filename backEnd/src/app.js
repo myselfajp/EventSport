@@ -8,6 +8,7 @@ import facilityRouter from './routes/facilityRouter.js';
 import companyRouter from './routes/companyRouter.js';
 import getDataRouter from './routes/getDataRouter.js';
 import adminRouter from './routes/adminRouter.js';
+import legalRouter from './routes/legalRouter.js';
 import notificationRouter from './routes/notificationRouter.js';
 import { authMiddleware } from './middleware/authMiddleware.js';
 import { adminMiddleware } from './middleware/adminMiddleware.js';
@@ -78,6 +79,7 @@ app.get('/mid', authMiddleware, (req, res) => {
 app.post('/api/v1/auth/sign-in', authRateLimiter, validateCSRFToken, authController.signIn);
 app.post('/api/v1/auth/sign-up', signupRateLimiter, validateCSRFToken, authController.signUp);
 app.use('/api/v1/auth', validateCSRFToken, authMiddleware, authRouter);
+app.use('/api/v1/legal', validateCSRFToken, legalRouter);
 app.use('/api/v1/participant', authMiddleware, participantRouter);
 app.use('/api/v1/reference-data', authMiddleware, (req, res, next) => {
     console.log('Reference data router - URL:', req.url);

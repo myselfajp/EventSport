@@ -107,6 +107,61 @@ export const signupSchema = z.object({
         error: (iss) =>
             iss.input === undefined ? { message: 'Age is required.' } : { message: 'Invalid age.' },
     }),
+
+    agreeTerms: z.literal(true, {
+        errorMap: () => ({ message: 'You must agree to the Terms and Conditions.' }),
+    }),
+    agreeKvkk: z.literal(true, {
+        errorMap: () => ({ message: 'You must agree to the KVKK.' }),
+    }),
+    termsVersionId: z.string().regex(MongoObjectIdRegex, 'Invalid terms version ID.'),
+    kvkkVersionId: z.string().regex(MongoObjectIdRegex, 'Invalid KVKK version ID.'),
+});
+
+export const adminCreateUserSchema = z.object({
+    firstName: z.string({
+        error: (iss) =>
+            iss.input === undefined
+                ? { message: 'First name is required.' }
+                : { message: 'Invalid first name.' },
+    }),
+    lastName: z.string({
+        error: (iss) =>
+            iss.input === undefined
+                ? { message: 'Last name is required.' }
+                : { message: 'Invalid last name.' },
+    }),
+    phone: z.string({
+        error: (iss) =>
+            iss.input === undefined
+                ? { message: 'Phone is required.' }
+                : { message: 'Invalid phone number.' },
+    }),
+    email: z
+        .string({
+            error: (iss) =>
+                iss.input === undefined
+                    ? { message: 'Email is required.' }
+                    : { message: 'Invalid input.' },
+        })
+        .email('Please provide a valid email address'),
+    password: z
+        .string({
+            error: (iss) =>
+                iss.input === undefined
+                    ? { message: 'Password is required.' }
+                    : { message: 'Invalid input.' },
+        })
+        .min(passwordMin, `Password must be at least ${passwordMin} characters`)
+        .max(passwordMax, `Password must be at most ${passwordMax} characters`)
+        .regex(
+            passwordRegex,
+            `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
+        ),
+    age: z.date({
+        error: (iss) =>
+            iss.input === undefined ? { message: 'Age is required.' } : { message: 'Invalid age.' },
+    }),
 });
 
 export const loginSchema = z.object({

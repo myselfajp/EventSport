@@ -19,6 +19,7 @@ if (!API_V1_BASE) {
 
 const AUTH_API = `${API_V1_BASE}/auth`;
 const ADMIN_API = `${API_V1_BASE}/admin`;
+const LEGAL_API = `${API_V1_BASE}/legal`;
 const REFERENCE_DATA_API = `${API_V1_BASE}/reference-data`;
 const PARTICIPANT_DATA_API = `${API_V1_BASE}/participant`;
 const COACH_DATA_API = `${API_V1_BASE}/coach`;
@@ -37,8 +38,21 @@ export const EP = {
     getUsers: `${AUTH_API}/get-user`,
     getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,
   },
+  LEGAL: {
+    getActive: (type: "kvkk" | "terms") =>
+      `${LEGAL_API}/active?type=${type}`,
+  },
   ADMIN: {
     panel: `${ADMIN_API}/panel`,
+    legal: {
+      list: (type?: "kvkk" | "terms") =>
+        type ? `${ADMIN_API}/legal?type=${type}` : `${ADMIN_API}/legal`,
+      create: `${ADMIN_API}/legal`,
+      getById: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
+      update: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
+      activate: (documentId: string) =>
+        `${ADMIN_API}/legal/${documentId}/activate`,
+    },
     users: {
       getAll: `${ADMIN_API}/users`,
       create: `${ADMIN_API}/users/create`,
@@ -83,12 +97,16 @@ export const EP = {
     sportGoal: {
       get: `${REFERENCE_DATA_API}/get-sport-goal`,
       create: `${REFERENCE_DATA_API}/create-sport-goal`,
+      edit: (sportGoalId: string) =>
+        `${REFERENCE_DATA_API}/update-sport-goal/${sportGoalId}`,
       delete: (sportGoalId: string) =>
         `${REFERENCE_DATA_API}/delete-sport-goal/${sportGoalId}`,
     },
     eventStyle: {
       get: `${REFERENCE_DATA_API}/get-event-style`,
       create: `${REFERENCE_DATA_API}/create-event-style`,
+      edit: (eventStyleId: string) =>
+        `${REFERENCE_DATA_API}/update-event-style/${eventStyleId}`,
       delete: (eventStyleId: string) =>
         `${REFERENCE_DATA_API}/delete-event-style/${eventStyleId}`,
     },
