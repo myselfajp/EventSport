@@ -160,16 +160,19 @@ const EventsDashboard = () => {
           setShowFollowings(false);
           setShowFavorites(false);
           setShowCoachCalendar(true);
+          setLeftSidebarOpen(false);
         }}
         onShowFollowings={() => {
           setShowCoachCalendar(false);
           setShowFavorites(false);
           setShowFollowings(true);
+          setLeftSidebarOpen(false);
         }}
         onShowFavorites={() => {
           setShowCoachCalendar(false);
           setShowFollowings(false);
           setShowFavorites(true);
+          setLeftSidebarOpen(false);
         }}
       />
 
