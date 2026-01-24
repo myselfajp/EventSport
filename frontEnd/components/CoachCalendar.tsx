@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, X, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, X, Clock, Users, CheckCircle, CreditCard } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -58,6 +58,12 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [showFacilityModal, setShowFacilityModal] = useState(false);
+  
+  // Participants modal state
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [selectedEventForParticipants, setSelectedEventForParticipants] = useState<Event | null>(null);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
 
   const monthNames = [
     "January",
@@ -451,6 +457,39 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     });
   };
 
+  const fetchParticipants = async (eventId: string) => {
+    setIsLoadingParticipants(true);
+    try {
+      const response = await fetchJSON(EP.COACH.getEventParticipants(eventId), {
+        method: "POST",
+        body: { perPage: 100, pageNumber: 1 },
+      });
+      if (response?.success && response?.data) {
+        setParticipants(response.data);
+      } else {
+        setParticipants([]);
+      }
+    } catch (err) {
+      console.error("Error fetching participants:", err);
+      setParticipants([]);
+    } finally {
+      setIsLoadingParticipants(false);
+    }
+  };
+
+  const handleShowParticipants = (e: React.MouseEvent, event: Event) => {
+    e.stopPropagation();
+    setSelectedEventForParticipants(event);
+    setShowParticipantsModal(true);
+    fetchParticipants(event._id);
+  };
+
+  const handleCloseParticipantsModal = () => {
+    setShowParticipantsModal(false);
+    setSelectedEventForParticipants(null);
+    setParticipants([]);
+  };
+
   return (
     <div className="h-full flex flex-col relative">
       <div className="flex items-center gap-3 mb-6">
@@ -706,6 +745,14 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                                     {event.eventStyle.name}
                                   </span>
                                 )}
+                                <button
+                                  onClick={(e) => handleShowParticipants(e, event)}
+                                  className="px-3 py-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                                  title="View Participants"
+                                >
+                                  <Users className="w-3 h-3" />
+                                  Participants
+                                </button>
                                 {isOwner && (
                                   <button
                                     onClick={(e) => {
@@ -793,6 +840,98 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         }}
         facility={selectedFacility}
       />
+
+      {/* Participants Modal */}
+      {showParticipantsModal && selectedEventForParticipants && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-auto max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Event Participants
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  {selectedEventForParticipants.name}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseParticipantsModal}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {isLoadingParticipants ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : participants.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 dark:text-slate-400">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No participants yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {participants.map((p: any) => (
+                    <div
+                      key={p._id}
+                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white font-semibold">
+                          {p.user?.firstName?.[0] || "?"}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {p.user?.firstName} {p.user?.lastName}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400">
+                            {p.participant?.name || "Participant"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {p.isCheckedIn ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
+                            <CheckCircle className="w-3 h-3" />
+                            Checked In
+                          </span>
+                        ) : p.isPaid ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded text-xs font-medium">
+                            <CreditCard className="w-3 h-3" />
+                            Paid
+                          </span>
+                        ) : p.isWaitListed ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded text-xs font-medium">
+                            <Clock className="w-3 h-3" />
+                            Waitlisted
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs font-medium">
+                            <Clock className="w-3 h-3" />
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+              <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
+                <span>Total: {participants.length} participants</span>
+                <span>
+                  Checked In: {participants.filter((p: any) => p.isCheckedIn).length}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
