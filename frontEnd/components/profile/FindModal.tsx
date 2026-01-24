@@ -412,6 +412,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   const searchFacilities = async (filters: {
     search?: string;
+    sport?: string;
     pageNumber?: number;
     perPage?: number;
   }) => {
@@ -427,6 +428,10 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
       if (filters.search && filters.search.trim().length >= 2) {
         payload.search = filters.search.trim();
+      }
+
+      if (filters.sport) {
+        payload.mainSport = filters.sport;
       }
 
       const response: FacilitySearchResponse = await fetchJSON(
@@ -657,6 +662,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     } else if (selectedType === "facility") {
       searchFacilities({
         search: searchQuery.trim().length >= 2 ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: 1,
         perPage: pagination.perPage,
       });
@@ -700,6 +706,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     } else if (selectedType === "facility") {
       searchFacilities({
         search: hasSearched ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: page,
         perPage: pagination.perPage,
       });
@@ -744,6 +751,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         });
       } else if (selectedType === "facility") {
         searchFacilities({
+          sport: sportFilter || undefined,
           pageNumber: 1,
           perPage: pagination.perPage,
         });
@@ -777,24 +785,42 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   // Handle sport filter changes - make API call
   useEffect(() => {
-    if (sportFilter) {
-      if (selectedType === "coach") {
-        searchCoaches({
-          search: hasSearched ? searchQuery : "",
-          sport: sportFilter,
-          pageNumber: 1,
-          perPage: pagination.perPage,
-          isVerified: true,
-        });
-      } else if (selectedType === "participant") {
-        searchParticipants({
-          search: hasSearched ? searchQuery : "",
-          sport: sportFilter,
-          pageNumber: 1,
-          perPage: pagination.perPage,
-        });
-      }
+    // Skip if modal is not open or not on a tab that uses sport filter
+    if (!isOpen || (selectedType !== "coach" && selectedType !== "participant" && selectedType !== "facility")) {
+      return;
     }
+    
+    // Only trigger search if user has searched before OR if sport filter is selected
+    // This prevents unnecessary API calls when just opening the modal for the first time
+    if (!hasSearched && !searchQuery && !sportFilter) {
+      return;
+    }
+    
+    // If user has searched or selected a sport filter, perform search
+    if (selectedType === "coach") {
+      searchCoaches({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+        isVerified: true,
+      });
+    } else if (selectedType === "participant") {
+      searchParticipants({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    } else if (selectedType === "facility") {
+      searchFacilities({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportFilter]);
 
   // Clear results when type changes to ensure proper filtering
@@ -1105,21 +1131,29 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
             </div>
           </form>
 
-          {/* Filters - Only show for coach and participant */}
-          {(selectedType === "coach" || selectedType === "participant") && (
+          {/* Filters - Show for coach, participant, and facility */}
+          {(selectedType === "coach" || selectedType === "participant" || selectedType === "facility") && (
             <div className="mb-6">
               <div className="flex gap-3">
                 <select
                   value={sportGroupFilter}
                   onChange={(e) => {
-                    setSportGroupFilter(e.target.value);
-                    setSportFilter("");
+                    if (e.target.value === "clear") {
+                      setSportGroupFilter("");
+                      setSportFilter("");
+                    } else {
+                      setSportGroupFilter(e.target.value);
+                      setSportFilter("");
+                    }
                   }}
                   disabled={isLoadingSportGroups}
                   className="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-cyan-500 disabled:opacity-50 text-base dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">
                     {isLoadingSportGroups ? "Loading..." : "All sport groups"}
+                  </option>
+                  <option value="clear" className="text-gray-500 italic">
+                    Clear selection
                   </option>
                   {sportGroups.map((group) => (
                     <option key={group._id} value={group._id}>
@@ -1129,7 +1163,13 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                 </select>
                 <select
                   value={sportFilter}
-                  onChange={(e) => setSportFilter(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === "clear") {
+                      setSportFilter("");
+                    } else {
+                      setSportFilter(e.target.value);
+                    }
+                  }}
                   disabled={!sportGroupFilter || isLoadingSports}
                   className="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-cyan-500 disabled:opacity-50 text-base dark:bg-gray-700 dark:text-white"
                 >
@@ -1138,7 +1178,10 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                       ? "Select sport group first"
                       : isLoadingSports
                       ? "Loading..."
-                      : "Select sport"}
+                      : "All sports"}
+                  </option>
+                  <option value="clear" className="text-gray-500 italic" disabled={!sportFilter}>
+                    Clear selection
                   </option>
                   {sports
                     .filter(

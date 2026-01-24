@@ -474,24 +474,38 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
                   <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                     Loading...
                   </div>
-                ) : sportGroups.length > 0 ? (
-                  sportGroups.map((group) => (
+                ) : (
+                  <>
                     <button
-                      key={group._id}
                       type="button"
                       onClick={() => {
-                        handleInputChange("sportGroup", group._id, group.name);
+                        handleInputChange("sportGroup", "", "");
                         setShowSportGroupDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors first:rounded-t-lg last:rounded-b-lg dark:text-white"
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors first:rounded-t-lg text-gray-500 dark:text-gray-400 italic"
                     >
-                      {group.name}
+                      Clear selection
                     </button>
-                  ))
-                ) : (
-                  <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                    No sport groups available
-                  </div>
+                    {sportGroups.length > 0 ? (
+                      sportGroups.map((group) => (
+                        <button
+                          key={group._id}
+                          type="button"
+                          onClick={() => {
+                            handleInputChange("sportGroup", group._id, group.name);
+                            setShowSportGroupDropdown(false);
+                          }}
+                          className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white"
+                        >
+                          {group.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                        No sport groups available
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -536,24 +550,38 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
                   <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                     Loading...
                   </div>
-                ) : sports.length > 0 ? (
-                  sports.map((sport) => (
+                ) : (
+                  <>
                     <button
-                      key={sport._id}
                       type="button"
                       onClick={() => {
-                        handleInputChange("mainSport", sport._id, sport.name);
+                        handleInputChange("mainSport", "", "");
                         setShowSportDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors first:rounded-t-lg last:rounded-b-lg dark:text-white"
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors first:rounded-t-lg text-gray-500 dark:text-gray-400 italic"
                     >
-                      {sport.name}
+                      Clear selection
                     </button>
-                  ))
-                ) : (
-                  <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                    No sports in this group
-                  </div>
+                    {sports.length > 0 ? (
+                      sports.map((sport) => (
+                        <button
+                          key={sport._id}
+                          type="button"
+                          onClick={() => {
+                            handleInputChange("mainSport", sport._id, sport.name);
+                            setShowSportDropdown(false);
+                          }}
+                          className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white"
+                        >
+                          {sport.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                        No sports in this group
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -624,24 +652,38 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
                   <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                     Loading...
                   </div>
-                ) : sportGoals.length > 0 ? (
-                  sportGoals.map((goal) => (
+                ) : (
+                  <>
                     <button
-                      key={goal._id}
                       type="button"
                       onClick={() => {
-                        handleInputChange("sportGoal", goal._id, goal.name);
+                        handleInputChange("sportGoal", "", "");
                         setShowGoalDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors first:rounded-t-lg last:rounded-b-lg dark:text-white"
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors first:rounded-t-lg text-gray-500 dark:text-gray-400 italic"
                     >
-                      {goal.name}
+                      Clear selection
                     </button>
-                  ))
-                ) : (
-                  <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                    No goals available
-                  </div>
+                    {sportGoals.length > 0 ? (
+                      sportGoals.map((goal) => (
+                        <button
+                          key={goal._id}
+                          type="button"
+                          onClick={() => {
+                            handleInputChange("sportGoal", goal._id, goal.name);
+                            setShowGoalDropdown(false);
+                          }}
+                          className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white"
+                        >
+                          {goal.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                        No goals available
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

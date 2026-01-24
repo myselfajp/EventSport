@@ -94,6 +94,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isGroupsListOpen, setIsGroupsListOpen] = useState(false);
   const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
+  const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
 
   const { data: allFacilities = [] } = useQuery({
     queryKey: ["facilities"],
@@ -970,11 +971,80 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             </div>
           </div>
 
-          <ParticipantModal
-            renderInline
-            onClose={() => {}}
-            onSubmit={handleCreateParticipant}
-          />
+          {/* Participant Section */}
+          <button
+            onClick={() => setIsParticipantModalOpen(true)}
+            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
+                <User className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                  Participant Profile
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  View and edit your participant information
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+          </button>
+
+          {/* Edit Coach and Account Info */}
+          <div className="space-y-2">
+            {hasCoachProfile && (
+              <button
+                onClick={handleOpenCoachModal}
+                className={`w-full bg-white dark:bg-gray-800 border rounded-lg p-3 transition-all group ${
+                  "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-1.5 rounded-md bg-green-100 dark:bg-green-900/50`}>
+                    <Users className={`w-4 h-4 text-green-600 dark:text-green-400`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-800 dark:text-white text-sm">
+                      Edit Coach Profile
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                      <span className="inline-flex items-center text-green-600 dark:text-green-400">
+                        <Check className="w-3 h-3 mr-0.5" />
+                        Added
+                      </span>
+                      <span className="text-gray-400 dark:text-gray-500">
+                        ·
+                      </span>
+                      <span>Edit your credentials</span>
+                    </div>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-green-600 dark:group-hover:text-green-400`} />
+                </div>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsUserEditModalOpen(true)}
+              className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
+                  <Edit className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-800 dark:text-white text-sm">
+                    Edit Account Info
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Update name, email, phone, password
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+            </button>
+          </div>
 
           <div className="space-y-2">
             <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
@@ -985,168 +1055,83 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               or group resources.
             </p>
 
-            <div className="space-y-2">
-              <button
-                onClick={handleOpenCoachModal}
-                className={`w-full bg-white dark:bg-gray-800 border rounded-lg p-3 transition-all group ${
-                  hasCoachProfile
-                    ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30"
-                    : "border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`p-1.5 rounded-md ${
-                      hasCoachProfile
-                        ? "bg-green-100 dark:bg-green-900/50"
-                        : "bg-orange-100 dark:bg-orange-900/50"
-                    }`}
-                  >
-                    <Users
-                      className={`w-4 h-4 ${
-                        hasCoachProfile
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-orange-600 dark:text-orange-400"
-                      }`}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-800 dark:text-white text-sm">
-                      {hasCoachProfile
-                        ? "Edit Coach Profile"
-                        : "Apply for Coaching"}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      {hasCoachProfile ? (
-                        <>
-                          <span className="inline-flex items-center text-green-600 dark:text-green-400">
-                            <Check className="w-3 h-3 mr-0.5" />
-                            Added
-                          </span>
-                          <span className="text-gray-400 dark:text-gray-500">
-                            ·
-                          </span>
-                          <span>Edit your credentials</span>
-                        </>
-                      ) : (
-                        "Become a coach and share your expertise"
-                      )}
-                    </div>
-                  </div>
-                  <ChevronRight
-                    className={`w-4 h-4 text-gray-400 dark:text-gray-500 ${
-                      hasCoachProfile
-                        ? "group-hover:text-green-600 dark:group-hover:text-green-400"
-                        : "group-hover:text-orange-600 dark:group-hover:text-orange-400"
-                    }`}
-                  />
-                </div>
-              </button>
-
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setIsFacilitiesListOpen(true)}
-                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                    <Home className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-800 dark:text-white text-sm">
-                      My Facilities
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {facilities.length}{" "}
-                      {facilities.length === 1 ? "facility" : "facilities"}
-                    </div>
-                  </div>
+                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
+                  <Home className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                  My Facilities
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {facilities.length} {facilities.length === 1 ? "facility" : "facilities"}
+                </div>
               </button>
 
               <button
                 onClick={() => setIsCompaniesListOpen(true)}
-                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                    <Building className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-800 dark:text-white text-sm">
-                      My Companies
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {companies.length}{" "}
-                      {companies.length === 1 ? "company" : "companies"}
-                    </div>
-                  </div>
+                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
+                  <Building className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                  My Companies
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {companies.length} {companies.length === 1 ? "company" : "companies"}
+                </div>
               </button>
 
               <button
                 onClick={() => setIsClubsListOpen(true)}
-                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                    <Shield className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-800 dark:text-white text-sm">
-                      My Clubs
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {myClubs.length} {myClubs.length === 1 ? "club" : "clubs"}
-                    </div>
-                  </div>
+                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
+                  <Shield className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                  My Clubs
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {myClubs.length} {myClubs.length === 1 ? "club" : "clubs"}
+                </div>
               </button>
 
-              {hasCoachProfile && (
+              {hasCoachProfile ? (
                 <button
                   onClick={() => setIsGroupsListOpen(true)}
-                  className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                      <Layers className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-800 dark:text-white text-sm">
-                        My Sport Communities
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {myGroups.length}{" "}
-                        {myGroups.length === 1 ? "sport community" : "sport communities"}
-                      </div>
-                    </div>
+                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
+                    <Layers className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+                  <div className="font-medium text-gray-800 dark:text-white text-sm">
+                    My Groups
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {myGroups.length} {myGroups.length === 1 ? "group" : "groups"}
+                  </div>
+                </button>
+              ) : (
+                <button
+                  onClick={handleOpenCoachModal}
+                  className="bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
+                >
+                  <div className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-md group-hover:bg-orange-200 dark:group-hover:bg-orange-900/70 mb-2">
+                    <Users className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="font-medium text-gray-800 dark:text-white text-sm">
+                    Apply for Coaching
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Become a coach
+                  </div>
                 </button>
               )}
-
-              <button
-                onClick={() => setIsUserEditModalOpen(true)}
-                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between mt-4"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                    <Edit className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-800 dark:text-white text-sm">
-                      Edit Account Info
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Update name, email, phone, password
-                    </div>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-              </button>
             </div>
           </div>
         </div>
@@ -1857,6 +1842,13 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       <FindModal
         isOpen={isFindModalOpen}
         onClose={() => setIsFindModalOpen(false)}
+      />
+
+      {/* Participant Modal */}
+      <ParticipantModal
+        isOpen={isParticipantModalOpen}
+        onClose={() => setIsParticipantModalOpen(false)}
+        onSubmit={handleCreateParticipant}
       />
 
       {/* User Edit Modal */}
