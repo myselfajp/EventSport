@@ -103,6 +103,7 @@ export const EP = {
     favoriteCoach: `${PARTICIPANT_DATA_API}/favorite-coach`,
     favoriteFacility: `${PARTICIPANT_DATA_API}/favorite-facility`,
     favoriteEvent: `${PARTICIPANT_DATA_API}/favorite-event`,
+    makeReservation: `${PARTICIPANT_DATA_API}/make-reservation`,
     unfavorite: (type: "coach" | "facility" | "event") =>
       `${PARTICIPANT_DATA_API}/favorite/${type}`,
     follow: {

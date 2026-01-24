@@ -1,108 +1,63 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, ArrowLeft, X, Clock } from "lucide-react";
+import { useMe } from "@/app/hooks/useAuth";
+import { fetchJSON } from "@/app/lib/api";
+import { EP } from "@/app/lib/endpoints";
+import ViewEventModal from "./event/ViewEventModal";
+import AddEventModal from "./event/AddEventModal";
+import CoachDetailModal from "./CoachDetailModal";
+import FacilityDetailsModal from "./profile/FacilityDetailsModal";
+import { Facility } from "@/app/lib/types";
 
 interface CoachCalendarProps {
   onBack: () => void;
 }
 
-interface CalendarEvent {
-  id: number;
-  title: string;
-  date: Date;
-  time: string;
-  type: "event" | "training" | "meeting";
-  color: string;
-  borderColor: string;
-  textColor: string;
+interface Event {
+  _id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  owner?: {
+    _id: string;
+  } | string;
+  backupCoach?: {
+    _id: string;
+  } | string;
+  eventStyle?: {
+    name: string;
+    color: string;
+  };
+  sport?: {
+    _id: string;
+    name: string;
+  };
+  sportGroup?: {
+    _id: string;
+    name: string;
+  };
+  [key: string]: any;
 }
 
 const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
+  const { data: user, isLoading: userLoading } = useMe();
+  const coachId = user?._id; // User ID is used as owner for events
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
-
-  const eventColors = [
-    { bg: "bg-blue-500", border: "border-blue-500", text: "text-blue-700", label: "Event" },
-    { bg: "bg-green-500", border: "border-green-500", text: "text-green-700", label: "Training" },
-    { bg: "bg-purple-500", border: "border-purple-500", text: "text-purple-700", label: "Meeting" },
-    { bg: "bg-cyan-500", border: "border-cyan-500", text: "text-cyan-700", label: "Event" },
-    { bg: "bg-orange-500", border: "border-orange-500", text: "text-orange-700", label: "Training" },
-    { bg: "bg-red-500", border: "border-red-500", text: "text-red-700", label: "Event" },
-    { bg: "bg-pink-500", border: "border-pink-500", text: "text-pink-700", label: "Meeting" },
-    { bg: "bg-yellow-500", border: "border-yellow-500", text: "text-yellow-700", label: "Event" },
-    { bg: "bg-indigo-500", border: "border-indigo-500", text: "text-indigo-700", label: "Training" },
-    { bg: "bg-teal-500", border: "border-teal-500", text: "text-teal-700", label: "Event" },
-  ];
-
-  const eventTitles = [
-    "Basketball Tournament",
-    "Team Training Session",
-    "Client Meeting",
-    "Yoga Class",
-    "Swimming Practice",
-    "Football Match",
-    "Strategy Meeting",
-    "Fitness Class",
-    "Tennis Tournament",
-    "Boxing Training",
-    "Volleyball Game",
-    "Running Club",
-    "Cycling Event",
-    "Martial Arts Class",
-    "Gymnastics Practice",
-  ];
-
-  const eventTypes: ("event" | "training" | "meeting")[] = ["event", "training", "meeting"];
-
-  const generateRandomEvents = useMemo(() => {
-    const events: CalendarEvent[] = [];
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
-    const randomDays = new Set<number>();
-    const numEvents = Math.floor(Math.random() * 8) + 5;
-    
-    while (randomDays.size < numEvents) {
-      randomDays.add(Math.floor(Math.random() * daysInMonth) + 1);
-    }
-    
-    randomDays.forEach((day, index) => {
-      const colorIndex = index % eventColors.length;
-      const colorScheme = eventColors[colorIndex];
-      const numEventsForDay = Math.floor(Math.random() * 3) + 1;
-      
-      for (let i = 0; i < numEventsForDay; i++) {
-        const hour = Math.floor(Math.random() * 12) + 8;
-        const minute = Math.random() < 0.5 ? 0 : 30;
-        const ampm = hour >= 12 ? "PM" : "AM";
-        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        const time = `${displayHour}:${minute.toString().padStart(2, "0")} ${ampm}`;
-        
-        events.push({
-          id: events.length + 1,
-          title: eventTitles[Math.floor(Math.random() * eventTitles.length)],
-          date: new Date(year, month, day),
-          time: time,
-          type: eventTypes[Math.floor(Math.random() * eventTypes.length)],
-          color: colorScheme.bg,
-          borderColor: colorScheme.border,
-          textColor: colorScheme.text,
-        });
-      }
-    });
-    
-    return events.sort((a, b) => {
-      if (a.date.getDate() !== b.date.getDate()) {
-        return a.date.getDate() - b.date.getDate();
-      }
-      return a.time.localeCompare(b.time);
-    });
-  }, [currentDate]);
-
-  const dummyEvents: CalendarEvent[] = generateRandomEvents;
+  const [monthEvents, setMonthEvents] = useState<Event[]>([]);
+  const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
+  const [isLoadingMonthEvents, setIsLoadingMonthEvents] = useState(false);
+  const [isLoadingDateEvents, setIsLoadingDateEvents] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showViewEventModal, setShowViewEventModal] = useState(false);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
+  const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
+  const [showCoachModal, setShowCoachModal] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [showFacilityModal, setShowFacilityModal] = useState(false);
 
   const monthNames = [
     "January",
@@ -119,6 +74,256 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     "December",
   ];
 
+  // Get start and end of month
+  const getMonthStartEnd = useCallback((date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const start = new Date(year, month, 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(year, month + 1, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }, []);
+
+  // Fetch events for the current month (for highlighting)
+  const fetchMonthEvents = useCallback(async () => {
+    if (!coachId || userLoading) return;
+    
+    setIsLoadingMonthEvents(true);
+    try {
+      const { start, end } = getMonthStartEnd(currentDate);
+      
+      const response = await fetchJSON(EP.EVENTS.getEvents, {
+        method: "POST",
+        body: {
+          perPage: 100,
+          pageNumber: 1,
+          sortBy: "startTime",
+          sortType: "asc",
+          // Don't filter by owner here, we'll filter in frontend to include backupCoach
+        },
+      });
+
+      if (response?.success && response?.data) {
+        // Filter events that belong to this coach (owner or backupCoach) and fall within the month range
+        let allFilteredEvents = response.data.filter((event: Event) => {
+          if (!event || !event.startTime) return false;
+          
+          // Check if coach is owner or backupCoach
+          const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
+          const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
+          const isOwner = ownerId === coachId;
+          const isBackupCoach = backupCoachId === coachId;
+          if (!isOwner && !isBackupCoach) return false;
+          
+          const eventStart = new Date(event.startTime);
+          const eventDate = new Date(
+            eventStart.getFullYear(),
+            eventStart.getMonth(),
+            eventStart.getDate()
+          );
+          const startDate = new Date(
+            start.getFullYear(),
+            start.getMonth(),
+            start.getDate()
+          );
+          const endDate = new Date(
+            end.getFullYear(),
+            end.getMonth(),
+            end.getDate()
+          );
+          return eventDate >= startDate && eventDate <= endDate;
+        });
+
+        // If there are more pages, fetch them
+        if (response.pagination && response.pagination.totalPages > 1) {
+          for (let page = 2; page <= response.pagination.totalPages; page++) {
+            try {
+              const nextResponse = await fetchJSON(EP.EVENTS.getEvents, {
+                method: "POST",
+                body: {
+                  perPage: 100,
+                  pageNumber: page,
+                  sortBy: "startTime",
+                  sortType: "asc",
+                },
+              });
+              
+              if (nextResponse?.success && nextResponse?.data) {
+                const nextFiltered = nextResponse.data.filter((event: Event) => {
+                  if (!event || !event.startTime) return false;
+                  
+                  // Check if coach is owner or backupCoach
+                  const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
+                  const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
+                  const isOwner = ownerId === coachId;
+                  const isBackupCoach = backupCoachId === coachId;
+                  if (!isOwner && !isBackupCoach) return false;
+                  
+                  const eventStart = new Date(event.startTime);
+                  const eventDate = new Date(
+                    eventStart.getFullYear(),
+                    eventStart.getMonth(),
+                    eventStart.getDate()
+                  );
+                  const startDate = new Date(
+                    start.getFullYear(),
+                    start.getMonth(),
+                    start.getDate()
+                  );
+                  const endDate = new Date(
+                    end.getFullYear(),
+                    end.getMonth(),
+                    end.getDate()
+                  );
+                  return eventDate >= startDate && eventDate <= endDate;
+                });
+                allFilteredEvents = [...allFilteredEvents, ...nextFiltered];
+              }
+            } catch (err) {
+              console.error(`Error fetching page ${page}:`, err);
+              break;
+            }
+          }
+        }
+        
+        setMonthEvents(allFilteredEvents);
+      } else {
+        setMonthEvents([]);
+      }
+    } catch (err) {
+      console.error("Error fetching month events:", err);
+      setMonthEvents([]);
+    } finally {
+      setIsLoadingMonthEvents(false);
+    }
+  }, [currentDate, coachId, userLoading, getMonthStartEnd]);
+
+  // Fetch events for a specific date
+  const fetchDateEvents = useCallback(async (date: Date) => {
+    if (!coachId) return;
+    
+    setIsLoadingDateEvents(true);
+    try {
+      const response = await fetchJSON(EP.EVENTS.getEvents, {
+        method: "POST",
+        body: {
+          perPage: 100,
+          pageNumber: 1,
+          sortBy: "startTime",
+          sortType: "asc",
+          // Don't filter by owner here, we'll filter in frontend to include backupCoach
+        },
+      });
+
+      if (response?.success && response?.data) {
+        // Filter events that belong to this coach (owner or backupCoach) and match the specific date
+        const filteredEvents = response.data.filter((event: Event) => {
+          if (!event || !event.startTime) return false;
+          
+          // Check if coach is owner or backupCoach
+          const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
+          const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
+          const isOwner = ownerId === coachId;
+          const isBackupCoach = backupCoachId === coachId;
+          if (!isOwner && !isBackupCoach) return false;
+          
+          const eventStart = new Date(event.startTime);
+          return (
+            eventStart.getDate() === date.getDate() &&
+            eventStart.getMonth() === date.getMonth() &&
+            eventStart.getFullYear() === date.getFullYear()
+          );
+        });
+
+        // If there are more pages, fetch them
+        if (response.pagination && response.pagination.totalPages > 1) {
+          for (let page = 2; page <= response.pagination.totalPages; page++) {
+            try {
+              const nextResponse = await fetchJSON(EP.EVENTS.getEvents, {
+                method: "POST",
+                body: {
+                  perPage: 100,
+                  pageNumber: page,
+                  sortBy: "startTime",
+                  sortType: "asc",
+                },
+              });
+              
+              if (nextResponse?.success && nextResponse?.data) {
+                const nextFiltered = nextResponse.data.filter((event: Event) => {
+                  if (!event || !event.startTime) return false;
+                  
+                  // Check if coach is owner or backupCoach
+                  const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
+                  const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
+                  const isOwner = ownerId === coachId;
+                  const isBackupCoach = backupCoachId === coachId;
+                  if (!isOwner && !isBackupCoach) return false;
+                  
+                  const eventStart = new Date(event.startTime);
+                  return (
+                    eventStart.getDate() === date.getDate() &&
+                    eventStart.getMonth() === date.getMonth() &&
+                    eventStart.getFullYear() === date.getFullYear()
+                  );
+                });
+                filteredEvents.push(...nextFiltered);
+              }
+            } catch (err) {
+              console.error(`Error fetching page ${page}:`, err);
+              break;
+            }
+          }
+        }
+        
+        setSelectedDateEvents(filteredEvents);
+      } else {
+        setSelectedDateEvents([]);
+      }
+    } catch (err) {
+      console.error("Error fetching date events:", err);
+      setSelectedDateEvents([]);
+    } finally {
+      setIsLoadingDateEvents(false);
+    }
+  }, [coachId]);
+
+  // Fetch month events when date changes
+  useEffect(() => {
+    if (coachId && !userLoading) {
+      fetchMonthEvents();
+    }
+  }, [currentDate, coachId, userLoading, fetchMonthEvents]);
+
+  // Get events for a specific day
+  const getEventsForDay = useCallback((day: number) => {
+    return monthEvents.filter((event) => {
+      const eventDate = new Date(event.startTime);
+      return (
+        eventDate.getDate() === day &&
+        eventDate.getMonth() === currentDate.getMonth() &&
+        eventDate.getFullYear() === currentDate.getFullYear()
+      );
+    });
+  }, [monthEvents, currentDate]);
+
+  // Check if a day has events
+  const hasEvents = useCallback((day: number) => {
+    return getEventsForDay(day).length > 0;
+  }, [getEventsForDay]);
+
+  const handleDateClick = (day: number) => {
+    const date = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day
+    );
+    setSelectedDate(date);
+    setShowEventModal(true);
+    fetchDateEvents(date);
+  };
+
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -130,20 +335,6 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     return { daysInMonth, startingDayOfWeek };
   };
 
-  const getEventsForDay = (day: number) => {
-    return dummyEvents.filter((event) => {
-      return (
-        event.date.getDate() === day &&
-        event.date.getMonth() === currentDate.getMonth() &&
-        event.date.getFullYear() === currentDate.getFullYear()
-      );
-    });
-  };
-
-  const getDayEvents = (day: number) => {
-    return getEventsForDay(day);
-  };
-
   const renderCalendar = () => {
     const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
     const days = [];
@@ -153,6 +344,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
       0
     ).getDate();
 
+    // Previous month days
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       days.push(
         <div key={`prev-${i}`} className="text-center py-2 text-gray-300 dark:text-slate-600 text-sm">
@@ -161,51 +353,57 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
       );
     }
 
+    // Current month days
     for (let day = 1; day <= daysInMonth; day++) {
       const dayEvents = getEventsForDay(day);
+      const hasEventsForDay = hasEvents(day);
       const isToday =
         day === new Date().getDate() &&
         currentDate.getMonth() === new Date().getMonth() &&
         currentDate.getFullYear() === new Date().getFullYear();
 
-      const uniqueColors = Array.from(new Set(dayEvents.map(e => e.color)));
+      // Get unique colors from events
+      const uniqueColors = Array.from(
+        new Set(
+          dayEvents
+            .map((e) => e.eventStyle?.color || "#3b82f6")
+            .filter((c) => c)
+        )
+      );
 
       days.push(
         <div
           key={day}
-          onClick={() => {
-            if (dayEvents.length > 0) {
-              setSelectedDay(day);
-              setShowEventModal(true);
-            }
-          }}
-          className={`relative text-center py-4 rounded-lg transition-all border-2 min-h-[60px] flex flex-col justify-center ${
-            isToday ? "bg-cyan-50 dark:bg-cyan-900/30 border-cyan-500" : "border-transparent"
-          } ${
-            dayEvents.length > 0
-              ? "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700"
-              : "cursor-default hover:bg-gray-50 dark:hover:bg-slate-700/50"
+          onClick={() => handleDateClick(day)}
+          className={`relative text-center py-4 rounded-lg transition-all border-2 min-h-[60px] flex flex-col justify-center cursor-pointer ${
+            isToday
+              ? "bg-cyan-50 dark:bg-cyan-900/30 border-cyan-500"
+              : hasEventsForDay
+              ? "bg-cyan-50 dark:bg-cyan-900/20 border-transparent hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700"
+              : "border-transparent hover:bg-gray-50 dark:hover:bg-slate-700/50"
           }`}
         >
           <div
             className={`text-lg font-semibold mb-2 ${
-              isToday ? "text-cyan-700 dark:text-cyan-400" : dayEvents.length > 0 ? "text-gray-800 dark:text-white" : "text-gray-700 dark:text-slate-300"
+              isToday
+                ? "text-cyan-700 dark:text-cyan-400"
+                : hasEventsForDay
+                ? "text-gray-800 dark:text-white"
+                : "text-gray-700 dark:text-slate-300"
             }`}
           >
             {day}
           </div>
-          {dayEvents.length > 0 && (
+          {hasEventsForDay && (
             <div className="flex flex-wrap gap-1 justify-center px-1">
-              {uniqueColors.slice(0, 3).map((color, idx) => {
-                const eventWithColor = dayEvents.find(e => e.color === color);
-                return (
-                  <div
-                    key={idx}
-                    className={`${color} h-2 w-2 rounded-full shadow-sm`}
-                    title={eventWithColor?.title}
-                  />
-                );
-              })}
+              {uniqueColors.slice(0, 3).map((color, idx) => (
+                <div
+                  key={idx}
+                  className="h-2 w-2 rounded-full shadow-sm"
+                  style={{ backgroundColor: color }}
+                  title={dayEvents.find((e) => (e.eventStyle?.color || "#3b82f6") === color)?.name}
+                />
+              ))}
               {uniqueColors.length > 3 && (
                 <div className="text-[8px] text-gray-600 dark:text-slate-300 font-semibold bg-gray-100 dark:bg-slate-700 px-1 rounded">
                   +{uniqueColors.length - 3}
@@ -217,6 +415,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
       );
     }
 
+    // Next month days
     const remainingDays = 42 - days.length;
     for (let i = 1; i <= remainingDays; i++) {
       days.push(
@@ -229,16 +428,28 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     return days;
   };
 
-  const selectedDayEvents = selectedDay ? getEventsForDay(selectedDay) : [];
+  // Calculate statistics
+  const totalEvents = monthEvents.length;
+  const eventTypes = monthEvents.reduce((acc, event) => {
+    const type = event.eventStyle?.name || "Event";
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-  const totalEvents = generateRandomEvents.length;
-  const greenEvents = generateRandomEvents.filter(e => e.type === 'training').length;
-  const redEvents = generateRandomEvents.filter(e => e.type === 'meeting').length;
-  const blueEvents = generateRandomEvents.filter(e => e.type === 'event').length;
+  const greenEvents = eventTypes["Training"] || 0;
+  const redEvents = eventTypes["Meeting"] || 0;
+  const blueEvents = totalEvents - greenEvents - redEvents;
 
-  const greenPercentage = Math.round((greenEvents / totalEvents) * 100);
-  const redPercentage = Math.round((redEvents / totalEvents) * 100);
-  const bluePercentage = Math.round((blueEvents / totalEvents) * 100);
+  const greenPercentage = totalEvents > 0 ? Math.round((greenEvents / totalEvents) * 100) : 0;
+  const redPercentage = totalEvents > 0 ? Math.round((redEvents / totalEvents) * 100) : 0;
+  const bluePercentage = totalEvents > 0 ? Math.round((blueEvents / totalEvents) * 100) : 0;
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   return (
     <div className="h-full flex flex-col relative">
@@ -327,48 +538,50 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-8 mb-8">
-              <div className="relative w-32 h-32">
-                <svg
-                  className="w-32 h-32 transform -rotate-90"
-                  viewBox="0 0 100 100"
-                >
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="15"
-                    strokeDasharray={`${bluePercentage * 2.512} 251.2`}
-                    strokeDashoffset="0"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="15"
-                    strokeDasharray={`${greenPercentage * 2.512} 251.2`}
-                    strokeDashoffset={`-${bluePercentage * 2.512}`}
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="15"
-                    strokeDasharray={`${redPercentage * 2.512} 251.2`}
-                    strokeDashoffset={`-${(bluePercentage + greenPercentage) * 2.512}`}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-bold text-gray-700 dark:text-slate-200">{totalEvents}</span>
+            {totalEvents > 0 && (
+              <div className="flex items-center justify-center gap-8 mb-8">
+                <div className="relative w-32 h-32">
+                  <svg
+                    className="w-32 h-32 transform -rotate-90"
+                    viewBox="0 0 100 100"
+                  >
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="15"
+                      strokeDasharray={`${bluePercentage * 2.512} 251.2`}
+                      strokeDashoffset="0"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="15"
+                      strokeDasharray={`${greenPercentage * 2.512} 251.2`}
+                      strokeDashoffset={`-${bluePercentage * 2.512}`}
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="15"
+                      strokeDasharray={`${redPercentage * 2.512} 251.2`}
+                      strokeDashoffset={`-${(bluePercentage + greenPercentage) * 2.512}`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-lg font-bold text-gray-700 dark:text-slate-200">{totalEvents}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
@@ -399,22 +612,24 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {showEventModal && selectedDay && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {/* Event Detail Modal */}
+      {showEventModal && selectedDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/75 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
               <div>
                 <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-                  {monthNames[currentDate.getMonth()]} {selectedDay}, {currentDate.getFullYear()}
+                  {monthNames[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? "s" : ""} scheduled
+                  {isLoadingDateEvents ? "Loading..." : `${selectedDateEvents.length} event${selectedDateEvents.length !== 1 ? "s" : ""} scheduled`}
                 </p>
               </div>
               <button
                 onClick={() => {
                   setShowEventModal(false);
-                  setSelectedDay(null);
+                  setSelectedDate(null);
+                  setSelectedDateEvents([]);
                 }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors"
               >
@@ -423,7 +638,11 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
             </div>
 
             <div className="p-6">
-              {selectedDayEvents.length === 0 ? (
+              {isLoadingDateEvents ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 dark:text-slate-400">Loading events...</p>
+                </div>
+              ) : selectedDateEvents.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-gray-300 dark:text-slate-600 mb-4">
                     <Clock className="w-16 h-16 mx-auto" />
@@ -432,47 +651,150 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {selectedDayEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-slate-700/50"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className={`${event.color} w-4 h-4 rounded-full mt-2 flex-shrink-0`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-semibold text-gray-800 dark:text-white text-lg mb-1">{event.title}</h4>
-                              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 mb-3">
-                                <Clock className="w-4 h-4 text-gray-400 dark:text-slate-500" />
-                                <span className="font-medium">{event.time}</span>
+                  {selectedDateEvents.map((event) => {
+                    const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
+                    const isOwner = ownerId === coachId;
+                    
+                    return (
+                      <div
+                        key={event._id}
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setShowViewEventModal(true);
+                        }}
+                        className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-slate-700/50 cursor-pointer"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div
+                            className="w-4 h-4 rounded-full mt-2 flex-shrink-0"
+                            style={{
+                              backgroundColor: event.eventStyle?.color || "#3b82f6",
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="font-semibold text-gray-800 dark:text-white text-lg mb-1">
+                                  {event.name}
+                                </h4>
+                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 mb-3">
+                                  <Clock className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                                  <span className="font-medium">
+                                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                                  </span>
+                                </div>
+                                {event.sport && (
+                                  <p className="text-sm text-gray-500 dark:text-slate-400 mb-1">
+                                    Sport: {event.sport.name}
+                                  </p>
+                                )}
+                                {event.sportGroup && (
+                                  <p className="text-sm text-gray-500 dark:text-slate-400">
+                                    Sport Group: {event.sportGroup.name}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {event.eventStyle && (
+                                  <span
+                                    className="text-xs px-3 py-1 rounded-full font-medium"
+                                    style={{
+                                      backgroundColor: `${event.eventStyle.color}20`,
+                                      color: event.eventStyle.color,
+                                    }}
+                                  >
+                                    {event.eventStyle.name}
+                                  </span>
+                                )}
+                                {isOwner && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedEvent(event);
+                                      setShowEditEventModal(true);
+                                      setShowEventModal(false); // Close the day events modal
+                                    }}
+                                    className="px-3 py-1 bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white rounded-lg text-xs font-medium transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                               </div>
                             </div>
-                            <span
-                              className={`text-xs px-3 py-1 rounded-full font-medium ${
-                                event.type === "event"
-                                  ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
-                                  : event.type === "training"
-                                  ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
-                                  : "bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300"
-                              }`}
-                            >
-                              {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
-                            </span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {selectedEvent && (
+        <ViewEventModal
+          isOpen={showViewEventModal}
+          onClose={() => {
+            setShowViewEventModal(false);
+            setSelectedEvent(null);
+          }}
+          event={{
+            ...selectedEvent,
+            createdAt: selectedEvent.createdAt || new Date().toISOString(),
+          }}
+          onCoachClick={(coachId: string) => {
+            if (coachId) {
+              setSelectedCoachId(coachId);
+              setShowCoachModal(true);
+            }
+          }}
+          onFacilityClick={(facility) => {
+            if (facility) {
+              setSelectedFacility(facility as Facility);
+              setShowFacilityModal(true);
+            }
+          }}
+        />
+      )}
+
+      <AddEventModal
+        isOpen={showEditEventModal}
+        onClose={() => {
+          setShowEditEventModal(false);
+          setSelectedEvent(null);
+        }}
+        onSuccess={() => {
+          // Refresh events for the selected date if modal is open
+          if (selectedDate) {
+            fetchDateEvents(selectedDate);
+          }
+          fetchMonthEvents(); // Refresh month events too
+          setSelectedEvent(null);
+        }}
+        initialData={showEditEventModal ? selectedEvent : undefined}
+      />
+
+      <CoachDetailModal
+        isOpen={showCoachModal}
+        onClose={() => {
+          setShowCoachModal(false);
+          setSelectedCoachId(null);
+        }}
+        coachId={selectedCoachId}
+      />
+
+      <FacilityDetailsModal
+        isOpen={showFacilityModal}
+        onClose={() => {
+          setShowFacilityModal(false);
+          setSelectedFacility(null);
+        }}
+        facility={selectedFacility}
+      />
     </div>
   );
 };
 
 export default CoachCalendar;
-

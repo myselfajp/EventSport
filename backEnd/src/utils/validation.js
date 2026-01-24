@@ -887,6 +887,8 @@ export const createSalonSchema = z.object({
                 ? { message: 'Price info is required.' }
                 : { message: 'Invalid price info.' },
     }),
+
+    description: z.string().optional(),
 });
 
 export const editSalonSchema = z
@@ -918,11 +920,14 @@ export const editSalonSchema = z
             })
             .min(1, 'Price info cannot be empty.')
             .optional(),
+
+        description: z.string().optional(),
+
+        clearPhoto: z.boolean().optional(),
     })
     .refine(
         (data) => {
-            // Dynamically check only specific optional keys:
-            const keysToCheck = ['name', 'sportGroup', 'sport', 'priceInfo'];
+            const keysToCheck = ['name', 'sportGroup', 'sport', 'priceInfo', 'description', 'clearPhoto'];
             return keysToCheck.some((key) => data[key] !== undefined);
         },
         {

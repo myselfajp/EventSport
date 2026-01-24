@@ -25,6 +25,15 @@ const salonSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        description: {
+            type: String,
+        },
+        photo: {
+            path: { type: String },
+            originalName: { type: String },
+            mimeType: { type: String },
+            size: { type: Number },
+        },
     },
     { timestamps: true }
 );

@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
-import { X, ImageIcon } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, ImageIcon, UserPlus } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
+import { useMe } from "@/app/hooks/useAuth";
+import { apiFetch } from "@/app/lib/api";
 
 interface Event {
   _id: string;
@@ -37,6 +39,19 @@ interface Event {
     _id: string;
     name: string;
     address?: string;
+    phone?: string;
+    email?: string;
+    photo?: {
+      path: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+    };
+    mainSport?: string;
+    membershipLevel?: string;
+    private?: boolean;
+    point?: number;
+    createdAt?: string;
   };
   salon?: {
     _id: string;
@@ -56,22 +71,22 @@ interface Event {
   isRecurring?: boolean;
   owner?: {
     _id: string;
-    firstName: string;
-    lastName: string;
-    coach: string;
-  };
+    firstName?: string;
+    lastName?: string;
+    coach?: string;
+  } | string;
   backupCoach?: {
     _id: string;
-    firstName: string;
-    lastName: string;
-    coach: string;
-  };
+    firstName?: string;
+    lastName?: string;
+    coach?: string;
+  } | string;
   backuoCoach?: {
     _id: string;
-    firstName: string;
-    lastName: string;
-    coach: string;
-  };
+    firstName?: string;
+    lastName?: string;
+    coach?: string;
+  } | string;
   [key: string]: any;
 }
 
@@ -80,6 +95,7 @@ interface ViewEventModalProps {
   onClose: () => void;
   event: Event | null;
   onCoachClick: (coachId: string) => void;
+  onFacilityClick?: (facility: Event['facility']) => void;
 }
 
 const ViewEventModal: React.FC<ViewEventModalProps> = ({
@@ -87,7 +103,117 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   onClose,
   event,
   onCoachClick,
+  onFacilityClick,
 }) => {
+  const { data: user } = useMe();
+  const [isJoining, setIsJoining] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
+  const [joinStatus, setJoinStatus] = useState<{
+    isWaitListed?: boolean;
+    isApproved?: boolean;
+    isCheckedIn?: boolean;
+  } | null>(null);
+
+  // Check if user is owner or backupCoach
+  const ownerId = typeof event?.owner === 'object' && event?.owner !== null ? event.owner._id : event?.owner;
+  const backupCoachId = typeof event?.backupCoach === 'object' && event?.backupCoach !== null ? event.backupCoach._id : event?.backupCoach;
+  const isOwner = ownerId === user?._id;
+  const isBackupCoach = backupCoachId === user?._id;
+  const isEventCreator = isOwner || isBackupCoach;
+  const isParticipant = !!user?.participant;
+
+  // Check if user has joined this event
+  useEffect(() => {
+    if (!isOpen || !event || !user?.participant) {
+      setHasJoined(false);
+      setJoinStatus(null);
+      return;
+    }
+
+    // Fetch reservation status from backend
+    const fetchReservationStatus = async () => {
+      try {
+        const response = await apiFetch(`${EP.EVENTS.getEvents}/${event._id}`, {
+          method: "POST",
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.success && data.reservation) {
+          setHasJoined(true);
+          setJoinStatus({
+            isWaitListed: data.reservation.isWaitListed,
+            isApproved: data.reservation.isApproved,
+            isCheckedIn: data.reservation.isCheckedIn,
+          });
+        } else {
+          setHasJoined(false);
+          setJoinStatus(null);
+        }
+      } catch (error) {
+        console.error("Error fetching reservation status:", error);
+        setHasJoined(false);
+        setJoinStatus(null);
+      }
+    };
+
+    fetchReservationStatus();
+  }, [isOpen, event, user]);
+
+  const handleJoinEvent = async () => {
+    if (!event || !user?.participant || isJoining) return;
+
+    setIsJoining(true);
+    try {
+      const response = await apiFetch(EP.PARTICIPANT.makeReservation, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId: event._id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setHasJoined(true);
+        // Refresh reservation status
+        try {
+          const statusResponse = await apiFetch(`${EP.EVENTS.getEvents}/${event._id}`, {
+            method: "POST",
+          });
+          const statusData = await statusResponse.json();
+          if (statusResponse.ok && statusData.success && statusData.reservation) {
+            setJoinStatus({
+              isWaitListed: statusData.reservation.isWaitListed,
+              isApproved: statusData.reservation.isApproved,
+              isCheckedIn: statusData.reservation.isCheckedIn,
+            });
+            // Show success message
+            const message = statusData.reservation?.isWaitListed 
+              ? "You have been added to the waitlist." 
+              : "Successfully joined the event!";
+            alert(message);
+          } else {
+            alert("Successfully joined the event!");
+          }
+        } catch (statusError) {
+          console.error("Error fetching reservation status:", statusError);
+          alert("Successfully joined the event!");
+        }
+      } else {
+        // Show error message
+        alert(data.error || data.message || "Failed to join event");
+      }
+    } catch (error) {
+      console.error("Error joining event:", error);
+      alert("An error occurred while joining the event");
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
   if (!isOpen || !event) return null;
 
   const getImageUrl = (photo?: { path?: string }) => {
@@ -188,12 +314,25 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 </label>
                 <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
                   {event.owner ? (
+                    (() => {
+                      const owner = event.owner;
+                      if (typeof owner === 'object' && owner !== null && 'firstName' in owner && owner.firstName) {
+                        return (
                     <button
-                      onClick={() => onCoachClick(event.owner!.coach)}
+                            onClick={() => onCoachClick(owner.coach || '')}
                       className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 hover:underline font-medium"
                     >
-                      {event.owner.firstName} {event.owner.lastName}
+                            {owner.firstName} {owner.lastName}
                     </button>
+                        );
+                      } else {
+                        return (
+                          <span className="text-gray-700 dark:text-slate-300">
+                            {typeof owner === 'string' ? owner : 'Coach'}
+                          </span>
+                        );
+                      }
+                    })()
                   ) : (
                     "-"
                   )}
@@ -206,17 +345,27 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 </label>
                 <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
                   {event.backupCoach || event.backuoCoach ? (
+                    (() => {
+                      const backupCoach = event.backupCoach || event.backuoCoach;
+                      if (typeof backupCoach === 'object' && backupCoach !== null && backupCoach.firstName) {
+                        return (
                     <button
                       onClick={() =>
-                        onCoachClick(
-                          (event.backupCoach || event.backuoCoach)!.coach
-                        )
+                              onCoachClick(backupCoach.coach || '')
                       }
                       className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 hover:underline font-medium"
                     >
-                      {(event.backupCoach || event.backuoCoach)!.firstName}{" "}
-                      {(event.backupCoach || event.backuoCoach)!.lastName}
+                            {backupCoach.firstName} {backupCoach.lastName}
                     </button>
+                        );
+                      } else {
+                        return (
+                          <span className="text-gray-700 dark:text-slate-300">
+                            {typeof backupCoach === 'string' ? backupCoach : 'Coach'}
+                          </span>
+                        );
+                      }
+                    })()
                   ) : (
                     "-"
                   )}
@@ -279,7 +428,20 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   Facility
                 </label>
                 <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
-                  {event.facility?.name || "-"}
+                  {event.facility ? (
+                    onFacilityClick ? (
+                      <button
+                        onClick={() => onFacilityClick(event.facility)}
+                        className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 hover:underline font-medium"
+                      >
+                        {event.facility.name}
+                      </button>
+                    ) : (
+                      event.facility.name
+                    )
+                  ) : (
+                    "-"
+                  )}
                 </div>
               </div>
 
@@ -440,6 +602,22 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           </div>
 
           <div className="flex justify-end gap-3 pt-6 mt-6 pb-6 px-6 -mx-6 border-t border-gray-200 dark:border-slate-700 sticky bottom-0 bg-white dark:bg-slate-800">
+            {!isEventCreator && isParticipant && !hasJoined && (
+              <button
+                type="button"
+                onClick={handleJoinEvent}
+                disabled={isJoining}
+                className="px-6 py-2.5 text-sm font-medium text-white bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <UserPlus className="w-4 h-4" />
+                {isJoining ? "Joining..." : "Join Event"}
+              </button>
+            )}
+            {hasJoined && (
+              <div className="px-6 py-2.5 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                Joined
+              </div>
+            )}
             <button
               type="button"
               onClick={onClose}
