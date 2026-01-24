@@ -9,20 +9,20 @@ import {
   processPhoneInput,
   getPhoneDigits,
 } from "@/app/lib/phone-utils";
+import { fetchJSON } from "@/app/lib/api";
+import { EP } from "@/app/lib/endpoints";
+import LegalContentModal from "./LegalContentModal";
 
 interface RegistrationFormProps {
   onToggleForm: () => void;
 }
 
-interface RegistrationData {
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  birthday: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  agreeTerms: boolean;
+interface ActiveLegal {
+  _id: string;
+  title: string;
+  content: string;
+  docType: string;
+  version: number;
 }
 
 const RegistrationForm: React.FC<RegistrationFormProps> = ({
@@ -40,14 +40,53 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreeKvkk, setAgreeKvkk] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [activeTerms, setActiveTerms] = useState<ActiveLegal | null>(null);
+  const [activeKvkk, setActiveKvkk] = useState<ActiveLegal | null>(null);
+  const [legalModal, setLegalModal] = useState<{ title: string; content: string } | null>(null);
+  const [legalLoading, setLegalLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLegalLoading(true);
+      try {
+        const [termsRes, kvkkRes] = await Promise.all([
+          fetchJSON(EP.LEGAL.getActive("terms"), { method: "GET" }, { skipAuth: true }),
+          fetchJSON(EP.LEGAL.getActive("kvkk"), { method: "GET" }, { skipAuth: true }),
+        ]);
+        if (cancelled) return;
+        if (termsRes?.success && termsRes?.data) setActiveTerms(termsRes.data);
+        if (kvkkRes?.success && kvkkRes?.data) setActiveKvkk(kvkkRes.data);
+      } catch {
+        if (!cancelled) {
+          setActiveTerms(null);
+          setActiveKvkk(null);
+        }
+      } finally {
+        if (!cancelled) setLegalLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError("");
 
     if (!agreeTerms) {
-      setValidationError("Please agree to the terms and conditions");
+      setValidationError("Please agree to the Terms and Conditions.");
+      return;
+    }
+    if (!agreeKvkk) {
+      setValidationError("Please agree to the KVKK.");
+      return;
+    }
+    if (!activeTerms || !activeKvkk) {
+      setValidationError("Terms and KVKK are not available. Please try again later.");
       return;
     }
 
@@ -67,16 +106,28 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
-    const formData = {
+    signUp({
       firstName,
       lastName,
       phone: phoneNumber,
       age: birthday,
       email,
       password,
-    };
+      agreeTerms: true,
+      agreeKvkk: true,
+      termsVersionId: activeTerms._id,
+      kvkkVersionId: activeKvkk._id,
+    });
+  };
 
-    signUp(formData);
+  const openTermsModal = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (activeTerms) setLegalModal({ title: activeTerms.title, content: activeTerms.content });
+  };
+
+  const openKvkkModal = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (activeKvkk) setLegalModal({ title: activeKvkk.title, content: activeKvkk.content });
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,18 +334,63 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               id="terms"
               checked={agreeTerms}
               onChange={(e) => setAgreeTerms(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900"
+              disabled={!activeTerms}
+              className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900 disabled:opacity-50"
             />
             <label
               htmlFor="terms"
               className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed"
             >
-              I Agree{" "}
-              <span className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors">
-                Terms and conditions.
-              </span>
+              I agree to the{" "}
+              <button
+                type="button"
+                onClick={openTermsModal}
+                disabled={!activeTerms}
+                className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Terms and Conditions
+              </button>
+              .
             </label>
           </div>
+
+          {/* KVKK */}
+          <div className="flex items-start gap-3 py-2">
+            <input
+              type="checkbox"
+              id="kvkk"
+              checked={agreeKvkk}
+              onChange={(e) => setAgreeKvkk(e.target.checked)}
+              disabled={!activeKvkk}
+              className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900 disabled:opacity-50"
+            />
+            <label
+              htmlFor="kvkk"
+              className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed"
+            >
+              I agree to the{" "}
+              <button
+                type="button"
+                onClick={openKvkkModal}
+                disabled={!activeKvkk}
+                className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                KVKK
+              </button>
+              .
+            </label>
+          </div>
+
+          {legalLoading && (
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              Loading Terms and KVKK...
+            </p>
+          )}
+          {!legalLoading && (!activeTerms || !activeKvkk) && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Terms and KVKK are not available. Registration is temporarily disabled.
+            </p>
+          )}
 
           {(validationError || error) && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded-lg">
@@ -306,7 +402,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || legalLoading || !activeTerms || !activeKvkk}
             className="w-full bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 
                        disabled:opacity-60 disabled:cursor-not-allowed 
                        text-white py-2.5 px-4 rounded-lg transition-colors font-medium shadow-sm hover:shadow-md text-sm"
@@ -315,6 +411,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
           </button>
         </form>
       </div>
+
+      {legalModal && (
+        <LegalContentModal
+          title={legalModal.title}
+          content={legalModal.content}
+          onClose={() => setLegalModal(null)}
+        />
+      )}
     </div>
   );
 };

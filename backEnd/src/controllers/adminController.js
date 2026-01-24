@@ -12,7 +12,7 @@ import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
 import { Sport } from '../models/referenceDataModel.js';
 import { AppError } from '../utils/appError.js';
-import { SearchQuerySchema, mongoObjectId, signupSchema, editUserSchema } from '../utils/validation.js';
+import { SearchQuerySchema, mongoObjectId, signupSchema, adminCreateUserSchema, editUserSchema } from '../utils/validation.js';
 import * as zodValidation from '../utils/validation.js';
 import argon2 from 'argon2';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
@@ -77,6 +77,8 @@ export const getAllUsers = async (req, res, next) => {
             })
             .populate('coach', 'name isVerified')
             .populate('facility', 'name mainSport')
+            .populate('termsAccepted.versionId', 'docType version title isActive')
+            .populate('kvkkConsent.versionId', 'docType version title isActive')
             .skip((pageNumber - 1) * perPage)
             .limit(perPage)
             .sort({ createdAt: -1 });
@@ -176,7 +178,7 @@ export const createUser = async (req, res, next) => {
             body.age = new Date(body.age);
         }
 
-        const result = signupSchema.parse(body);
+        const result = adminCreateUserSchema.parse(body);
 
         const passwordCheck = checkPasswordStrength(result.password);
         if (!passwordCheck.valid) {
@@ -194,6 +196,8 @@ export const createUser = async (req, res, next) => {
         const user = await User.create({
             ...userData,
             password: hashedPassword,
+            termsAccepted: null,
+            kvkkConsent: null,
         });
 
         const { password: pass, ...userWithoutPassword } = user.toObject();

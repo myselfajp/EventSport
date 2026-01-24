@@ -50,6 +50,15 @@ interface User {
       groupsCount: number;
     };
   };
+  termsAccepted?: {
+    versionId?: { version?: number; title?: string };
+    acceptedAt?: string;
+  } | null;
+  kvkkConsent?: {
+    agreed?: boolean;
+    versionId?: { version?: number; title?: string };
+    consentedAt?: string;
+  } | null;
   createdAt: string;
 }
 
@@ -402,6 +411,12 @@ export default function UsersManagement() {
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Phone
                   </th>
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    Terms version
+                  </th>
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    KVKK consent
+                  </th>
                   {activeTab === 'participant' && (
                     <>
                       <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
@@ -451,6 +466,18 @@ export default function UsersManagement() {
                     </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       {user.phone}
+                    </td>
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                      {user.termsAccepted?.versionId && typeof user.termsAccepted.versionId === "object" && user.termsAccepted.versionId.version != null
+                        ? `v${user.termsAccepted.versionId.version}`
+                        : "-"}
+                    </td>
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                      {user.kvkkConsent?.agreed ? (
+                        <span className="text-green-600 dark:text-green-400 font-medium">Yes</span>
+                      ) : (
+                        <span className="text-gray-500 dark:text-slate-400">No</span>
+                      )}
                     </td>
                     {activeTab === 'participant' && (
                       <>

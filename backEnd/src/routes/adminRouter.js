@@ -2,6 +2,7 @@ import express from 'express';
 const router = express.Router();
 import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 import * as adminController from '../controllers/adminController.js';
+import * as legalController from '../controllers/legalController.js';
 
 router.get('/panel', adminController.getAdminPanel);
 
@@ -36,5 +37,12 @@ router.put(
     uploadFile({ fieldName: 'facility-photo', optional: true }),
     adminController.updateFacilityProfile
 );
+
+// Legal (KVKK, Terms & Conditions)
+router.get('/legal', legalController.list);
+router.post('/legal', legalController.create);
+router.get('/legal/:documentId', legalController.getById);
+router.put('/legal/:documentId', legalController.update);
+router.put('/legal/:documentId/activate', legalController.setActive);
 
 export default router;

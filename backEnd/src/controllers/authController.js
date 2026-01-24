@@ -1,6 +1,7 @@
 import User from '../models/userModel.js';
 import Participant from '../models/participantModel.js';
 import Coach from '../models/coachModel.js';
+import LegalDocument from '../models/legalDocumentModel.js';
 import { Types } from 'mongoose';
 import argon2 from 'argon2';
 import {
@@ -24,7 +25,6 @@ export const signUp = async (req, res, next) => {
             body.age = new Date(body.age);
         }
 
-        // validate info
         const result = signupSchema.parse(body);
 
         const passwordCheck = checkPasswordStrength(result.password);
@@ -32,29 +32,39 @@ export const signUp = async (req, res, next) => {
             throw new AppError(400, passwordCheck.message);
         }
 
+        const termsDoc = await LegalDocument.findById(result.termsVersionId).lean();
+        if (!termsDoc || termsDoc.docType !== 'terms' || !termsDoc.isActive) {
+            throw new AppError(400, 'Invalid or inactive Terms & Conditions version.');
+        }
+        const kvkkDoc = await LegalDocument.findById(result.kvkkVersionId).lean();
+        if (!kvkkDoc || kvkkDoc.docType !== 'kvkk' || !kvkkDoc.isActive) {
+            throw new AppError(400, 'Invalid or inactive KVKK version.');
+        }
+
         const email = result.email;
-
-        const existingUser = await User.findOne({
-            email,
-        });
-
+        const existingUser = await User.findOne({ email });
         if (existingUser) throw new AppError(409, 'Email already registered');
 
         const hashedPassword = await argon2.hash(result.password);
-        const { password, ...userData } = result;
-
-        const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        const userAgent = req.headers['user-agent'] || 'Unknown';
+        const { password, agreeTerms, agreeKvkk, termsVersionId, kvkkVersionId, ...userData } = result;
 
         const user = await User.create({
             ...userData,
             password: hashedPassword,
+            termsAccepted: {
+                versionId: new Types.ObjectId(termsVersionId),
+                acceptedAt: new Date(),
+            },
+            kvkkConsent: {
+                agreed: true,
+                versionId: new Types.ObjectId(kvkkVersionId),
+                consentedAt: new Date(),
+            },
         });
 
         const { password: pass, ...userWithoutPassword } = user.toObject();
 
         const tokens = await generateTokens(user.id);
-
         sendTokens(res, tokens);
 
         res.status(201).json({

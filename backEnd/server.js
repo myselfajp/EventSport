@@ -1,6 +1,7 @@
 import app from './src/app.js';
 import mongoose from 'mongoose';
 import { initAdmin } from './src/utils/initAdmin.js';
+import { initLegal } from './src/utils/initLegal.js';
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -21,8 +22,8 @@ const connectDB = async () => {
         await mongoose.connect(MONGODB_URI);
         console.log('✅ MongoDB connected');
         
-        // Initialize admin user after DB connection
         await initAdmin();
+        await initLegal();
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1); // stop app if DB fails
