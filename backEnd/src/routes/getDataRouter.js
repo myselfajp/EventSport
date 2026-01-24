@@ -74,7 +74,7 @@ router.post(
     '/get-event',
     createSearchController(Event, {
         searchFields: ['name'],
-        allowedFilters: ['sport', 'sportGroup', 'private'],
+        allowedFilters: ['sport', 'sportGroup', 'private', 'owner'],
         allowedSortFields: ['name', 'sportGroup', 'sport', 'startTime', 'endTime'],
     })
 );

@@ -17,8 +17,16 @@ router.put(
 router.delete('/:facilityId', facilityController.deleteFacility);
 
 // salon
-router.post('/salon/add-salon', facilityController.addSalon);
-router.put('/salon/:salonId', facilityController.editSalon);
+router.post(
+    '/salon/add-salon',
+    uploadFile({ fieldName: 'salon-photo', optional: true }),
+    facilityController.addSalon
+);
+router.put(
+    '/salon/:salonId',
+    uploadFile({ fieldName: 'salon-photo', optional: true }),
+    facilityController.editSalon
+);
 router.delete('/salon/:salonId', facilityController.deleteSalon);
 
 // calendar

@@ -1,11 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  PHONE_PREFIX,
+  processPhoneInput,
+  normalizePhoneForDisplay,
+  isPhoneComplete,
+} from "@/app/lib/phone-utils";
 
 interface UserEditModalProps {
   isOpen: boolean;
@@ -29,7 +35,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
     firstName: "",
     lastName: "",
     email: "",
-    phone: "",
+    phone: PHONE_PREFIX,
     oldPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -38,13 +44,15 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState("");
   const [changePassword, setChangePassword] = useState(false);
 
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (isOpen && user) {
       setFormData({
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.email || "",
-        phone: user.phone || "",
+        phone: normalizePhoneForDisplay(user.phone) || PHONE_PREFIX,
         oldPassword: "",
         newPassword: "",
         confirmPassword: "",
@@ -53,6 +61,12 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
       setError("");
     }
   }, [isOpen, user]);
+
+  useEffect(() => {
+    if (!phoneInputRef.current) return;
+    const len = formData.phone.length;
+    phoneInputRef.current.setSelectionRange(len, len);
+  }, [formData.phone]);
 
   const handleInputChange = (
     field: keyof UserFormData,
@@ -65,11 +79,20 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
     setError("");
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = processPhoneInput(e.target.value);
+    handleInputChange("phone", next);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Validate password change if enabled
+    if (formData.phone && !isPhoneComplete(formData.phone)) {
+      setError(`Enter full Turkish phone (9 digits after ${PHONE_PREFIX})`);
+      return;
+    }
+
     if (changePassword) {
       if (!formData.oldPassword) {
         setError("Old password is required");
@@ -204,9 +227,13 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
               Phone
             </label>
             <input
+              ref={phoneInputRef}
               type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
               value={formData.phone}
-              onChange={(e) => handleInputChange("phone", e.target.value)}
+              onChange={handlePhoneChange}
+              placeholder={`${PHONE_PREFIX}XX XXX XX XX`}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required
             />

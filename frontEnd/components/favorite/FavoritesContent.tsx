@@ -367,6 +367,12 @@ const FavoritesContent: React.FC = () => {
           setSelectedEvent(null);
           setSelectedCoachId(coachId);
         }}
+        onFacilityClick={(facility) => {
+          if (facility) {
+            setSelectedEvent(null);
+            setSelectedFacility(facility);
+          }
+        }}
       />
       <UserProfileModal
         isOpen={!!selectedCoachId}

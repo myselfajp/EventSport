@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import ViewEventModal from "./ViewEventModal";
 import CoachDetailModal from "../CoachDetailModal";
+import FacilityDetailsModal from "../profile/FacilityDetailsModal";
+import { Facility } from "@/app/lib/types";
 import { EP } from "@/app/lib/endpoints";
 import { fetchJSON } from "@/app/lib/api";
 import {
@@ -108,6 +110,8 @@ const EventsTable: React.FC<EventsTableProps> = ({
 
   const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [isFacilityModalOpen, setIsFacilityModalOpen] = useState(false);
 
   const { data: user } = useMe();
   const { data: favoritesData } = useFavorites();
@@ -183,6 +187,11 @@ const EventsTable: React.FC<EventsTableProps> = ({
   const handleCloseCoachModal = () => {
     setIsCoachModalOpen(false);
     setSelectedCoachId(null);
+  };
+
+  const handleCloseFacilityModal = () => {
+    setIsFacilityModalOpen(false);
+    setSelectedFacility(null);
   };
 
   const goToPage = (page: number) => {
@@ -587,12 +596,24 @@ const EventsTable: React.FC<EventsTableProps> = ({
           setSelectedCoachId(coachId);
           setIsCoachModalOpen(true);
         }}
+        onFacilityClick={(facility) => {
+          if (facility) {
+            setSelectedFacility(facility as Facility);
+            setIsFacilityModalOpen(true);
+          }
+        }}
       />
 
       <CoachDetailModal
         isOpen={isCoachModalOpen}
         onClose={handleCloseCoachModal}
         coachId={selectedCoachId}
+      />
+
+      <FacilityDetailsModal
+        isOpen={isFacilityModalOpen}
+        onClose={handleCloseFacilityModal}
+        facility={selectedFacility}
       />
     </div>
   );

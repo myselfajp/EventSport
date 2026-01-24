@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Upload } from "lucide-react";
+import {
+  PHONE_PREFIX,
+  processPhoneInput,
+  normalizePhoneForDisplay,
+  isPhoneComplete,
+} from "@/app/lib/phone-utils";
 
 interface CompanyModalProps {
   isOpen: boolean;
@@ -27,16 +33,20 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
   const [formData, setFormData] = useState<CompanyFormData>({
     name: "",
     address: "",
-    phone: "",
+    phone: PHONE_PREFIX,
     email: "",
     photo: "",
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        phone: normalizePhoneForDisplay(initialData.phone) || PHONE_PREFIX,
+      });
       if (initialData.photo) {
         setPhotoPreview(initialData.photo);
       }
@@ -44,7 +54,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
       setFormData({
         name: "",
         address: "",
-        phone: "",
+        phone: PHONE_PREFIX,
         email: "",
         photo: "",
       });
@@ -52,12 +62,23 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     }
   }, [initialData]);
 
+  useEffect(() => {
+    if (!phoneInputRef.current) return;
+    const len = formData.phone.length;
+    phoneInputRef.current.setSelectionRange(len, len);
+  }, [formData.phone]);
+
   const handleInputChange = (field: keyof CompanyFormData, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
     setError("");
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = processPhoneInput(e.target.value);
+    handleInputChange("phone", next);
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,12 +116,17 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
       }
     }
 
+    if (formData.phone && !isPhoneComplete(formData.phone)) {
+      setError(`Enter full Turkish phone (9 digits after ${PHONE_PREFIX})`);
+      return;
+    }
+
     onSubmit(formData);
     onClose();
     setFormData({
       name: "",
       address: "",
-      phone: "",
+      phone: PHONE_PREFIX,
       email: "",
       photo: "",
     });
@@ -113,7 +139,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     setFormData({
       name: "",
       address: "",
-      phone: "",
+      phone: PHONE_PREFIX,
       email: "",
       photo: "",
     });
@@ -179,10 +205,13 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
                   Phone
                 </label>
                 <input
+                  ref={phoneInputRef}
                   type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
                   value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
-                  placeholder="Enter phone number"
+                  onChange={handlePhoneChange}
+                  placeholder={`${PHONE_PREFIX}XX XXX XX XX`}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
               </div>

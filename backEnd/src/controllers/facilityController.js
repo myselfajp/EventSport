@@ -137,7 +137,8 @@ export const addSalon = async (req, res, next) => {
         }
 
         const user = req.user;
-        const result = zodValidation.createSalonSchema.parse(req.body);
+        const raw = typeof req.body?.data === 'string' ? JSON.parse(req.body.data) : req.body;
+        const result = zodValidation.createSalonSchema.parse(raw);
 
         const facilityExists = await Facility.exists({ _id: result.facilityId });
         if (!facilityExists) throw new AppError(404, 'Facility not found');
@@ -148,16 +149,29 @@ export const addSalon = async (req, res, next) => {
         const sportGroupExists = await SportGroup.exists({ _id: result.sportGroup });
         if (!sportGroupExists) throw new AppError(404, 'SportGroup not found');
 
-        // Check if user is owner of facility
         const isOwner = user.facility?.some((f) => f.equals(result.facilityId));
         if (!isOwner && user.role !== 0) {
             throw new AppError(403, 'You are not the owner of this facility');
         }
 
-        const newSalon = await Salon.create({
-            ...result,
+        const payload = {
             facility: result.facilityId,
-        });
+            name: result.name,
+            sportGroup: result.sportGroup,
+            sport: result.sport,
+            priceInfo: result.priceInfo,
+            ...(result.description != null && result.description !== '' && { description: result.description }),
+        };
+        if (req.fileMeta) {
+            payload.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
+
+        const newSalon = await Salon.create(payload);
 
         res.status(201).json({
             success: true,
@@ -177,7 +191,8 @@ export const editSalon = async (req, res, next) => {
 
         const user = req.user;
         const salonId = zodValidation.mongoObjectId.parse(req.params.salonId);
-        const result = zodValidation.editSalonSchema.parse(req.body);
+        const raw = typeof req.body?.data === 'string' ? JSON.parse(req.body.data) : req.body;
+        const result = zodValidation.editSalonSchema.parse(raw);
 
         const salonExists = await Salon.findById(salonId);
         if (!salonExists) throw new AppError(404, 'Salon not found');
@@ -191,15 +206,30 @@ export const editSalon = async (req, res, next) => {
             const sportGroupExists = await SportGroup.exists({ _id: result.sportGroup });
             if (!sportGroupExists) throw new AppError(404, 'SportGroup not found');
         }
-        // Check if user is owner of facility
+
         const isOwner = user.facility?.some((f) => f.equals(salonExists.facility));
         if (!isOwner && user.role !== 0) {
             throw new AppError(403, 'You are not the owner of this facility');
         }
 
+        const { clearPhoto, ...rest } = result;
+        const payload = { ...rest };
+        if (!clearPhoto && req.fileMeta) {
+            payload.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
+
+        const updateOp = clearPhoto
+            ? { $set: payload, $unset: { photo: 1 } }
+            : { $set: payload };
+
         const updatedSalon = await Salon.findByIdAndUpdate(
             salonId,
-            { $set: result },
+            updateOp,
             { new: true }
         );
 

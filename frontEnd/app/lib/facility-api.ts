@@ -112,13 +112,27 @@ export async function deleteFacility(id: string) {
 
 // Salon API
 
-export async function addSalon(facilityId: string, salonData: any) {
+export async function addSalon(
+  facilityId: string,
+  salonData: {
+    name: string;
+    sport: string;
+    sportGroup: string;
+    priceInfo: string;
+    description?: string;
+  },
+  photoFile?: File | null
+) {
+  const formData = new FormData();
+  const payload = { ...salonData, facilityId };
+  formData.append("data", JSON.stringify(payload));
+  if (photoFile) {
+    formData.append("salon-photo", photoFile);
+  }
+
   const res = await apiFetch(`${EP.FACILITY.base}/salon/add-salon`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ ...salonData, facilityId }),
+    body: formData,
   });
 
   const body = await res.json().catch(() => ({}));
@@ -128,13 +142,27 @@ export async function addSalon(facilityId: string, salonData: any) {
   return body?.data;
 }
 
-export async function updateSalon(salonId: string, salonData: any) {
+export async function updateSalon(
+  salonId: string,
+  salonData: {
+    name?: string;
+    sport?: string;
+    sportGroup?: string;
+    priceInfo?: string;
+    description?: string;
+    clearPhoto?: boolean;
+  },
+  photoFile?: File | null
+) {
+  const formData = new FormData();
+  formData.append("data", JSON.stringify(salonData));
+  if (photoFile) {
+    formData.append("salon-photo", photoFile);
+  }
+
   const res = await apiFetch(`${EP.FACILITY.base}/salon/${salonId}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(salonData),
+    body: formData,
   });
 
   const body = await res.json().catch(() => ({}));

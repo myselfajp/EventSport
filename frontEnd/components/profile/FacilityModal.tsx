@@ -21,6 +21,12 @@ import {
 } from "@/app/lib/facility-api";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import {
+  PHONE_PREFIX,
+  processPhoneInput,
+  normalizePhoneForDisplay,
+  isPhoneComplete,
+} from "@/app/lib/phone-utils";
 
 interface FacilityModalProps {
   isOpen: boolean;
@@ -41,12 +47,14 @@ interface FacilityFormData {
 }
 
 interface SalonFormData {
-  id: string; // temp id for UI or _id for existing
-  _id?: string; // real backend id
+  id: string;
+  _id?: string;
   name: string;
   sport: string;
   sportGroup: string;
   priceInfo: string;
+  description: string;
+  photo?: string;
   isNew?: boolean;
 }
 
@@ -71,7 +79,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   const [formData, setFormData] = useState<FacilityFormData>({
     name: "",
     address: "",
-    phone: "",
+    phone: PHONE_PREFIX,
     email: "",
     photo: "",
     mainSport: "",
@@ -79,10 +87,12 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const facilityPhoneRef = useRef<HTMLInputElement>(null);
 
-  // Salon State
   const [salons, setSalons] = useState<SalonFormData[]>([]);
-  const [deletedSalons, setDeletedSalons] = useState<string[]>([]); // Track IDs of salons to delete
+  const [deletedSalons, setDeletedSalons] = useState<string[]>([]);
+  const [salonPhotoFiles, setSalonPhotoFiles] = useState<Record<string, File>>({});
+  const [salonPhotosRemoved, setSalonPhotosRemoved] = useState<Set<string>>(new Set());
 
   // Dirty Checking State
   const initialFormState = useRef<string>("");
@@ -130,6 +140,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     if (initialData) {
       const initialForm = {
         ...initialData,
+        phone: normalizePhoneForDisplay(initialData.phone),
         mainSport:
           typeof initialData.mainSport === "object"
             ? initialData.mainSport._id
@@ -144,18 +155,27 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       setPhotoFile(null);
       setExpandedSection("facility");
 
-      // Fetch existing salons
       if (initialData._id) {
+        setSalonPhotoFiles({});
+        setSalonPhotosRemoved(new Set());
         getSalons(initialData._id).then((fetchedSalons) => {
-          const formattedSalons = fetchedSalons.map((s: any) => ({
-            id: s._id,
-            _id: s._id,
-            name: s.name,
-            sport: s.sport,
-            sportGroup: s.sportGroup,
-            priceInfo: s.priceInfo,
-            isNew: false,
-          }));
+          const formattedSalons = fetchedSalons.map((s: any) => {
+            const photoUrl =
+              s.photo?.path &&
+              `${EP.API_ASSETS_BASE}/${s.photo.path}`.replace(/\\/g, "/");
+            return {
+              id: s._id,
+              _id: s._id,
+              name: s.name,
+              sport: typeof s.sport === "object" ? s.sport?._id : s.sport,
+              sportGroup:
+                typeof s.sportGroup === "object" ? s.sportGroup?._id : s.sportGroup,
+              priceInfo: s.priceInfo,
+              description: s.description ?? "",
+              photo: photoUrl,
+              isNew: false,
+            };
+          });
           setSalons(formattedSalons);
           initialSalonsState.current = JSON.stringify(formattedSalons);
         });
@@ -169,7 +189,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     const emptyForm = {
       name: "",
       address: "",
-      phone: "",
+      phone: PHONE_PREFIX,
       email: "",
       photo: "",
       mainSport: "",
@@ -180,6 +200,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     setPhotoPreview(null);
     setPhotoFile(null);
     setSalons([]);
+    setSalonPhotoFiles({});
+    setSalonPhotosRemoved(new Set());
     initialSalonsState.current = JSON.stringify([]);
     setDeletedSalons([]);
     setErrors({});
@@ -198,6 +220,17 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     setErrors((prev) => ({ ...prev, [field]: "" }));
     setGeneralError("");
   };
+
+  const handleFacilityPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = processPhoneInput(e.target.value);
+    handleInputChange("phone", next);
+  };
+
+  useEffect(() => {
+    if (!facilityPhoneRef.current) return;
+    const len = formData.phone.length;
+    facilityPhoneRef.current.setSelectionRange(len, len);
+  }, [formData.phone]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -229,6 +262,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
         sport: "",
         sportGroup: "",
         priceInfo: "",
+        description: "",
         isNew: true,
       },
     ]);
@@ -240,6 +274,17 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     if (!salonToRemove.isNew && salonToRemove._id) {
       setDeletedSalons((prev) => [...prev, salonToRemove._id!]);
     }
+    const key = salonToRemove.id;
+    setSalonPhotoFiles((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setSalonPhotosRemoved((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
     setSalons((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -251,15 +296,49 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     setSalons((prev) =>
       prev.map((salon, i) => {
         if (i !== index) return salon;
-
         const updates: Partial<SalonFormData> = { [field]: value };
-
         if (field === "sportGroup") {
-          updates.sport = ""; // Reset sport when group changes
+          updates.sport = "";
         }
-
         return { ...salon, ...updates };
       })
+    );
+  };
+
+  const handleSalonPhotoUpload = (index: number, file: File) => {
+    const salon = salons[index];
+    if (!salon) return;
+    const key = salon.id;
+    setSalonPhotoFiles((prev) => ({ ...prev, [key]: file }));
+    setSalonPhotosRemoved((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const url = e.target?.result as string;
+      setSalons((prev) =>
+        prev.map((s, i) => (i === index ? { ...s, photo: url } : s))
+      );
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeSalonPhoto = (index: number) => {
+    const salon = salons[index];
+    if (!salon) return;
+    const key = salon.id;
+    setSalonPhotoFiles((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    if (!salon.isNew && salon._id) {
+      setSalonPhotosRemoved((prev) => new Set(prev).add(key));
+    }
+    setSalons((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, photo: undefined } : s))
     );
   };
 
@@ -281,7 +360,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     if (!initialData) {
       if (!formData.name) newErrors.name = "Facility Name is required";
       if (!formData.address) newErrors.address = "Address is required";
-      if (!formData.phone) newErrors.phone = "Phone is required";
+      if (!formData.phone || !isPhoneComplete(formData.phone))
+        newErrors.phone = `Phone required (9 digits after ${PHONE_PREFIX})`;
       if (!formData.email) newErrors.email = "E-mail is required";
       if (!formData.mainSport) newErrors.mainSport = "Main Sport is required";
       if (!photoFile && !formData.photo)
@@ -292,8 +372,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       newErrors.email = "Invalid email format";
     }
 
-    if (formData.phone && !/^[\d\s\-+()]+$/.test(formData.phone)) {
-      newErrors.phone = "Invalid phone number format";
+    if (formData.phone && !isPhoneComplete(formData.phone)) {
+      newErrors.phone = `Enter full Turkish phone (9 digits after ${PHONE_PREFIX})`;
     }
 
     // Salon Validation
@@ -361,16 +441,21 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       if (facilityId) {
         const promises: Promise<any>[] = [];
 
-        // Add New Salons
         const newSalons = salons.filter((s) => s.isNew);
         newSalons.forEach((salon) => {
           promises.push(
-            addSalon(facilityId!, {
-              name: salon.name,
-              sport: salon.sport,
-              sportGroup: salon.sportGroup,
-              priceInfo: salon.priceInfo,
-            })
+            addSalon(
+              facilityId!,
+              {
+                name: salon.name,
+                sport: salon.sport,
+                sportGroup: salon.sportGroup,
+                priceInfo: salon.priceInfo,
+                ...(salon.description != null &&
+                  salon.description !== "" && { description: salon.description }),
+              },
+              salonPhotoFiles[salon.id] ?? null
+            )
           );
         });
 
@@ -382,21 +467,32 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
           const initialSalon = initialSalons.find(
             (s: any) => s._id === salon._id
           );
+          const photoChanged = !!salonPhotoFiles[salon.id];
+          const photoRemoved = salonPhotosRemoved.has(salon.id);
           const isDirty =
             !initialSalon ||
             salon.name !== initialSalon.name ||
             salon.sport !== initialSalon.sport ||
             salon.sportGroup !== initialSalon.sportGroup ||
-            salon.priceInfo !== initialSalon.priceInfo;
+            salon.priceInfo !== initialSalon.priceInfo ||
+            (salon.description ?? "") !== (initialSalon.description ?? "") ||
+            photoChanged ||
+            photoRemoved;
 
           if (isDirty && salon._id) {
             promises.push(
-              updateSalon(salon._id, {
-                name: salon.name,
-                sport: salon.sport,
-                sportGroup: salon.sportGroup,
-                priceInfo: salon.priceInfo,
-              })
+              updateSalon(
+                salon._id,
+                {
+                  name: salon.name,
+                  sport: salon.sport,
+                  sportGroup: salon.sportGroup,
+                  priceInfo: salon.priceInfo,
+                  description: salon.description ?? "",
+                  ...(photoRemoved && { clearPhoto: true }),
+                },
+                photoChanged ? salonPhotoFiles[salon.id] : null
+              )
             );
           }
         });
@@ -557,12 +653,13 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
                             )}
                           </label>
                           <input
+                            ref={facilityPhoneRef}
                             type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel"
                             value={formData.phone}
-                            onChange={(e) =>
-                              handleInputChange("phone", e.target.value)
-                            }
-                            placeholder="Enter phone number"
+                            onChange={handleFacilityPhoneChange}
+                            placeholder={`${PHONE_PREFIX}XX XXX XX XX`}
                             className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
                               errors.phone
                                 ? "border-red-300 focus:ring-red-200 dark:border-red-500"
@@ -946,6 +1043,67 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
                                 {errors[`salon_${index}_priceInfo`]}
                               </p>
                             )}
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Description
+                            </label>
+                            <textarea
+                              value={salon.description ?? ""}
+                              onChange={(e) =>
+                                handleSalonChange(
+                                  index,
+                                  "description",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="e.g., Spacious hall with natural light"
+                              rows={3}
+                              className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 transition-colors dark:bg-gray-600 dark:text-white dark:placeholder-gray-400 border-gray-200 dark:border-gray-500 focus:ring-cyan-500"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Photo
+                            </label>
+                            <div className="relative w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-600">
+                              {salon.photo ? (
+                                <>
+                                  <img
+                                    src={salon.photo}
+                                    alt="Salon"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSalonPhoto(index)}
+                                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 text-xs"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </>
+                              ) : (
+                                <div className="text-center">
+                                  <Upload className="w-6 h-6 mx-auto text-gray-400 dark:text-gray-500 mb-1" />
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                                    Upload
+                                  </span>
+                                </div>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpg,image/jpeg"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleSalonPhotoUpload(index, f);
+                                  e.target.value = "";
+                                }}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                disabled={isLoading}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

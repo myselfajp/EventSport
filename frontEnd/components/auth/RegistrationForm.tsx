@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSignUp } from "@/app/hooks/useAuth";
+import {
+  PHONE_PREFIX,
+  PHONE_DIGITS_LENGTH,
+  processPhoneInput,
+  getPhoneDigits,
+} from "@/app/lib/phone-utils";
 
 interface RegistrationFormProps {
   onToggleForm: () => void;
@@ -25,7 +31,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const { mutate: signUp, isPending, error } = useSignUp();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState(PHONE_PREFIX);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const [birthday, setBirthday] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,6 +61,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
+    const phoneDigits = getPhoneDigits(phoneNumber);
+    if (phoneDigits.length < PHONE_DIGITS_LENGTH) {
+      setValidationError(`Please enter a complete Turkish phone number (9 digits after ${PHONE_PREFIX})`);
+      return;
+    }
+
     const formData = {
       firstName,
       lastName,
@@ -65,6 +78,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
     signUp(formData);
   };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhoneNumber(processPhoneInput(e.target.value));
+  };
+
+  useEffect(() => {
+    if (!phoneInputRef.current) return;
+    const len = phoneNumber.length;
+    phoneInputRef.current.setSelectionRange(len, len);
+  }, [phoneNumber]);
 
   return (
     <div className="p-4 h-full flex flex-col justify-start bg-gradient-to-br from-gray-50 to-white dark:from-slate-900 dark:to-slate-800 overflow-y-auto">
@@ -134,10 +157,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               Phone Number <span className="text-red-500">*</span>
             </label>
             <input
+              ref={phoneInputRef}
               type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="+1234567890"
+              onChange={handlePhoneChange}
+              placeholder={`${PHONE_PREFIX}XX XXX XX XX`}
               className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg 
                          bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
                          placeholder:text-gray-400 dark:placeholder:text-slate-500

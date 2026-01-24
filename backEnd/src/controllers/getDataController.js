@@ -79,9 +79,9 @@ export const createSearchController = (model, config = {}) => {
                     { path: 'sportGroup', select: 'name' },
                     { path: 'style', select: 'name' },
                     { path: 'salon', select: 'name' },
-                    { path: 'facility', select: 'name' },
-                    { path: 'owner', select: 'firstName lastName' },
-                    { path: 'backupCoach', select: 'firstName lastName' },
+                    { path: 'facility', select: 'name address phone email photo mainSport membershipLevel private point createdAt' },
+                    { path: 'owner', select: 'firstName lastName coach' },
+                    { path: 'backupCoach', select: 'firstName lastName coach' },
                 ]);
             }
             // Execute query
@@ -269,16 +269,23 @@ export const getEvent = async (req, res, next) => {
         const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404, 'Event not found');
 
-        if (eventExists.private) {
-            const hasAccess = await Reservation.findOne({
+        let reservation = null;
+        let canReserve = true;
+
+        // Check if user has a reservation for this event
+        if (user.participant) {
+            reservation = await Reservation.findOne({
                 participant: user.participant,
                 event: eventId,
-            }).select('isApproved');
+            }).select('isApproved isWaitListed isCheckedIn isCancelled isPaid');
+        }
 
-            if (hasAccess.isApproved) {
+        if (eventExists.private) {
+            if (reservation?.isApproved) {
                 return res.status(200).json({
                     success: true,
                     data: eventExists,
+                    reservation: reservation,
                 });
             }
 
@@ -288,6 +295,7 @@ export const getEvent = async (req, res, next) => {
                     success: true,
                     canReserve: true,
                     data: eventExists,
+                    reservation: reservation,
                 });
             }
             return res.status(403).json({
@@ -300,6 +308,7 @@ export const getEvent = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: eventExists,
+            reservation: reservation,
         });
     } catch (err) {
         next(err);

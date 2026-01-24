@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import CoachModal from "../profile/CoachModal";
 import ParticipantModal from "../profile/ParticipantModal";
 import FacilityModal from "../profile/FacilityModal";
+import {
+  PHONE_PREFIX,
+  processPhoneInput,
+  normalizePhoneForDisplay,
+  isPhoneComplete,
+} from "../../app/lib/phone-utils";
 
 interface User {
   _id: string;
@@ -117,13 +123,15 @@ export default function UsersManagement() {
     }
   };
 
+  const adminPhoneRef = useRef<HTMLInputElement>(null);
+
   const handleCreate = () => {
     setEditingUser(null);
     setFormData({
       firstName: "",
       lastName: "",
       email: "",
-      phone: "",
+      phone: PHONE_PREFIX,
       age: "",
       password: "",
       role: 1,
@@ -137,7 +145,7 @@ export default function UsersManagement() {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phone: user.phone,
+      phone: normalizePhoneForDisplay(user.phone) || PHONE_PREFIX,
       age: user.age ? new Date(user.age).toISOString().split("T")[0] : "",
       password: "",
       role: user.role,
@@ -160,10 +168,25 @@ export default function UsersManagement() {
     }
   };
 
+  useEffect(() => {
+    if (!adminPhoneRef.current) return;
+    const len = formData.phone.length;
+    adminPhoneRef.current.setSelectionRange(len, len);
+  }, [formData.phone]);
+
+  const handleAdminPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = processPhoneInput(e.target.value);
+    setFormData((prev) => ({ ...prev, phone: next }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setError("");
+      if (!isPhoneComplete(formData.phone)) {
+        setError(`Enter full Turkish phone (9 digits after ${PHONE_PREFIX})`);
+        return;
+      }
       const url = editingUser
         ? EP.ADMIN.users.update(editingUser._id)
         : EP.ADMIN.users.create;
@@ -578,12 +601,14 @@ export default function UsersManagement() {
                   Phone
                 </label>
                 <input
-                  type="text"
+                  ref={adminPhoneRef}
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
                   required
                   value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
+                  onChange={handleAdminPhoneChange}
+                  placeholder={`${PHONE_PREFIX}XX XXX XX XX`}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
                 />
               </div>

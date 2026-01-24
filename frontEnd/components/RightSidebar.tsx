@@ -10,9 +10,13 @@ import {
   Clock,
 } from "lucide-react";
 import AddEventModal from "./event/AddEventModal";
+import ViewEventModal from "./event/ViewEventModal";
+import CoachDetailModal from "./CoachDetailModal";
+import FacilityDetailsModal from "./profile/FacilityDetailsModal";
 import { useMe } from "@/app/hooks/useAuth";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { Facility } from "@/app/lib/types";
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -42,6 +46,13 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [showViewEventModal, setShowViewEventModal] = useState(false);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
+  const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
+  const [showCoachModal, setShowCoachModal] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [showFacilityModal, setShowFacilityModal] = useState(false);
 
   // Set currentDate to today on mount if not already set
   useEffect(() => {
@@ -480,8 +491,12 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
       </div>
 
       <AddEventModal
-        isOpen={isAddEventModalOpen}
-        onClose={() => setIsAddEventModalOpen(false)}
+        isOpen={isAddEventModalOpen || showEditEventModal}
+        onClose={() => {
+          setIsAddEventModalOpen(false);
+          setShowEditEventModal(false);
+          setSelectedEvent(null);
+        }}
         onSuccess={() => {
           // Refresh events for the selected date if modal is open
           if (selectedDate) {
@@ -490,7 +505,9 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
           if (onEventCreated) {
             onEventCreated();
           }
+          setSelectedEvent(null);
         }}
+        initialData={showEditEventModal ? selectedEvent : undefined}
       />
 
       {/* Detail View Modal */}
@@ -546,47 +563,118 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {selectedDateEvents.map((event, idx) => (
-                    <div
-                      key={event._id || idx}
-                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md dark:hover:shadow-lg transition-shadow bg-white dark:bg-slate-800/50"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div
-                          className="w-4 h-4 rounded-full mt-2 flex-shrink-0"
-                          style={{
-                            backgroundColor:
-                              event.eventStyle?.color || "#3b82f6",
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-semibold text-gray-800 dark:text-slate-100 text-lg mb-1">
-                                {event.name}
-                              </h4>
-                              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 mb-3">
-                                <Clock className="w-4 h-4 text-gray-400 dark:text-slate-500" />
-                                <span className="font-medium">
-                                  {formatTime(event.startTime)} -{" "}
-                                  {formatTime(event.endTime)}
+                  {selectedDateEvents.map((event, idx) => {
+                    const ownerId =
+                      typeof event.owner === "object" && event.owner !== null
+                        ? event.owner._id
+                        : event.owner;
+                    const isOwner = ownerId === user?._id;
+
+                    return (
+                      <div
+                        key={event._id || idx}
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setShowViewEventModal(true);
+                        }}
+                        className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md dark:hover:shadow-lg transition-shadow bg-white dark:bg-slate-800/50 cursor-pointer"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div
+                            className="w-4 h-4 rounded-full mt-2 flex-shrink-0"
+                            style={{
+                              backgroundColor:
+                                event.eventStyle?.color || "#3b82f6",
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="font-semibold text-gray-800 dark:text-slate-100 text-lg mb-1">
+                                  {event.name}
+                                </h4>
+                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 mb-3">
+                                  <Clock className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                                  <span className="font-medium">
+                                    {formatTime(event.startTime)} -{" "}
+                                    {formatTime(event.endTime)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-full text-xs font-medium">
+                                  {event.sport?.name || "Event"}
                                 </span>
+                                {isOwner && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedEvent(event);
+                                      setShowEditEventModal(true);
+                                      setShowEventModal(false); // Close the day events modal
+                                    }}
+                                    className="px-3 py-1 bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white rounded-lg text-xs font-medium transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                               </div>
                             </div>
-                            <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-full text-xs font-medium">
-                              {event.sport?.name || "Event"}
-                            </span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {selectedEvent && (
+        <ViewEventModal
+          isOpen={showViewEventModal}
+          onClose={() => {
+            setShowViewEventModal(false);
+            setSelectedEvent(null);
+          }}
+          event={{
+            ...selectedEvent,
+            createdAt: selectedEvent.createdAt || new Date().toISOString(),
+          }}
+          onCoachClick={(coachId: string) => {
+            if (coachId) {
+              setSelectedCoachId(coachId);
+              setShowCoachModal(true);
+            }
+          }}
+          onFacilityClick={(facility) => {
+            if (facility) {
+              setSelectedFacility(facility as Facility);
+              setShowFacilityModal(true);
+            }
+          }}
+        />
+      )}
+
+      <CoachDetailModal
+        isOpen={showCoachModal}
+        onClose={() => {
+          setShowCoachModal(false);
+          setSelectedCoachId(null);
+        }}
+        coachId={selectedCoachId}
+      />
+
+      <FacilityDetailsModal
+        isOpen={showFacilityModal}
+        onClose={() => {
+          setShowFacilityModal(false);
+          setSelectedFacility(null);
+        }}
+        facility={selectedFacility}
+      />
     </div>
   );
 };

@@ -51,25 +51,6 @@ services:
       - eventSport_network
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontEnd
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE}
-        - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE}
-    container_name: eventSport_frontend_prod
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE}
-      - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE}
-    ports:
-      - "${FRONTEND_PORT:-3001}:3001"
-    depends_on:
-      - backend
-    networks:
-      - eventSport_network
-    restart: unless-stopped
 
 volumes:
   mongodb_data_prod:
