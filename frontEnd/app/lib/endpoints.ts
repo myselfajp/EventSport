@@ -75,6 +75,14 @@ export const EP = {
       reject: (branchId: string) =>
         `${ADMIN_API}/coaches/branches/${branchId}/reject`,
     },
+    staticPages: {
+      getAll: `${ADMIN_API}/static-pages`,
+      getActive: `${ADMIN_API}/static-pages/active`,
+      getById: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
+      create: `${ADMIN_API}/static-pages`,
+      update: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
+      delete: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
+    },
   },
   REFERENCE: {
     sportGroup: {

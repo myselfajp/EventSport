@@ -12,8 +12,9 @@ import EnumManagement from "../../components/admin/EnumManagement";
 import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
 import LegalManagement from "../../components/admin/LegalManagement";
+import StaticPagesManagement from "../../components/admin/StaticPagesManagement";
 
-type TabType = "users" | "coaches" | "enums" | "events" | "notifications" | "legal";
+type TabType = "users" | "coaches" | "enums" | "events" | "notifications" | "legal" | "static-pages";
 
 export default function AdminPanelPage() {
   const router = useRouter();
@@ -149,6 +150,16 @@ export default function AdminPanelPage() {
               >
                 Legal (KVKK & Terms)
               </button>
+              <button
+                onClick={() => setActiveTab("static-pages")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "static-pages"
+                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                }`}
+              >
+                Static Pages
+              </button>
             </nav>
           </div>
 
@@ -159,6 +170,7 @@ export default function AdminPanelPage() {
             {activeTab === "events" && <EventsManagement />}
             {activeTab === "notifications" && <NotificationManagement />}
             {activeTab === "legal" && <LegalManagement />}
+            {activeTab === "static-pages" && <StaticPagesManagement />}
           </div>
         </div>
       </div>

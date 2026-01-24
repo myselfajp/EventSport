@@ -45,4 +45,12 @@ router.get('/legal/:documentId', legalController.getById);
 router.put('/legal/:documentId', legalController.update);
 router.put('/legal/:documentId/activate', legalController.setActive);
 
+// Static Pages
+router.get('/static-pages', adminController.getAllStaticPages);
+router.get('/static-pages/active', adminController.getActiveStaticPages);
+router.get('/static-pages/:pageId', adminController.getStaticPageById);
+router.post('/static-pages', adminController.createStaticPage);
+router.put('/static-pages/:pageId', adminController.updateStaticPage);
+router.delete('/static-pages/:pageId', adminController.deleteStaticPage);
+
 export default router;

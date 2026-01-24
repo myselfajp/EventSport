@@ -11,6 +11,7 @@ import CoachCalendar from "./CoachCalendar";
 import FollowingsView from "./follow/FollowingsView";
 import FavoritesView from "./favorite/FavoritesView";
 import SportsBanner from "./SportsBanner";
+import StaticPageView from "./StaticPageView";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -26,6 +27,7 @@ const EventsDashboard = () => {
   const [showCoachCalendar, setShowCoachCalendar] = useState(false);
   const [showFollowings, setShowFollowings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [selectedStaticPageId, setSelectedStaticPageId] = useState<string | null>(null);
 
   const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -174,6 +176,13 @@ const EventsDashboard = () => {
           setShowFavorites(true);
           setLeftSidebarOpen(false);
         }}
+        onShowStaticPage={(pageId: string) => {
+          setShowCoachCalendar(false);
+          setShowFollowings(false);
+          setShowFavorites(false);
+          setSelectedStaticPageId(pageId);
+          setLeftSidebarOpen(false);
+        }}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -251,6 +260,11 @@ const EventsDashboard = () => {
                 <FollowingsView onBack={() => setShowFollowings(false)} />
               ) : showFavorites ? (
                 <FavoritesView onBack={() => setShowFavorites(false)} />
+              ) : selectedStaticPageId ? (
+                <StaticPageView
+                  pageId={selectedStaticPageId}
+                  onBack={() => setSelectedStaticPageId(null)}
+                />
               ) : (
                 <EventsTable
                   events={events}
