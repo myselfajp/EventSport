@@ -21,6 +21,7 @@ import {
   Shield,
   Layers,
   Heart,
+  FileText,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -61,12 +62,14 @@ import UserEditModal from "./UserEditModal";
 import { EP } from "@/app/lib/endpoints";
 import { defaultFavorites, useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
+import { fetchJSON } from "@/app/lib/api";
 
 interface ProfileSidebarProps {
   onLogout: () => void;
   onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
+  onShowStaticPage?: (pageId: string) => void;
   initialFacilities?: any[];
   initialCompanies?: any[];
 }
@@ -76,6 +79,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   onShowCalendar,
   onShowFollowings,
   onShowFavorites,
+  onShowStaticPage,
   initialFacilities = [],
   initialCompanies = [],
 }) => {
@@ -83,6 +87,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const { data: user } = useMe();
   const queryClient = useQueryClient();
   const hasCoachProfile = !!user?.coach;
+  const [staticPages, setStaticPages] = useState<Array<{ _id: string; name: string; title: string }>>([]);
 
   const [activePanel, setActivePanel] = useState<"home" | "profile">("home");
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
@@ -233,6 +238,21 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       setCompanies(user.company);
     }
   }, [user]);
+
+  // Fetch static pages
+  useEffect(() => {
+    const fetchStaticPages = async () => {
+      try {
+        const res = await fetchJSON(EP.ADMIN.staticPages.getActive, { method: "GET" });
+        if (res?.success && Array.isArray(res?.data)) {
+          setStaticPages(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch static pages:", err);
+      }
+    };
+    fetchStaticPages();
+  }, []);
 
   const handleCreateParticipant = async (formData: any) => {
     console.log("Participant profile saved:", formData);
@@ -950,6 +970,26 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
           {/* Divider */}
           <div className="my-4 border-t border-gray-200 dark:border-gray-700"></div>
+
+          {/* Static Pages */}
+          {staticPages.length > 0 && (
+            <nav className="space-y-1 mt-4">
+              {staticPages.map((page) => (
+                <button
+                  key={page._id}
+                  onClick={() => {
+                    if (onShowStaticPage) {
+                      onShowStaticPage(page._id);
+                    }
+                  }}
+                  className="w-full flex items-center px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
+                >
+                  <FileText className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
+                  {page.title}
+                </button>
+              ))}
+            </nav>
+          )}
         </>
       ) : (
         <div className="space-y-4">

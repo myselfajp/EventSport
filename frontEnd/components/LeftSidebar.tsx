@@ -11,6 +11,7 @@ interface LeftSidebarProps {
   onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
+  onShowStaticPage?: (pageId: string) => void;
 }
 
 // Fake user credentials for testing
@@ -61,7 +62,7 @@ const DUMMY_COMPANIES = [
   },
 ];
 
-const LeftSidebar: React.FC<LeftSidebarProps> = ({ isOpen, onShowCalendar, onShowFollowings, onShowFavorites }) => {
+const LeftSidebar: React.FC<LeftSidebarProps> = ({ isOpen, onShowCalendar, onShowFollowings, onShowFavorites, onShowStaticPage }) => {
   const { data: user, isLoading: userLoading } = useMe();
   const { mutate: signOut } = useSignOut();
   const isLoggedIn = !!user;
@@ -96,6 +97,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ isOpen, onShowCalendar, onSho
           onShowCalendar={onShowCalendar}
           onShowFollowings={onShowFollowings}
           onShowFavorites={onShowFavorites}
+          onShowStaticPage={onShowStaticPage}
           initialFacilities={
             FAKE_USER.facility
               ? DUMMY_FACILITIES.filter((f) =>

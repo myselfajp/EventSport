@@ -11,6 +11,7 @@ import Salon from '../models/salonModel.js';
 import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
 import { Sport } from '../models/referenceDataModel.js';
+import StaticPage from '../models/staticPageModel.js';
 import { AppError } from '../utils/appError.js';
 import { SearchQuerySchema, mongoObjectId, signupSchema, adminCreateUserSchema, editUserSchema } from '../utils/validation.js';
 import * as zodValidation from '../utils/validation.js';
@@ -951,6 +952,142 @@ export const updateFacilityProfile = async (req, res, next) => {
             success: true,
             message: 'Facility updated successfully',
             data: updatedFacility,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Static Pages Management
+export const getAllStaticPages = async (req, res, next) => {
+    try {
+        const pages = await StaticPage.find()
+            .sort({ order: 1, createdAt: -1 })
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: pages,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getStaticPageById = async (req, res, next) => {
+    try {
+        const pageId = zodValidation.mongoObjectId.parse(req.params.pageId);
+        const page = await StaticPage.findById(pageId);
+
+        if (!page) {
+            throw new AppError(404, 'Page not found');
+        }
+
+        res.status(200).json({
+            success: true,
+            data: page,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const createStaticPage = async (req, res, next) => {
+    try {
+        const { name, title, content, isActive, order } = req.body;
+
+        if (!name || !title || !content) {
+            throw new AppError(400, 'Name, title, and content are required');
+        }
+
+        // Check if name already exists
+        const existingPage = await StaticPage.findOne({ name });
+        if (existingPage) {
+            throw new AppError(409, 'Page with this name already exists');
+        }
+
+        const page = await StaticPage.create({
+            name,
+            title,
+            content,
+            isActive: isActive !== undefined ? isActive : true,
+            order: order || 0,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Page created successfully',
+            data: page,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateStaticPage = async (req, res, next) => {
+    try {
+        const pageId = zodValidation.mongoObjectId.parse(req.params.pageId);
+        const { name, title, content, isActive, order } = req.body;
+
+        const page = await StaticPage.findById(pageId);
+        if (!page) {
+            throw new AppError(404, 'Page not found');
+        }
+
+        // Check if name is being changed and if it conflicts
+        if (name && name !== page.name) {
+            const existingPage = await StaticPage.findOne({ name });
+            if (existingPage) {
+                throw new AppError(409, 'Page with this name already exists');
+            }
+        }
+
+        if (name) page.name = name;
+        if (title) page.title = title;
+        if (content !== undefined) page.content = content;
+        if (isActive !== undefined) page.isActive = isActive;
+        if (order !== undefined) page.order = order;
+
+        await page.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Page updated successfully',
+            data: page,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const deleteStaticPage = async (req, res, next) => {
+    try {
+        const pageId = zodValidation.mongoObjectId.parse(req.params.pageId);
+        const page = await StaticPage.findByIdAndDelete(pageId);
+
+        if (!page) {
+            throw new AppError(404, 'Page not found');
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Page deleted successfully',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getActiveStaticPages = async (req, res, next) => {
+    try {
+        const pages = await StaticPage.find({ isActive: true })
+            .sort({ order: 1, createdAt: -1 })
+            .select('name title')
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: pages,
         });
     } catch (err) {
         next(err);
