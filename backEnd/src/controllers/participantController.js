@@ -586,7 +586,7 @@ export const makeReservation = async (req, res, next) => {
         });
         if (alreadyReserved) throw new AppError(409, 'You already reserved this event.');
 
-        const event = await Event.findById(eventId).select('startTime capacity');
+        const event = await Event.findById(eventId).select('startTime capacity priceType');
 
         if (!event) throw new AppError(404);
 
@@ -595,8 +595,10 @@ export const makeReservation = async (req, res, next) => {
         const twoDaysBefore = new Date(event.startTime.getTime() - 2 * 24 * 60 * 60 * 1000);
         const timeDiff = event.startTime - now; // difference in milliseconds
         const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
+        const isWithinDeadline = timeDiff < twoDaysInMs;
+        const isFreeEvent = event.priceType === 'Free';
 
-        if (timeDiff < twoDaysInMs) {
+        if (isWithinDeadline) {
             const countCheckedIn = await Reservation.countDocuments({
                 event: eventId,
                 isCheckedIn: true,
@@ -605,17 +607,43 @@ export const makeReservation = async (req, res, next) => {
             if (countCheckedIn >= event.capacity) {
                 throw new AppError(403, 'Event is already full and less than 2 days remaining');
             }
-            const reserveAndCheckIn = await Reservation.create({
+
+            // If free event within deadline, auto check-in
+            if (isFreeEvent) {
+                const reserveAndCheckIn = await Reservation.create({
+                    participant: user.participant,
+                    event: eventId,
+                    checkInDeadline: twoDaysBefore,
+                    isCheckedIn: true,
+                    isPaid: true,
+                    isJoined: true,
+                });
+                if (!reserveAndCheckIn) throw new AppError(404);
+
+                return res.status(201).json({
+                    success: true,
+                    data: 'saved',
+                    isWithinDeadline: true,
+                    autoCheckedIn: true,
+                });
+            }
+
+            // If paid event within deadline, create reservation but require payment first
+            const reserveWithinDeadline = await Reservation.create({
                 participant: user.participant,
                 event: eventId,
                 checkInDeadline: twoDaysBefore,
-                isCheckedIn: true,
+                isCheckedIn: false,
+                isPaid: false,
+                isJoined: true,
             });
-            if (!reserveAndCheckIn) throw new AppError(404);
+            if (!reserveWithinDeadline) throw new AppError(404);
 
             return res.status(201).json({
                 success: true,
                 data: 'saved',
+                isWithinDeadline: true,
+                requiresPayment: true,
             });
         }
 
@@ -628,6 +656,7 @@ export const makeReservation = async (req, res, next) => {
                 event: eventId,
                 checkInDeadline: twoDaysBefore,
                 isWaitListed: true,
+                isJoined: true,
             });
             if (!reserveAndWaitlist) throw new AppError(404);
 
@@ -641,6 +670,7 @@ export const makeReservation = async (req, res, next) => {
             participant: user.participant,
             event: eventId,
             checkInDeadline: twoDaysBefore,
+            isJoined: true,
         });
         if (!reserve) throw new AppError(404);
 
@@ -668,15 +698,15 @@ export const checkIn = async (req, res, next) => {
 
         // check if already reserved this event
         const alreadyReserved = await Reservation.findOne({
-            user: user._id,
+            participant: user.participant,
             event: eventId,
         });
         if (!alreadyReserved || !alreadyReserved.isPaid || alreadyReserved.isWaitListed) {
-            throw new AppError(403, 'Already reserved');
+            throw new AppError(403, 'You must have a paid reservation to check in');
         }
 
         const checkIn = await Reservation.findOneAndUpdate(
-            { event: eventId, user: user._id },
+            { event: eventId, participant: user.participant },
             { isCheckedIn: true },
             { new: true }
         );
@@ -685,6 +715,55 @@ export const checkIn = async (req, res, next) => {
         res.status(201).json({
             success: true,
             data: 'saved',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const confirmPayment = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const eventId = zodValidation.eventId.parse(req.body?.eventId);
+        const autoCheckIn = req.body?.autoCheckIn === true;
+
+        // Find the reservation
+        const reservation = await Reservation.findOne({
+            participant: user.participant,
+            event: eventId,
+        });
+
+        if (!reservation) {
+            throw new AppError(404, 'Reservation not found');
+        }
+
+        if (reservation.isPaid) {
+            throw new AppError(409, 'Already paid');
+        }
+
+        if (reservation.isCancelled) {
+            throw new AppError(403, 'Reservation is cancelled');
+        }
+
+        // Update payment status
+        reservation.isPaid = true;
+        
+        // Auto check-in if requested (for within deadline payments)
+        if (autoCheckIn) {
+            reservation.isCheckedIn = true;
+        }
+        
+        await reservation.save();
+
+        res.status(200).json({
+            success: true,
+            message: autoCheckIn ? 'Payment confirmed and checked in' : 'Payment confirmed',
+            reservationId: reservation._id,
+            isCheckedIn: reservation.isCheckedIn,
         });
     } catch (err) {
         next(err);
@@ -1023,6 +1102,77 @@ export const getParticipantDetails = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: allData,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getMyReservations = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const page = parseInt(req.body?.pageNumber) || 1;
+        const perPage = parseInt(req.body?.perPage) || 10;
+        const skip = (page - 1) * perPage;
+
+        // Build query for reservations
+        const query = {
+            participant: user.participant,
+            isCancelled: false,
+        };
+
+        // Count total
+        const total = await Reservation.countDocuments(query);
+
+        // Get reservations with populated event data
+        const reservations = await Reservation.find(query)
+            .populate({
+                path: 'event',
+                populate: [
+                    { path: 'owner', select: 'firstName lastName photo coach' },
+                    { path: 'backupCoach', select: 'firstName lastName photo coach' },
+                    { path: 'sportGroup', select: 'name' },
+                    { path: 'sport', select: 'name' },
+                    { path: 'facility', select: 'name address photo' },
+                    { path: 'salon', select: 'name' },
+                    { path: 'club', select: 'name' },
+                    { path: 'group', select: 'name' },
+                ],
+            })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(perPage)
+            .lean();
+
+        // Transform data to match events format with reservation info
+        const eventsWithReservation = reservations
+            .filter(r => r.event) // Filter out reservations where event was deleted
+            .map(r => ({
+                ...r.event,
+                eventStyle: r.event.eventStyle || null,
+                reservation: {
+                    _id: r._id,
+                    isApproved: r.isApproved,
+                    isPaid: r.isPaid,
+                    isCheckedIn: r.isCheckedIn,
+                    isWaitListed: r.isWaitListed,
+                    checkInDeadline: r.checkInDeadline,
+                },
+            }));
+
+        res.status(200).json({
+            success: true,
+            data: eventsWithReservation,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(total / perPage),
+                total,
+                perPage,
+            },
         });
     } catch (err) {
         next(err);

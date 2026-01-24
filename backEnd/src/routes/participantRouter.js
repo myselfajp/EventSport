@@ -23,6 +23,7 @@ router.post('/join-to-group/:groupId', participantController.joinToClubGroup);
 router.post('/leave-group/:groupId', participantController.leaveClubGroup);
 router.post('/make-reservation', participantController.makeReservation);
 router.post('/check-in', participantController.checkIn);
+router.post('/confirm-payment', participantController.confirmPayment);
 router.post('/follow-group', participantController.followGroup);
 router.post('/unfollow-group', participantController.unfollowGroup);
 router.post('/join-to-club/:clubId', participantController.joinToClub);
@@ -34,5 +35,6 @@ router.post(
 );
 router.get('/get-by-detail/:participantId', participantController.getParticipantDetails);
 router.get('/follows', participantController.getFollows);
+router.post('/my-reservations', participantController.getMyReservations);
 
 export default router;

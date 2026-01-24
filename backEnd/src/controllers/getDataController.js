@@ -277,7 +277,7 @@ export const getEvent = async (req, res, next) => {
             reservation = await Reservation.findOne({
                 participant: user.participant,
                 event: eventId,
-            }).select('isApproved isWaitListed isCheckedIn isCancelled isPaid');
+            }).select('_id isApproved isWaitListed isCheckedIn isCancelled isPaid');
         }
 
         if (eventExists.private) {

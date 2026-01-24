@@ -51,27 +51,38 @@ const EventsDashboard = () => {
     setError(null);
 
     try {
+      // Determine which endpoint to use based on activeTab
+      let endpoint = EP.EVENTS.getEvents;
+      if (activeTab === "my") {
+        endpoint = EP.PARTICIPANT.myReservations;
+      } else if (activeTab === "created") {
+        endpoint = EP.COACH.myCreatedEvents;
+      }
+      
       const payload: any = {
         perPage: pagination.perPage,
         pageNumber: pagination.currentPage,
       };
 
-      if (filters.search && filters.search.length >= 2) {
-        payload.search = filters.search;
+      // Only apply filters for "all" tab
+      if (activeTab === "all") {
+        if (filters.search && filters.search.length >= 2) {
+          payload.search = filters.search;
+        }
+
+        if (filters.sortBy) {
+          payload.sortBy = filters.sortBy;
+          payload.sortType = filters.sortType;
+        }
+
+        payload.private = filters.private;
+
+        if (filters.sport) {
+          payload.sport = filters.sport;
+        }
       }
 
-      if (filters.sortBy) {
-        payload.sortBy = filters.sortBy;
-        payload.sortType = filters.sortType;
-      }
-
-      payload.private = filters.private;
-
-      if (filters.sport) {
-        payload.sport = filters.sport;
-      }
-
-      const response = await fetchJSON(EP.EVENTS.getEvents, {
+      const response = await fetchJSON(endpoint, {
         method: "POST",
         body: payload,
       });
@@ -98,6 +109,7 @@ const EventsDashboard = () => {
       setIsLoading(false);
     }
   }, [
+    activeTab,
     pagination.currentPage,
     pagination.perPage,
     filters.search,
@@ -110,6 +122,12 @@ const EventsDashboard = () => {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+  
+  // Reset pagination when tab changes
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
 
   const handlePageChange = (page: number) => {
     setPagination((prev) => ({ ...prev, currentPage: page }));
@@ -236,7 +254,7 @@ const EventsDashboard = () => {
                   isLoading={isLoading}
                   error={error}
                   activeTab={activeTab}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={handleTabChange}
                   pagination={pagination}
                   onPageChange={handlePageChange}
                   onSearchChange={handleSearchChange}

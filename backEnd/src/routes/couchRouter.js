@@ -84,6 +84,7 @@ router.post(
 
 //
 router.post('/event/participants/:eventId', coachController.getEventParticipants);
+router.post('/my-events', coachController.getMyCreatedEvents);
 
 router.post('/approve-reservation/:requestId', coachController.approveReservation);
 

@@ -1069,3 +1069,68 @@ export const getCoachDetails = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getMyCreatedEvents = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.coach) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const page = parseInt(req.body?.pageNumber) || 1;
+        const perPage = parseInt(req.body?.perPage) || 10;
+        const skip = (page - 1) * perPage;
+
+        // Find events where user is owner or backupCoach
+        const query = {
+            $or: [
+                { owner: user._id },
+                { backupCoach: user._id },
+            ],
+        };
+
+        const total = await Event.countDocuments(query);
+
+        const events = await Event.find(query)
+            .populate([
+                { path: 'owner', select: 'firstName lastName photo coach' },
+                { path: 'backupCoach', select: 'firstName lastName photo coach' },
+                { path: 'sportGroup', select: 'name' },
+                { path: 'sport', select: 'name' },
+                { path: 'facility', select: 'name address photo' },
+                { path: 'salon', select: 'name' },
+                { path: 'club', select: 'name' },
+                { path: 'group', select: 'name' },
+            ])
+            .sort({ startTime: -1 })
+            .skip(skip)
+            .limit(perPage)
+            .lean();
+
+        // Add participant count for each event
+        for (let event of events) {
+            event.participantCount = await Reservation.countDocuments({
+                event: event._id,
+                isCancelled: false,
+            });
+            event.checkedInCount = await Reservation.countDocuments({
+                event: event._id,
+                isCheckedIn: true,
+                isCancelled: false,
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: events,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(total / perPage),
+                total,
+                perPage,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};

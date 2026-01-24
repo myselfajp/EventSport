@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, ImageIcon, UserPlus } from "lucide-react";
+import { X, ImageIcon, UserPlus, CheckCircle, CreditCard, Copy, Check } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
 import { apiFetch } from "@/app/lib/api";
@@ -109,10 +109,33 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [joinStatus, setJoinStatus] = useState<{
+    _id?: string;
     isWaitListed?: boolean;
     isApproved?: boolean;
     isCheckedIn?: boolean;
+    isPaid?: boolean;
   } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
+  const [reservationId, setReservationId] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isWithinDeadline, setIsWithinDeadline] = useState(false);
+
+  // Calculate if within deadline (less than 2 days to event start)
+  const isFreeEvent = event?.priceType === 'Free';
+  
+  useEffect(() => {
+    if (event?.startTime) {
+      const now = new Date();
+      const eventStart = new Date(event.startTime);
+      const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
+      const timeDiff = eventStart.getTime() - now.getTime();
+      setIsWithinDeadline(timeDiff < twoDaysInMs && timeDiff > 0);
+    }
+  }, [event?.startTime]);
 
   // Check if user is owner or backupCoach
   const ownerId = typeof event?.owner === 'object' && event?.owner !== null ? event.owner._id : event?.owner;
@@ -141,10 +164,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
         if (response.ok && data.success && data.reservation) {
           setHasJoined(true);
           setJoinStatus({
+            _id: data.reservation._id,
             isWaitListed: data.reservation.isWaitListed,
             isApproved: data.reservation.isApproved,
             isCheckedIn: data.reservation.isCheckedIn,
+            isPaid: data.reservation.isPaid,
           });
+          // Also set reservationId for checked-in display
+          if (data.reservation.isCheckedIn) {
+            setReservationId(data.reservation._id);
+          }
         } else {
           setHasJoined(false);
           setJoinStatus(null);
@@ -178,7 +207,32 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 
       if (response.ok && data.success) {
         setHasJoined(true);
-        // Refresh reservation status
+        
+        // If within deadline and requires payment, open payment modal
+        if (data.isWithinDeadline && data.requiresPayment) {
+          setJoinStatus({
+            isWaitListed: false,
+            isApproved: false,
+            isCheckedIn: false,
+            isPaid: false,
+          });
+          setShowPaymentModal(true);
+          return;
+        }
+        
+        // If auto checked in (free event within deadline)
+        if (data.autoCheckedIn) {
+          setJoinStatus({
+            isWaitListed: false,
+            isApproved: true,
+            isCheckedIn: true,
+            isPaid: true,
+          });
+          alert("Successfully joined and checked in!");
+          return;
+        }
+        
+        // Refresh reservation status for normal flow
         try {
           const statusResponse = await apiFetch(`${EP.EVENTS.getEvents}/${event._id}`, {
             method: "POST",
@@ -189,8 +243,8 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               isWaitListed: statusData.reservation.isWaitListed,
               isApproved: statusData.reservation.isApproved,
               isCheckedIn: statusData.reservation.isCheckedIn,
+              isPaid: statusData.reservation.isPaid,
             });
-            // Show success message
             const message = statusData.reservation?.isWaitListed 
               ? "You have been added to the waitlist." 
               : "Successfully joined the event!";
@@ -203,7 +257,6 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           alert("Successfully joined the event!");
         }
       } else {
-        // Show error message
         alert(data.error || data.message || "Failed to join event");
       }
     } catch (error) {
@@ -211,6 +264,127 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
       alert("An error occurred while joining the event");
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!event || !user?.participant || isCheckingIn) return;
+
+    setIsCheckingIn(true);
+    try {
+      const response = await apiFetch(EP.PARTICIPANT.checkIn, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId: event._id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setJoinStatus((prev) => prev ? { ...prev, isCheckedIn: true } : null);
+        alert("Successfully checked in!");
+      } else {
+        alert(data.error || data.message || "Failed to check in");
+      }
+    } catch (error) {
+      console.error("Error checking in:", error);
+      alert("An error occurred while checking in");
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!event || !user?.participant || isPaying) return;
+
+    setIsPaying(true);
+    try {
+      const response = await apiFetch(EP.PARTICIPANT.confirmPayment, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId: event._id,
+          autoCheckIn: isWithinDeadline, // Auto check-in if within deadline
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setReservationId(data.reservationId);
+        setShowPaymentModal(false);
+        
+        // If auto checked in (within deadline), show success modal directly
+        if (data.isCheckedIn) {
+          setJoinStatus((prev) => prev ? { ...prev, isPaid: true, isCheckedIn: true } : null);
+          setShowSuccessModal(true);
+        } else {
+          // Normal flow - ask if user wants to check-in
+          setJoinStatus((prev) => prev ? { ...prev, isPaid: true } : null);
+          setShowCheckInConfirm(true);
+        }
+      } else {
+        alert(data.error || data.message || "Payment failed");
+      }
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      alert("An error occurred while processing payment");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const handleCheckInAfterPayment = async () => {
+    setShowCheckInConfirm(false);
+    
+    if (!event || !user?.participant) return;
+
+    setIsCheckingIn(true);
+    try {
+      const response = await apiFetch(EP.PARTICIPANT.checkIn, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId: event._id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setJoinStatus((prev) => prev ? { ...prev, isCheckedIn: true } : null);
+        setShowSuccessModal(true);
+      } else {
+        alert(data.error || data.message || "Failed to check in");
+      }
+    } catch (error) {
+      console.error("Error checking in:", error);
+      alert("An error occurred while checking in");
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleSkipCheckIn = () => {
+    setShowCheckInConfirm(false);
+    alert("Payment confirmed! You can check-in later.");
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -602,6 +776,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           </div>
 
           <div className="flex justify-end gap-3 pt-6 mt-6 pb-6 px-6 -mx-6 border-t border-gray-200 dark:border-slate-700 sticky bottom-0 bg-white dark:bg-slate-800">
+            {/* Show Join button if user is participant and hasn't joined yet */}
             {!isEventCreator && isParticipant && !hasJoined && (
               <button
                 type="button"
@@ -610,14 +785,65 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 className="px-6 py-2.5 text-sm font-medium text-white bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <UserPlus className="w-4 h-4" />
-                {isJoining ? "Joining..." : "Join Event"}
+                {isJoining ? "Joining..." : "Join"}
               </button>
             )}
-            {hasJoined && (
-              <div className="px-6 py-2.5 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                Joined
+            
+            {/* Show Check-in button if user has joined, is paid, not waitlisted, and not checked in yet */}
+            {hasJoined && joinStatus && !joinStatus.isCheckedIn && joinStatus.isPaid && !joinStatus.isWaitListed && (
+              <button
+                type="button"
+                onClick={handleCheckIn}
+                disabled={isCheckingIn}
+                className="px-6 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {isCheckingIn ? "Checking in..." : "Check-in"}
+              </button>
+            )}
+            
+            {/* Show Checked In status with ID if user has already checked in */}
+            {hasJoined && joinStatus?.isCheckedIn && (
+              <button
+                onClick={() => joinStatus._id && copyToClipboard(joinStatus._id)}
+                className="px-6 py-2.5 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center gap-2 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
+                title="Click to copy Check-in ID"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Checked In</span>
+                {joinStatus._id && (
+                  <>
+                    <span className="text-green-500 dark:text-green-500">|</span>
+                    <span className="font-mono text-xs">{joinStatus._id.slice(-8)}</span>
+                    {copied ? (
+                      <Check className="w-3.5 h-3.5 text-green-500" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </>
+                )}
+              </button>
+            )}
+            
+            {/* Show Waitlisted status if user is on the waitlist */}
+            {hasJoined && joinStatus?.isWaitListed && (
+              <div className="px-6 py-2.5 text-sm font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                Waitlisted
               </div>
             )}
+            
+            {/* Show Pay button if user has joined but not paid */}
+            {hasJoined && joinStatus && !joinStatus.isPaid && !joinStatus.isWaitListed && !joinStatus.isCheckedIn && (
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="px-6 py-2.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                Pay {event.participationFee ? `$${event.participationFee}` : ""}
+              </button>
+            )}
+            
             <button
               type="button"
               onClick={onClose}
@@ -628,6 +854,137 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Confirm Payment
+              </h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-slate-400 mb-2">Event</p>
+                <p className="font-medium text-gray-900 dark:text-white">{event.name}</p>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-slate-400 mb-2">Amount</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {event.priceType === 'Free' ? 'Free' : `$${event.participationFee || 0}`}
+                </p>
+              </div>
+              
+              {isWithinDeadline && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+                    Since the event starts in less than 2 days, you will be automatically checked in after payment.
+                  </p>
+                </div>
+              )}
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  This is a test payment. Click "Confirm Payment" to simulate a successful payment.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePayment}
+                disabled={isPaying}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isPaying ? "Processing..." : isWithinDeadline ? "Pay & Check-in" : "Confirm Payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in Confirmation Modal */}
+      {showCheckInConfirm && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-auto p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Payment Successful!
+              </h3>
+              <p className="text-gray-600 dark:text-slate-400">
+                Would you like to check-in now?
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleSkipCheckIn}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              >
+                Later
+              </button>
+              <button
+                onClick={handleCheckInAfterPayment}
+                disabled={isCheckingIn}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isCheckingIn ? "Checking in..." : "Check-in Now"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal with Reservation ID */}
+      {showSuccessModal && reservationId && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-auto p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Check-in Successful!
+              </h3>
+              <p className="text-gray-600 dark:text-slate-400 mb-4">
+                You are now checked in for this event.
+              </p>
+              
+              <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-slate-400 mb-2">Your Confirmation ID</p>
+                <p className="text-lg font-mono font-bold text-cyan-600 dark:text-cyan-400 select-all">
+                  {reservationId}
+                </p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full px-4 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 rounded-lg transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

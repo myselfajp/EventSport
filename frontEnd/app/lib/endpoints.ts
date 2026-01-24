@@ -122,6 +122,9 @@ export const EP = {
     favoriteFacility: `${PARTICIPANT_DATA_API}/favorite-facility`,
     favoriteEvent: `${PARTICIPANT_DATA_API}/favorite-event`,
     makeReservation: `${PARTICIPANT_DATA_API}/make-reservation`,
+    checkIn: `${PARTICIPANT_DATA_API}/check-in`,
+    confirmPayment: `${PARTICIPANT_DATA_API}/confirm-payment`,
+    myReservations: `${PARTICIPANT_DATA_API}/my-reservations`,
     unfavorite: (type: "coach" | "facility" | "event") =>
       `${PARTICIPANT_DATA_API}/favorite/${type}`,
     follow: {
@@ -150,6 +153,9 @@ export const EP = {
     getCoachById: (coachId: string) =>
       `${COACH_DATA_API}/get-by-detail/${coachId}`,
     getCoachList: `${API_V1_BASE}/get-coach-list`,
+    myCreatedEvents: `${COACH_DATA_API}/my-events`,
+    getEventParticipants: (eventId: string) =>
+      `${COACH_DATA_API}/event/participants/${eventId}`,
   },
   PARTICIPANT_LIST: {
     getParticipantList: `${API_V1_BASE}/get-participant-list`,
