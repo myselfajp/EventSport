@@ -53,13 +53,12 @@ services:
       context: ./frontEnd
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE}
-        - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE}
+        - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE:-http://localhost:3000/api/v1}
+        - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE:-http://localhost:3000}
     container_name: eventSport_frontend_prod
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE}
-      - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE}
+      - PORT=3001
     ports:
       - "${FRONTEND_PORT:-3001}:3001"
     depends_on:
