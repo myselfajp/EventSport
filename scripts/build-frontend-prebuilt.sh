@@ -8,6 +8,11 @@ cd "$ROOT/frontEnd"
 # Load .env from project root so Next.js build sees NEXT_PUBLIC_* vars
 [ -f "$ROOT/.env" ] && set -a && . "$ROOT/.env" && set +a
 
+echo "API base for build: ${NEXT_PUBLIC_API_V1_BASE:-<not set>}"
+if [ -z "$NEXT_PUBLIC_API_V1_BASE" ] || [ "$NEXT_PUBLIC_API_V1_BASE" = "http://localhost:3000/api/v1" ]; then
+  echo "WARNING: Set NEXT_PUBLIC_API_V1_BASE in $ROOT/.env to your server URL (e.g. http://143.198.141.222:3000/api/v1) before building."
+fi
+
 echo "Installing dependencies..."
 npm ci
 
@@ -27,4 +32,4 @@ docker build -f "$ROOT/frontEnd/Dockerfile.prebuilt" -t eventsport-frontend:late
 
 rm -rf "$CONTEXT"
 echo "Done. Image: eventsport-frontend:latest"
-echo "Run: docker compose -f docker-compose-prod.yml up -d"
+echo "Run: docker compose -f docker-compose-prod.prebuilt.yml up -d"
