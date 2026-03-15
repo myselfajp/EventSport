@@ -41,6 +41,7 @@ services:
       - ADMIN_LAST_NAME=${ADMIN_LAST_NAME}
       - ADMIN_PHONE=${ADMIN_PHONE}
       - ADMIN_AGE=${ADMIN_AGE}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
