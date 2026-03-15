@@ -1,4 +1,15 @@
 import dotenv from 'dotenv';
+dotenv.config();
+
+// Fix malformed MONGODB_URI (e.g. missing "mongodb://" or trailing "}" from .env typo)
+if (process.env.MONGODB_URI) {
+  let uri = process.env.MONGODB_URI.trim().replace(/\}+$/, '');
+  if (uri && !/^mongodb(\+srv)?:\/\//i.test(uri)) {
+    uri = `mongodb://${uri}`;
+  }
+  process.env.MONGODB_URI = uri;
+}
+
 import express from 'express';
 import authRouter from './routes/authRouter.js';
 import participantRouter from './routes/participantRouter.js';
@@ -21,7 +32,6 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import path from 'path';
 
-dotenv.config();
 const app = express();
 
 app.set('trust proxy', 1);
