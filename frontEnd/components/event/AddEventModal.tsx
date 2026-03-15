@@ -545,7 +545,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     setError("");
 
     if (field === "priceType" && value === "Free") {
-      setFormData((prev) => ({ ...prev, participationFee: "" }));
+      setFormData((prev) => ({ ...prev, participationFee: "0" }));
     }
   };
 
@@ -602,12 +602,25 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       !formData.sport ||
       !formData.startDate ||
       !formData.startTime ||
+      !formData.endDate ||
+      !formData.endTime ||
       !formData.capacity ||
       !formData.level ||
       !formData.type ||
-      !formData.priceType
+      !formData.priceType ||
+      !formData.equipment
     ) {
       setError("Please fill in all required fields");
+      return;
+    }
+
+    if (!bannerFile && !isEditMode) {
+      setError("Event Banner is required");
+      return;
+    }
+
+    if (!bannerFile && isEditMode && !initialData?.banner?.path) {
+      setError("Event Banner is required");
       return;
     }
 
@@ -616,8 +629,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       return;
     }
 
-    if (formData.priceType !== "Free" && !formData.participationFee) {
-      setError("Participant Fee is required when Price Type is not 'Free'");
+    if (!formData.participationFee || parseFloat(formData.participationFee) < 0) {
+      setError("Participant Fee must be a valid number (0 or greater)");
+      return;
+    }
+
+    if (formData.priceType !== "Free" && parseFloat(formData.participationFee) === 0) {
+      setError("Participant Fee must be greater than 0 when Price Type is not 'Free'");
       return;
     }
 
@@ -1514,7 +1532,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Event End Date
+                    Event End Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
@@ -1523,12 +1541,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       handleInputChange("endDate", e.target.value)
                     }
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white"
+                    required
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Event End Time
+                    Event End Time <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="time"
@@ -1537,6 +1556,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       handleInputChange("endTime", e.target.value)
                     }
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white"
+                    required
                   />
                 </div>
               </div>
@@ -1620,7 +1640,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Participant Fee
+                    Participant Fee <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1632,6 +1652,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                     disabled={formData.priceType === "Free"}
                     min="0"
+                    required
                     step="0.01"
                   />
                   {formData.priceType === "Free" && (
@@ -1644,7 +1665,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Equipment
+                  Equipment <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={formData.equipment}
@@ -1654,6 +1675,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   placeholder="Equipment"
                   rows={3}
                   className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  required
                 />
               </div>
 

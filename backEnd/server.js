@@ -4,7 +4,11 @@ import { initAdmin } from './src/utils/initAdmin.js';
 import { initLegal } from './src/utils/initLegal.js';
 
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI;
+// Normalize URI: ensure mongodb:// prefix and strip trailing typos (e.g. stray '}')
+let MONGODB_URI = (process.env.MONGODB_URI || '').trim().replace(/\}+$/, '');
+if (MONGODB_URI && !/^mongodb(\+srv)?:\/\//i.test(MONGODB_URI)) {
+    MONGODB_URI = `mongodb://${MONGODB_URI}`;
+}
 
 const startServer = async () => {
     try {
