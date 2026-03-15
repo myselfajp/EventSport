@@ -1,0 +1,74 @@
+# Full stack with pre-built frontend (no npm run build in Docker — use when build fails with SIGBUS).
+# 1) Build frontend on host: ./scripts/build-frontend-prebuilt.sh
+# 2) Then: docker compose -f docker-compose-prod.prebuilt.yml up -d
+services:
+  mongodb:
+    image: mongo:7
+    container_name: eventSport_mongodb_prod
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-sportsevents}
+    command: mongod --quiet --logpath /dev/null
+    volumes:
+      - mongodb_data_prod:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eventSport_network
+    restart: unless-stopped
+    logging:
+      driver: "none"
+
+  backend:
+    build:
+      context: ./backEnd
+      dockerfile: Dockerfile
+    container_name: eventSport_backend_prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=${MONGODB_URI:-mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB:-sportsevents}?authSource=admin}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ADMIN_FIRST_NAME=${ADMIN_FIRST_NAME}
+      - ADMIN_LAST_NAME=${ADMIN_LAST_NAME}
+      - ADMIN_PHONE=${ADMIN_PHONE}
+      - ADMIN_AGE=${ADMIN_AGE}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./backEnd/uploads:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - eventSport_network
+    restart: unless-stopped
+
+  frontend:
+    image: eventsport-frontend:latest
+    container_name: eventSport_frontend_prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+    ports:
+      - "${FRONTEND_PORT:-3001}:3001"
+    depends_on:
+      - backend
+    networks:
+      - eventSport_network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data_prod:
+
+networks:
+  eventSport_network:
+    driver: bridge
