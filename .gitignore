@@ -145,3 +145,7 @@ scripts/db-seed-toolkit/
 scripts/db-seed-toolkit/**
 EventSport-db-seed-toolkit.zip
 *.seed-toolkit.zip
+
+# --- Yedek arşivleri (gerçek veri / şifre hash'leri; GitHub'a gitmez) ---
+backup.rar
+*.rar
