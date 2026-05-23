@@ -81,6 +81,35 @@ export const createNotification = async (options) => {
 };
 
 /**
+ * Create notification for nearby event (same district)
+ */
+export const notifyNearbyEventCreated = async ({
+    eventId,
+    eventName,
+    coachName,
+    districtName,
+    userIds,
+}) => {
+    if (!userIds?.length) return null;
+
+    return await createNotification({
+        scope: 'group',
+        type: 'nearby_event_created',
+        title: 'New Event in Your District',
+        message: `${coachName} created "${eventName}" in ${districtName}.`,
+        data: {
+            eventId,
+            eventName,
+            coachName,
+            districtName,
+        },
+        targetUsers: userIds,
+        priority: 'normal',
+        icon: 'map-pin',
+    });
+};
+
+/**
  * Create notification for event created
  */
 export const notifyEventCreated = async (eventId, eventName, coachId, coachName, userIds = null) => {
@@ -195,6 +224,62 @@ export const notifyReservationRejected = async (userId, eventId, eventName) => {
         userId,
         priority: 'normal',
         icon: 'x-circle',
+    });
+};
+
+/**
+ * Reminder: check-in opens in ~24 hours.
+ */
+export const notifyCheckInOpensReminder24h = async (
+    userId,
+    eventId,
+    eventName,
+    checkInOpensAt,
+    checkInOpensLabel
+) => {
+    return await createNotification({
+        scope: 'user',
+        type: 'check_in_opens_reminder_24h',
+        title: 'Check-in opens tomorrow',
+        message: `Check-in for "${eventName}" opens in 24 hours${checkInOpensLabel ? ` (${checkInOpensLabel})` : ''}.`,
+        data: {
+            eventId,
+            eventName,
+            checkInOpensAt,
+            reminderKind: '24h',
+        },
+        userId,
+        priority: 'normal',
+        icon: 'bell',
+        expiresAt: checkInOpensAt ? new Date(checkInOpensAt) : undefined,
+    });
+};
+
+/**
+ * Reminder: check-in opens in ~2 hours.
+ */
+export const notifyCheckInOpensReminder2h = async (
+    userId,
+    eventId,
+    eventName,
+    checkInOpensAt,
+    checkInOpensLabel
+) => {
+    return await createNotification({
+        scope: 'user',
+        type: 'check_in_opens_reminder_2h',
+        title: 'Check-in opens soon',
+        message: `Check-in for "${eventName}" opens in about 2 hours${checkInOpensLabel ? ` (${checkInOpensLabel})` : ''}. Don't forget to check in!`,
+        data: {
+            eventId,
+            eventName,
+            checkInOpensAt,
+            reminderKind: '2h',
+        },
+        userId,
+        priority: 'high',
+        icon: 'bell',
+        expiresAt: checkInOpensAt ? new Date(checkInOpensAt) : undefined,
     });
 };
 

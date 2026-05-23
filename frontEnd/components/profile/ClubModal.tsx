@@ -4,6 +4,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { X, Upload, Loader, Check, Search as SearchIcon } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import LocationFields, {
+  emptyLocationValue,
+} from "@/components/location/LocationFields";
+import type { LocationValue } from "@/app/lib/location-api";
 
 interface ClubModalProps {
   isOpen: boolean;
@@ -67,6 +71,26 @@ const ClubModal: React.FC<ClubModalProps> = ({
   const [showPresidentDropdown, setShowPresidentDropdown] = useState(false);
   const [showCoachesDropdown, setShowCoachesDropdown] = useState(false);
   const [selectedCoachesData, setSelectedCoachesData] = useState<CoachSearchResult[]>([]);
+  const [locationValue, setLocationValue] = useState<LocationValue>(
+    emptyLocationValue()
+  );
+  const [mainSport, setMainSport] = useState("");
+  const [sports, setSports] = useState<{ _id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        const res = await fetchJSON(EP.REFERENCE.sport.get, {
+          method: "POST",
+          body: { perPage: 200, pageNumber: 1 },
+        });
+        if (res?.success && Array.isArray(res.data)) setSports(res.data);
+      } catch {
+        setSports([]);
+      }
+    })();
+  }, [isOpen]);
 
   const searchCoaches = async (query: string, isForPresident: boolean) => {
     if (query.trim().length < 2) {
@@ -310,6 +334,12 @@ const ClubModal: React.FC<ClubModalProps> = ({
       const clubData: any = {
         name: formData.name,
       };
+
+      if (mainSport) clubData.mainSport = mainSport;
+      if (locationValue.district) {
+        clubData.district = locationValue.district;
+        if (locationValue.addressLine) clubData.addressLine = locationValue.addressLine;
+      }
       
       if (formData.vision) clubData.vision = formData.vision;
       if (formData.conditions) clubData.conditions = formData.conditions;
@@ -402,6 +432,36 @@ const ClubModal: React.FC<ClubModalProps> = ({
                       disabled={isLoading}
                     />
                     {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Main sport
+                    </label>
+                    <select
+                      value={mainSport}
+                      onChange={(e) => setMainSport(e.target.value)}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                      disabled={isLoading}
+                    >
+                      <option value="">Select sport (optional)</option>
+                      {sports.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Istanbul district
+                    </label>
+                    <LocationFields
+                      value={locationValue}
+                      onChange={setLocationValue}
+                      disabled={isLoading}
+                    />
                   </div>
 
                   <div>

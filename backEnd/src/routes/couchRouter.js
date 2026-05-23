@@ -31,6 +31,8 @@ router.post(
     }),
     coachController.editEvent
 );
+router.post('/cancel-event/:eventId', coachController.cancelEvent);
+router.get('/listing-quote', coachController.getListingQuote);
 router.delete('/delete-event/:eventId', coachController.deleteEvent);
 
 router.post('/join-backup-coach/:eventId', coachController.joinBackupCoach);

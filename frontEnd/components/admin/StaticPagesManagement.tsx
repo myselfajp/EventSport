@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
+import { SOZLESMELER_STATIC_SLUGS } from "../../app/lib/sozlesmeler-static-slugs";
+import { STATIC_FOOTER_PAGE_ROUTES } from "../../app/lib/footer-config";
 import { X, Plus, Edit2, Trash2, Eye, Save, Type, Heading1, FileText } from "lucide-react";
 
 interface StaticPage {
@@ -159,6 +161,42 @@ export default function StaticPagesManagement() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Static Pages</h2>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             Create and manage static pages like "About Us"
+          </p>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-2 max-w-2xl">
+            <span className="font-medium text-gray-600 dark:text-slate-300">
+              /sozlesmeler:
+            </span>{" "}
+            public sayfa için{" "}
+            <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">
+              name
+            </code>{" "}
+            alanı şunlardan biri olmalı:{" "}
+            {SOZLESMELER_STATIC_SLUGS.map((s) => (
+              <code
+                key={s}
+                className="bg-gray-100 dark:bg-slate-800 px-1 rounded mr-1 text-[11px]"
+              >
+                {s}
+              </code>
+            ))}
+            (sayfa aktif olmalı).
+          </p>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-2 max-w-2xl">
+            <span className="font-medium text-gray-600 dark:text-slate-300">
+              Site footer (static pages only)
+            </span>{" "}
+            aşağıdaki bağlantılar için{" "}
+            <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">name</code>{" "}
+            değerleri:{" "}
+            {STATIC_FOOTER_PAGE_ROUTES.map(({ slug }) => (
+              <code
+                key={slug}
+                className="bg-gray-100 dark:bg-slate-800 px-1 rounded mr-1 text-[11px]"
+              >
+                {slug}
+              </code>
+            ))}
+            .
           </p>
         </div>
         <button

@@ -18,13 +18,7 @@ interface Sport {
   groupName: string;
 }
 
-const getImageUrl = (path: string) => {
-  if (!path) return "";
-  // Use API_ASSETS_BASE with the path from database
-  // If path starts with /, use it directly, otherwise add /
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
-};
+const getImageUrl = (path: string) => EP.assetUrl(path);
 
 interface SportsBannerProps {
   selectedSportId?: string | null;

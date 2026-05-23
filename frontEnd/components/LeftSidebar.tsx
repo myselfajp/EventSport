@@ -8,6 +8,7 @@ import ProfileSidebar from "./profile/ProfileSidebar";
 
 interface LeftSidebarProps {
   isOpen: boolean;
+  gamerProfileOpenSignal?: number;
   onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
@@ -62,7 +63,14 @@ const DUMMY_COMPANIES = [
   },
 ];
 
-const LeftSidebar: React.FC<LeftSidebarProps> = ({ isOpen, onShowCalendar, onShowFollowings, onShowFavorites, onShowStaticPage }) => {
+const LeftSidebar: React.FC<LeftSidebarProps> = ({
+  isOpen,
+  gamerProfileOpenSignal = 0,
+  onShowCalendar,
+  onShowFollowings,
+  onShowFavorites,
+  onShowStaticPage,
+}) => {
   const { data: user, isLoading: userLoading } = useMe();
   const { mutate: signOut } = useSignOut();
   const isLoggedIn = !!user;
@@ -94,6 +102,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ isOpen, onShowCalendar, onSho
       ) : isLoggedIn ? (
         <ProfileSidebar
           onLogout={handleLogout}
+          gamerProfileOpenSignal={gamerProfileOpenSignal}
           onShowCalendar={onShowCalendar}
           onShowFollowings={onShowFollowings}
           onShowFavorites={onShowFavorites}

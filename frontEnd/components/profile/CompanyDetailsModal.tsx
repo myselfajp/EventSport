@@ -5,6 +5,7 @@ import { X, Building, Phone, Mail, MapPin, Calendar } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { Company } from "@/app/lib/types";
+import { getCompanyTypeLabel } from "@/app/lib/company-types";
 
 interface CompanyDetailsModalProps {
   isOpen: boolean;
@@ -52,7 +53,7 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                 <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900/50 rounded-full flex items-center justify-center">
                   {company.photo ? (
                     <img
-                      src={typeof company.photo === 'string' ? company.photo : `${EP.API_ASSETS_BASE}${(company.photo as any).path}`}
+                      src={typeof company.photo === 'string' ? company.photo : EP.assetUrl((company.photo as any).path)}
                       alt={company.name}
                       className="w-20 h-20 rounded-full object-cover"
                     />
@@ -64,7 +65,9 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {company.name}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">Sports Company</p>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    {getCompanyTypeLabel(company.companyType)}
+                  </p>
                   <p className="text-sm text-gray-500 dark:text-gray-500">
                     Added {formatDate(company.createdAt)}
                   </p>

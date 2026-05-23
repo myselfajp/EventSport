@@ -36,9 +36,24 @@ const reservationSchema = new mongoose.Schema(
             type: Date,
             required: true,
         },
+        checkInReminder24hSentAt: {
+            type: Date,
+            default: null,
+        },
+        checkInReminder2hSentAt: {
+            type: Date,
+            default: null,
+        },
         qr: {
             type: String,
         },
+        /** Health & legal confirmations at registration time */
+        acceptHealthNoIllness: { type: Boolean },
+        acceptHealthNoDisability: { type: Boolean },
+        acceptHealthNoMedication: { type: Boolean },
+        acceptHealthSportOk: { type: Boolean },
+        acceptDistantSelling: { type: Boolean },
+        acceptEventPurchaseTerms: { type: Boolean },
         isJoined: {
             type: Boolean,
             required: true,

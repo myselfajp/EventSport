@@ -5,6 +5,7 @@ import { X, Upload, ImageIcon, ChevronDown, Search } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { LEVEL_DEFINITIONS } from "@/app/lib/level-definitions";
+import LocationFields from "@/components/location/LocationFields";
 import LevelDefinitions from "@/components/LevelDefinitions";
 
 // Custom hook for debounce
@@ -88,6 +89,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     facility: "",
     salon: "",
     location: "",
+    district: "",
     startDate: "",
     startTime: "",
     endDate: "",
@@ -98,9 +100,23 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     priceType: "",
     participationFee: "",
     equipment: "",
+    eventDetails: "",
+    eventLink: "",
     private: false,
     isRecurring: false,
+    checkInOpensHoursBeforeStart: "",
+    recurrenceFrequency: "weekly" as "weekly" | "daily" | "monthly",
+    recurrenceInterval: "1",
+    recurrenceSessionCount: "4",
+    listingPurchaseConfirmed: false,
+    editScope: "single" as "single" | "following",
   });
+
+  const [listingQuote, setListingQuote] = useState<{
+    unitPrice: number;
+    totalAmount: number;
+  } | null>(null);
+  const [loadingListingQuote, setLoadingListingQuote] = useState(false);
 
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -342,6 +358,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         facility: initialData.facility?._id || initialData.facility || "",
         salon: initialData.salon?._id || initialData.salon || "",
         location: initialData.location || "",
+        district: initialData.district?._id || initialData.district || "",
         startDate: startDate,
         startTime: startTime,
         endDate: endDate,
@@ -352,18 +369,70 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         priceType: initialData.priceType || "",
         participationFee: initialData.participationFee?.toString() || "",
         equipment: initialData.equipment || "",
+        eventDetails: initialData.eventDetails || "",
+        eventLink: initialData.eventLink || "",
         private: initialData.private || false,
         isRecurring: initialData.isRecurring || false,
+        checkInOpensHoursBeforeStart:
+          initialData.checkInOpensHoursBeforeStart != null
+            ? String(initialData.checkInOpensHoursBeforeStart)
+            : "",
+        recurrenceFrequency: "weekly",
+        recurrenceInterval: "1",
+        recurrenceSessionCount: "4",
+        listingPurchaseConfirmed: false,
+        editScope: "single",
       });
 
       if (initialData.photo?.path) {
-        setPhotoPreview(`${EP.API_ASSETS_BASE}/${initialData.photo.path}`.replace(/\\/g, "/"));
+        setPhotoPreview(EP.assetUrl(initialData.photo.path));
       }
       if (initialData.banner?.path) {
-        setBannerPreview(`${EP.API_ASSETS_BASE}/${initialData.banner.path}`.replace(/\\/g, "/"));
+        setBannerPreview(EP.assetUrl(initialData.banner.path));
       }
     }
   }, [initialData, isOpen]);
+
+  const isSeriesEdit = isEditMode && !!(initialData?.series?._id || initialData?.series);
+
+  useEffect(() => {
+    if (!isOpen || !formData.isRecurring || isEditMode) {
+      setListingQuote(null);
+      return;
+    }
+    const count = parseInt(formData.recurrenceSessionCount, 10);
+    if (Number.isNaN(count) || count < 2 || count > 52) {
+      setListingQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const loadQuote = async () => {
+      setLoadingListingQuote(true);
+      try {
+        const res = await apiFetch(EP.COACH.listingQuote(count));
+        const json = await res.json();
+        if (!cancelled && json?.success && json.data) {
+          setListingQuote({
+            unitPrice: json.data.unitPrice,
+            totalAmount: json.data.totalAmount,
+          });
+        }
+      } catch {
+        if (!cancelled) setListingQuote(null);
+      } finally {
+        if (!cancelled) setLoadingListingQuote(false);
+      }
+    };
+    void loadQuote();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    formData.isRecurring,
+    formData.recurrenceSessionCount,
+    isEditMode,
+  ]);
 
   const fetchClubs = async (search: string = "") => {
     setLoadingClubs(true);
@@ -538,10 +607,16 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "type" && value === "Online") {
+        next.district = "";
+      }
+      if (field === "facility" && value) {
+        next.district = "";
+      }
+      return next;
+    });
     setError("");
 
     if (field === "priceType" && value === "Free") {
@@ -624,19 +699,42 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       return;
     }
 
-    if (!formData.facility && !formData.salon && !formData.location) {
-      setError("Exactly one of Facility, Salon, or Location must be provided");
-      return;
+    if (formData.type !== "Online") {
+      if (!formData.facility && !formData.salon && !formData.location) {
+        setError("Exactly one of Facility, Salon, or Location must be provided");
+        return;
+      }
+
+      if (!formData.facility && !formData.salon && !formData.district) {
+        setError("Select an Istanbul district when no facility is chosen");
+        return;
+      }
     }
 
     if (!formData.participationFee || parseFloat(formData.participationFee) < 0) {
-      setError("Participant Fee must be a valid number (0 or greater)");
+      setError("Gamer Fee must be a valid number (0 or greater)");
       return;
     }
 
     if (formData.priceType !== "Free" && parseFloat(formData.participationFee) === 0) {
-      setError("Participant Fee must be greater than 0 when Price Type is not 'Free'");
+      setError("Gamer Fee must be greater than 0 when Price Type is not 'Free'");
       return;
+    }
+
+    const rawLink = formData.eventLink.trim();
+    let normalizedLink = "";
+    if (rawLink) {
+      normalizedLink = /^https?:\/\//i.test(rawLink)
+        ? rawLink
+        : `https://${rawLink}`;
+      if (!/^https?:\/\/.+/i.test(normalizedLink)) {
+        setError("Enter a valid http or https URL for the event link");
+        return;
+      }
+      if (normalizedLink.length > 500) {
+        setError("Event link must be at most 500 characters");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -676,7 +774,20 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         private: formData.private,
         isRecurring: formData.isRecurring,
         equipment: formData.equipment,
+        eventDetails: formData.eventDetails.trim(),
+        eventLink: normalizedLink,
       };
+
+      const checkInHoursRaw = formData.checkInOpensHoursBeforeStart.trim();
+      if (checkInHoursRaw !== "") {
+        const hours = parseInt(checkInHoursRaw, 10);
+        if (Number.isNaN(hours) || hours < 0 || hours > 720) {
+          setError("Check-in hours must be between 0 and 720");
+          setSubmitting(false);
+          return;
+        }
+        (eventData as any).checkInOpensHoursBeforeStart = hours;
+      }
 
       if (formData.facility) {
         (eventData as any).facility = formData.facility;
@@ -686,6 +797,40 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       }
       if (formData.location) {
         (eventData as any).location = formData.location;
+      }
+      if (formData.type !== "Online" && formData.district) {
+        (eventData as any).district = formData.district;
+      }
+
+      if (formData.isRecurring && !isEditMode) {
+        const sessionCount = parseInt(formData.recurrenceSessionCount, 10);
+        const interval = parseInt(formData.recurrenceInterval, 10);
+        if (
+          Number.isNaN(sessionCount) ||
+          sessionCount < 2 ||
+          sessionCount > 52 ||
+          Number.isNaN(interval) ||
+          interval < 1
+        ) {
+          setError("Invalid recurrence settings (session count 2–52, interval ≥ 1)");
+          setSubmitting(false);
+          return;
+        }
+        if (!formData.listingPurchaseConfirmed) {
+          setError("Please confirm listing purchase for the recurring series");
+          setSubmitting(false);
+          return;
+        }
+        (eventData as any).recurrence = {
+          frequency: formData.recurrenceFrequency,
+          interval,
+          sessionCount,
+        };
+        (eventData as any).listingPurchaseConfirmed = true;
+      }
+
+      if (isSeriesEdit) {
+        (eventData as any).scope = formData.editScope;
       }
 
       formDataToSend.append("data", JSON.stringify(eventData));
@@ -707,7 +852,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       const result = await response.json();
 
       if (result.success) {
-        alert(isEditMode ? "🎉 Event updated successfully!" : "🎉 Event created successfully!");
+        const msg =
+          !isEditMode && formData.isRecurring && result.sessions
+            ? `🎉 Series created with ${result.sessions.length} sessions! Listing: ${result.listing?.totalAmount ?? 0} TRY`
+            : isEditMode
+              ? "🎉 Event updated successfully!"
+              : "🎉 Event created successfully!";
+        alert(msg);
         handleClose();
         if (onSuccess) {
           onSuccess();
@@ -736,6 +887,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       facility: "",
       salon: "",
       location: "",
+      district: "",
       startDate: "",
       startTime: "",
       endDate: "",
@@ -746,9 +898,18 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       priceType: "",
       participationFee: "",
       equipment: "",
+      eventDetails: "",
+      eventLink: "",
       private: false,
       isRecurring: false,
+      checkInOpensHoursBeforeStart: "",
+      recurrenceFrequency: "weekly",
+      recurrenceInterval: "1",
+      recurrenceSessionCount: "4",
+      listingPurchaseConfirmed: false,
+      editScope: "single",
     });
+    setListingQuote(null);
     setBannerFile(null);
     setPhotoFile(null);
     setBannerPreview(null);
@@ -1493,9 +1654,29 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   }
                   placeholder="If there are no Facility/Salon"
                   rows={3}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  disabled={formData.type === "Online"}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 disabled:opacity-50"
                 />
               </div>
+
+              {formData.type !== "Online" && !formData.facility && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Istanbul District <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Required when no facility is selected. If you pick a facility, its district is used automatically.
+                  </p>
+                  <LocationFields
+                    value={{
+                      district: formData.district,
+                      addressLine: "",
+                    }}
+                    onChange={(loc) => handleInputChange("district", loc.district)}
+                    showAddressLine={false}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1561,9 +1742,29 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </div>
               </div>
 
-              <LevelDefinitions />
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 items-start">
+                <LevelDefinitions className="min-h-0 max-h-[320px] overflow-y-auto" />
+                <div className="lg:pt-7">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Level <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.level}
+                    onChange={(e) => handleInputChange("level", e.target.value)}
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white dark:bg-gray-700 dark:text-white"
+                    required
+                  >
+                    <option value="">Select Level</option>
+                    {LEVEL_DEFINITIONS.map(({ level, label }) => (
+                      <option key={level} value={level}>
+                        {level} – {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Capacity <span className="text-red-500">*</span>
@@ -1583,25 +1784,6 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Level <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.level}
-                    onChange={(e) => handleInputChange("level", e.target.value)}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white dark:bg-gray-700 dark:text-white"
-                    required
-                  >
-                    <option value="">Select Level</option>
-                    {LEVEL_DEFINITIONS.map(({ level, label }) => (
-                      <option key={level} value={level}>
-                        {level} – {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Type <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -1616,6 +1798,28 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <option value="Online">Online</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Check-in opens (hours before start)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={720}
+                  step={1}
+                  value={formData.checkInOpensHoursBeforeStart}
+                  onChange={(e) =>
+                    handleInputChange("checkInOpensHoursBeforeStart", e.target.value)
+                  }
+                  placeholder="Leave empty to use Event Style default"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Example: 48 = check-in opens 2 days before the event. Empty = use the
+                  style default from admin settings.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1640,7 +1844,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Participant Fee <span className="text-red-500">*</span>
+                    Gamer Fee <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1648,7 +1852,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     onChange={(e) =>
                       handleInputChange("participationFee", e.target.value)
                     }
-                    placeholder="Participant Fee"
+                    placeholder="Gamer Fee"
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                     disabled={formData.priceType === "Free"}
                     min="0"
@@ -1672,11 +1876,54 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   onChange={(e) =>
                     handleInputChange("equipment", e.target.value)
                   }
-                  placeholder="Equipment"
+                  placeholder="e.g. running shoes, racket, water bottle"
                   rows={3}
                   className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Event link
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Optional. Registration page, live stream, tickets, or any related link
+                  (shown as a clickable link on the event page).
+                </p>
+                <input
+                  type="url"
+                  value={formData.eventLink}
+                  onChange={(e) =>
+                    handleInputChange("eventLink", e.target.value)
+                  }
+                  placeholder="https://example.com/register"
+                  maxLength={500}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Event details &amp; rules
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Optional. Add house rules, skill requirements, cancellation policy, or
+                  other notes for participants.
+                </p>
+                <textarea
+                  value={formData.eventDetails}
+                  onChange={(e) =>
+                    handleInputChange("eventDetails", e.target.value)
+                  }
+                  placeholder="e.g. Arrive 15 minutes early. No refunds within 24h of start. Beginners welcome."
+                  rows={5}
+                  maxLength={5000}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-y min-h-[120px] dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">
+                  {formData.eventDetails.length}/5000
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1703,10 +1950,11 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     type="checkbox"
                     id="isRecurring"
                     checked={formData.isRecurring}
+                    disabled={isEditMode}
                     onChange={(e) =>
                       handleInputChange("isRecurring", e.target.checked)
                     }
-                    className="w-4 h-4 text-cyan-500 border-gray-300 dark:border-gray-600 rounded focus:ring-cyan-500 focus:ring-2"
+                    className="w-4 h-4 text-cyan-500 border-gray-300 dark:border-gray-600 rounded focus:ring-cyan-500 focus:ring-2 disabled:opacity-50"
                   />
                   <label
                     htmlFor="isRecurring"
@@ -1716,6 +1964,138 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   </label>
                 </div>
               </div>
+
+              {formData.isRecurring && !isEditMode && (
+                <div className="mt-4 p-4 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-950/20 space-y-4">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Recurrence schedule
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Frequency
+                      </label>
+                      <select
+                        value={formData.recurrenceFrequency}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "recurrenceFrequency",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="daily">Daily</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Every (interval)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={formData.recurrenceInterval}
+                        onChange={(e) =>
+                          handleInputChange("recurrenceInterval", e.target.value)
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Number of sessions
+                      </label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={52}
+                        value={formData.recurrenceSessionCount}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "recurrenceSessionCount",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700 dark:text-gray-300">
+                    {loadingListingQuote ? (
+                      <span>Calculating listing cost…</span>
+                    ) : listingQuote ? (
+                      <span>
+                        Listing purchase:{" "}
+                        <strong>
+                          {listingQuote.totalAmount.toLocaleString("tr-TR")} TRY
+                        </strong>{" "}
+                        ({formData.recurrenceSessionCount} ×{" "}
+                        {listingQuote.unitPrice.toLocaleString("tr-TR")} TRY per
+                        session)
+                      </span>
+                    ) : (
+                      <span>Enter session count to see listing cost.</span>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="listingPurchaseConfirmed"
+                      checked={formData.listingPurchaseConfirmed}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "listingPurchaseConfirmed",
+                          e.target.checked
+                        )
+                      }
+                      className="mt-1 w-4 h-4 text-cyan-500 border-gray-300 dark:border-gray-600 rounded"
+                    />
+                    <label
+                      htmlFor="listingPurchaseConfirmed"
+                      className="text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      I confirm the listing purchase for all sessions in this
+                      series (payment will be integrated later).
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {isSeriesEdit && (
+                <div className="mt-4 p-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">
+                    Apply changes to
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="editScope"
+                        checked={formData.editScope === "single"}
+                        onChange={() =>
+                          handleInputChange("editScope", "single")
+                        }
+                      />
+                      This session only
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="editScope"
+                        checked={formData.editScope === "following"}
+                        onChange={() =>
+                          handleInputChange("editScope", "following")
+                        }
+                      />
+                      This and following sessions
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           </fieldset>
 

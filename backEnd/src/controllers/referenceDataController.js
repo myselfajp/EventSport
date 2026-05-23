@@ -1,7 +1,13 @@
 import mongoose from 'mongoose';
 import { Sport, SportGoal, SportGroup, EventStyle } from '../models/referenceDataModel.js';
 import { AppError } from '../utils/appError.js';
-import { mongoObjectId, SearchQuerySchema, name, color } from '../utils/validation.js';
+import {
+    mongoObjectId,
+    SearchQuerySchema,
+    name,
+    color,
+    checkInOpensHoursBeforeStart,
+} from '../utils/validation.js';
 
 // sportGoal
 export const createSportGoal = async (req, res, next) => {
@@ -376,7 +382,14 @@ export const createEventStyle = async (req, res, next) => {
 
         const eventName = name.parse(req.body?.name);
         const eventColor = color.parse(req.body?.color);
-        const createEventStyle = await EventStyle.create({ name: eventName, color: eventColor });
+        const checkInHours = checkInOpensHoursBeforeStart.parse(
+            req.body?.checkInOpensHoursBeforeStart
+        );
+        const createEventStyle = await EventStyle.create({
+            name: eventName,
+            color: eventColor,
+            checkInOpensHoursBeforeStart: checkInHours,
+        });
         if (!createEventStyle) throw new AppError(404);
 
         res.status(201).json({
@@ -432,10 +445,17 @@ export const updateEventStyle = async (req, res, next) => {
         const eventStyleId = mongoObjectId.parse(req.params.eventStyleId);
         const eventName = name.parse(req.body?.name);
         const eventColor = color.parse(req.body?.color);
+        const checkInHours = checkInOpensHoursBeforeStart.parse(
+            req.body?.checkInOpensHoursBeforeStart
+        );
 
         const updated = await EventStyle.findByIdAndUpdate(
             eventStyleId,
-            { name: eventName, color: eventColor },
+            {
+                name: eventName,
+                color: eventColor,
+                checkInOpensHoursBeforeStart: checkInHours,
+            },
             { new: true }
         );
         if (!updated) throw new AppError(404);

@@ -3,6 +3,8 @@ import { AppError } from '../utils/appError.js';
 import User from '../models/userModel.js';
 import Company from '../models/companyModel.js';
 import * as zodValidation from '../utils/validation.js';
+import { Sport } from '../models/referenceDataModel.js';
+import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 
 export const createCompany = async (req, res, next) => {
     try {
@@ -22,7 +24,12 @@ export const createCompany = async (req, res, next) => {
             };
         }
 
-        const newCompany = await Company.create({ ...result });
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+        const companyPayload = await mergeLocationIntoPayload(result);
+        const newCompany = await Company.create(companyPayload);
 
         await User.findByIdAndUpdate(user._id, {
             $push: { company: newCompany._id },
@@ -68,9 +75,14 @@ export const editCompany = async (req, res, next) => {
             };
         }
 
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+        const updatePayload = await mergeLocationIntoPayload(result);
         const updatedCompany = await Company.findByIdAndUpdate(
             companyId,
-            { $set: result },
+            { $set: updatePayload },
             { new: true }
         );
 

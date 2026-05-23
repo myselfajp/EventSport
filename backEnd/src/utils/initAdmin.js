@@ -43,6 +43,7 @@ export const initAdmin = async () => {
             phone: adminPhone,
             age: ageDate,
             role: 0, // Admin role
+            isActive: true,
             isEmailVerified: true,
             isPhoneVerified: true,
         });

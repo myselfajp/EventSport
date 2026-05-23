@@ -114,9 +114,35 @@ const eventSchema = new mongoose.Schema(
             type: Boolean,
             required: true,
         },
+        /** Parent series when part of a recurring program. */
+        series: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'EventSeries',
+            index: true,
+            default: null,
+        },
+        /** 1-based index within the series. */
+        sessionIndex: {
+            type: Number,
+            min: 1,
+            default: null,
+        },
+        /** Optional override: hours before startTime when check-in opens (else Event Style default). */
+        checkInOpensHoursBeforeStart: {
+            type: Number,
+            min: 0,
+            max: 720,
+            default: null,
+        },
         facility: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Facility',
+        },
+        /** Istanbul district for nearby recommendations and notifications (not set for Online events). */
+        district: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'District',
+            index: true,
         },
         location: {
             type: String,
@@ -129,10 +155,34 @@ const eventSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        /** Rules, notes, and extra info shown on the event page */
+        eventDetails: {
+            type: String,
+            default: '',
+            trim: true,
+        },
+        /** Optional external link (registration, stream, tickets, etc.) */
+        eventLink: {
+            type: String,
+            default: '',
+            trim: true,
+        },
         secretId: {
             type: String,
             default: null,
             select: false,
+        },
+        status: {
+            type: String,
+            enum: {
+                values: ['active', 'cancelled'],
+                message: 'Should be active or cancelled',
+            },
+            default: 'active',
+        },
+        cancelledAt: {
+            type: Date,
+            default: null,
         },
     },
     { timestamps: true }

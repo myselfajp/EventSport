@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
+import { useMe } from "../../app/hooks/useAuth";
 import { Edit, Trash2, Calendar, Filter } from "lucide-react";
 import AddEventModal from "../event/AddEventModal";
 
@@ -23,12 +24,17 @@ interface Event {
   startTime: string;
   endTime: string;
   owner?: {
+    _id?: string;
     firstName: string;
     lastName: string;
   };
   createdAt: string;
   updatedAt: string;
+  status?: "active" | "cancelled";
+  cancelledAt?: string;
 }
+
+type EventListView = "active" | "cancelled" | "all";
 
 interface SportGroup {
   _id: string;
@@ -42,6 +48,7 @@ interface Sport {
 }
 
 const EventsManagement: React.FC = () => {
+  const { data: currentUser, isLoading: userLoading } = useMe();
   const [events, setEvents] = useState<Event[]>([]);
   const [sportGroups, setSportGroups] = useState<SportGroup[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
@@ -55,7 +62,10 @@ const EventsManagement: React.FC = () => {
     sport: "",
     startDate: "",
     endDate: "",
+    search: "",
   });
+  const [listView, setListView] = useState<EventListView>("active");
+  const isAdmin = Number(currentUser?.role) === 0;
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -77,8 +87,9 @@ const EventsManagement: React.FC = () => {
   }, [filters.sportGroup]);
 
   useEffect(() => {
+    if (userLoading) return;
     fetchEvents();
-  }, [pagination.currentPage, filters]);
+  }, [pagination.currentPage, filters, listView, isAdmin, userLoading]);
 
   const fetchSportGroups = async () => {
     try {
@@ -141,23 +152,35 @@ const EventsManagement: React.FC = () => {
         payload.endTime = new Date(filters.endDate).toISOString();
       }
 
+      if (filters.search.trim()) {
+        payload.search = filters.search.trim();
+      }
+
+      if (isAdmin) {
+        payload.status = listView;
+      }
+
       const response = await fetchJSON(EP.EVENTS.getEvents, {
         method: "POST",
         body: payload,
       });
 
-      if (response?.success && response?.data) {
-        setEvents(response.data);
+      if (response?.success) {
+        const rows = Array.isArray(response.data) ? response.data : [];
+        setEvents(rows);
+        setError("");
         if (response.pagination) {
           setPagination({
             currentPage: response.pagination.currentPage || 1,
             totalPages: response.pagination.totalPages || 1,
-            total: response.pagination.total || 0,
+            total: response.pagination.total ?? rows.length,
             perPage: response.pagination.perPage || 20,
           });
         }
       } else {
-        setError(response?.message || "Failed to load events");
+        setError(
+          response?.message || response?.error || "Failed to load events"
+        );
         setEvents([]);
       }
     } catch (err: any) {
@@ -173,9 +196,36 @@ const EventsManagement: React.FC = () => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   };
 
-  const handleEdit = (event: Event) => {
-    setEditingEvent(event);
-    setIsEditModalOpen(true);
+  const handleListViewChange = (view: EventListView) => {
+    setListView(view);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
+
+  const isEventOwner = (event: Event) => {
+    const ownerId = event.owner?._id;
+    return (
+      !!ownerId &&
+      !!currentUser?._id &&
+      String(ownerId) === String(currentUser._id)
+    );
+  };
+
+  const handleEdit = async (event: Event) => {
+    if (!isEventOwner(event) || event.status === "cancelled") return;
+    try {
+      setError("");
+      const response = await fetchJSON(`${EP.EVENTS.getEvents}/${event._id}`, {
+        method: "POST",
+      });
+      if (response?.success && response.data) {
+        setEditingEvent(response.data as Event);
+        setIsEditModalOpen(true);
+      } else {
+        setError(response?.message || "Failed to load event for editing");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load event for editing");
+    }
   };
 
   const handleEditSuccess = () => {
@@ -189,7 +239,8 @@ const EventsManagement: React.FC = () => {
     setEditingEvent(null);
   };
 
-  const handleDelete = async (eventId: string) => {
+  const handleDelete = async (eventId: string, event: Event) => {
+    if (!isEventOwner(event)) return;
     if (!confirm("Are you sure you want to delete this event?")) {
       return;
     }
@@ -228,7 +279,7 @@ const EventsManagement: React.FC = () => {
 
   const getImageUrl = (photo?: { path?: string }) => {
     if (photo?.path) {
-      return `${EP.API_ASSETS_BASE}/${photo.path}`.replace(/\\/g, "/");
+      return EP.assetUrl(photo.path);
     }
     return null;
   };
@@ -250,7 +301,57 @@ const EventsManagement: React.FC = () => {
           </h3>
         </div>
 
+        {isAdmin && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleListViewChange("active")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                listView === "active"
+                  ? "bg-cyan-600 text-white border-cyan-600"
+                  : "bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              }`}
+            >
+              Active events
+            </button>
+            <button
+              type="button"
+              onClick={() => handleListViewChange("cancelled")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                listView === "cancelled"
+                  ? "bg-amber-600 text-white border-amber-600"
+                  : "bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              }`}
+            >
+              Cancelled events
+            </button>
+            <button
+              type="button"
+              onClick={() => handleListViewChange("all")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                listView === "all"
+                  ? "bg-slate-700 text-white border-slate-700 dark:bg-slate-500"
+                  : "bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              }`}
+            >
+              All events
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-2">
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+              Search (name or event ID)
+            </label>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => handleFilterChange("search", e.target.value)}
+              placeholder="Event title or 24-character MongoDB _id"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
               Sport Group
@@ -329,7 +430,11 @@ const EventsManagement: React.FC = () => {
         </div>
       ) : events.length === 0 ? (
         <div className="text-center py-8 text-gray-500 dark:text-slate-400">
-          No events found.
+          {listView === "cancelled"
+            ? "No cancelled events."
+            : listView === "all"
+              ? "No events in the system."
+              : "No active events."}
         </div>
       ) : (
         <>
@@ -339,11 +444,19 @@ const EventsManagement: React.FC = () => {
                 <thead className="bg-gray-50 dark:bg-slate-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                      ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
                       Photo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
                       Name
                     </th>
+                    {isAdmin && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                        Status
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
                       Sport Group
                     </th>
@@ -368,6 +481,14 @@ const EventsManagement: React.FC = () => {
                   {events.map((event) => (
                     <tr key={event._id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className="font-mono text-xs text-gray-500 dark:text-slate-400 select-all"
+                          title={event._id}
+                        >
+                          {event._id.slice(-8)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {getImageUrl(event.photo) ? (
                           <img
                             src={getImageUrl(event.photo)!}
@@ -385,6 +506,19 @@ const EventsManagement: React.FC = () => {
                           {event.name}
                         </div>
                       </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                              event.status === "cancelled"
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                : "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
+                            }`}
+                          >
+                            {event.status === "cancelled" ? "Cancelled" : "Active"}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500 dark:text-slate-400">
                           {event.sportGroup?.name || "-"}
@@ -413,22 +547,26 @@ const EventsManagement: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(event)}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                            title="Edit"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(event._id)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
+                        {isEventOwner(event) && event.status !== "cancelled" ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => void handleEdit(event)}
+                              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                              title="Edit"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => void handleDelete(event._id, event)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-slate-500">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

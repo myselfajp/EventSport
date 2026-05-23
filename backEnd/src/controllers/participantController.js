@@ -14,8 +14,18 @@ import { JoinClub, JoinGroup } from '../models/joinRequestModel.js';
 import Event from '../models/eventModel.js';
 import Invite from '../models/inviteModel.js';
 import EventEndPhoto from '../models/eventEndPhotoModel.js';
+import RegistrationConsentLog from '../models/registrationConsentLogModel.js';
+import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import * as zodValidation from '../utils/validation.js';
+import { loadMappedEventEndPhotos } from '../utils/eventEndPhotoHelper.js';
+import {
+    resolveCheckInOpensHours,
+    checkInOpensAt,
+    isWithinCheckInWindow,
+} from '../utils/eventCheckInHelper.js';
+import { enrollParticipantInSeries } from '../utils/eventSeriesService.js';
 
 export const createProfile = async (req, res, next) => {
     try {
@@ -570,6 +580,49 @@ export const unfollowClub = async (req, res, next) => {
     }
 };
 
+function consentFieldsFromParsed(parsed) {
+    return {
+        acceptHealthNoIllness: parsed.acceptHealthNoIllness,
+        acceptHealthNoDisability: parsed.acceptHealthNoDisability,
+        acceptHealthNoMedication: parsed.acceptHealthNoMedication,
+        acceptHealthSportOk: parsed.acceptHealthSportOk,
+        acceptDistantSelling: parsed.acceptDistantSelling,
+        acceptEventPurchaseTerms: parsed.acceptEventPurchaseTerms,
+    };
+}
+
+async function logRegistrationConsent(req, user, eventId, reservationId, consent, legalVersionIds) {
+    await RegistrationConsentLog.create({
+        user: user._id,
+        participant: user.participant,
+        event: eventId,
+        reservation: reservationId,
+        ...consent,
+        ipAddress:
+            typeof req.headers['x-forwarded-for'] === 'string'
+                ? req.headers['x-forwarded-for'].split(',')[0].trim()
+                : req.socket?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+    });
+
+    await Promise.all([
+        recordLegalAcceptance(req, user._id, {
+            versionId: legalVersionIds.distanceSellingVersionId,
+            expectedDocType: 'distance_selling',
+            context: 'event_reservation',
+            eventId,
+            reservationId,
+        }),
+        recordLegalAcceptance(req, user._id, {
+            versionId: legalVersionIds.eventContractVersionId,
+            expectedDocType: 'event_contract',
+            context: 'event_reservation',
+            eventId,
+            reservationId,
+        }),
+    ]);
+}
+
 export const makeReservation = async (req, res, next) => {
     try {
         if (!req.user || !req.user.participant) {
@@ -577,26 +630,65 @@ export const makeReservation = async (req, res, next) => {
         }
 
         const user = req.user;
-        const eventId = zodValidation.eventId.parse(req.body?.eventId);
+        const parsed = zodValidation.makeReservationBodySchema.parse(req.body);
+        const eventId = parsed.eventId;
+        const consent = consentFieldsFromParsed(parsed);
+        const legalVersionIds = {
+            distanceSellingVersionId: parsed.distanceSellingVersionId,
+            eventContractVersionId: parsed.eventContractVersionId,
+        };
 
-        // check if already reserved this event
         const alreadyReserved = await Reservation.findOne({
             participant: user.participant,
             event: eventId,
         });
         if (alreadyReserved) throw new AppError(409, 'You already reserved this event.');
 
-        const event = await Event.findById(eventId).select('startTime capacity priceType');
-
+        const event = await Event.findById(eventId).select(
+            'startTime endTime capacity priceType status style'
+        );
         if (!event) throw new AppError(404);
 
-        // check this event starttime
+        if (event.status === 'cancelled') {
+            throw new AppError(403, 'This event has been cancelled');
+        }
+
         const now = new Date();
-        const twoDaysBefore = new Date(event.startTime.getTime() - 2 * 24 * 60 * 60 * 1000);
-        const timeDiff = event.startTime - now; // difference in milliseconds
-        const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
-        const isWithinDeadline = timeDiff < twoDaysInMs;
+        if (event.endTime && now >= event.endTime) {
+            throw new AppError(403, 'This event has ended');
+        }
+        if (now >= event.startTime) {
+            throw new AppError(403, 'This event has already started');
+        }
+
+        const checkInHours = await resolveCheckInOpensHours(event);
+        const checkInDeadline = checkInOpensAt(event.startTime, checkInHours);
+        const isWithinDeadline = isWithinCheckInWindow(now, event.startTime, checkInHours);
         const isFreeEvent = event.priceType === 'Free';
+
+        const baseExtra = {
+            qr: randomUUID(),
+            ...consent,
+        };
+
+        const createAndLog = async (doc) => {
+            const reservation = await Reservation.create(doc);
+            if (!reservation) throw new AppError(404);
+            try {
+                await logRegistrationConsent(
+                    req,
+                    user,
+                    eventId,
+                    reservation._id,
+                    consent,
+                    legalVersionIds
+                );
+            } catch (logErr) {
+                await Reservation.deleteOne({ _id: reservation._id });
+                throw logErr;
+            }
+            return reservation;
+        };
 
         if (isWithinDeadline) {
             const countCheckedIn = await Reservation.countDocuments({
@@ -605,78 +697,91 @@ export const makeReservation = async (req, res, next) => {
             });
 
             if (countCheckedIn >= event.capacity) {
-                throw new AppError(403, 'Event is already full and less than 2 days remaining');
+                throw new AppError(
+                    403,
+                    'Event is already full and check-in window has started'
+                );
             }
 
-            // If free event within deadline, auto check-in
             if (isFreeEvent) {
-                const reserveAndCheckIn = await Reservation.create({
+                const reservation = await createAndLog({
                     participant: user.participant,
                     event: eventId,
-                    checkInDeadline: twoDaysBefore,
+                    checkInDeadline,
                     isCheckedIn: true,
                     isPaid: true,
                     isJoined: true,
+                    ...baseExtra,
                 });
-                if (!reserveAndCheckIn) throw new AppError(404);
 
                 return res.status(201).json({
                     success: true,
                     data: 'saved',
                     isWithinDeadline: true,
+                    checkInOpensHoursBeforeStart: checkInHours,
                     autoCheckedIn: true,
+                    qrToken: reservation.qr,
+                    reservationId: reservation._id,
                 });
             }
 
-            // If paid event within deadline, create reservation but require payment first
-            const reserveWithinDeadline = await Reservation.create({
+            const reservation = await createAndLog({
                 participant: user.participant,
                 event: eventId,
-                checkInDeadline: twoDaysBefore,
+                checkInDeadline,
                 isCheckedIn: false,
                 isPaid: false,
                 isJoined: true,
+                ...baseExtra,
             });
-            if (!reserveWithinDeadline) throw new AppError(404);
 
             return res.status(201).json({
                 success: true,
                 data: 'saved',
                 isWithinDeadline: true,
+                checkInOpensHoursBeforeStart: checkInHours,
                 requiresPayment: true,
+                qrToken: reservation.qr,
+                reservationId: reservation._id,
             });
         }
 
-        // check for capacity
         const count = await Reservation.countDocuments({ event: eventId });
 
         if (count >= event.capacity) {
-            const reserveAndWaitlist = await Reservation.create({
+            const reservation = await createAndLog({
                 participant: user.participant,
                 event: eventId,
-                checkInDeadline: twoDaysBefore,
+                checkInDeadline,
                 isWaitListed: true,
                 isJoined: true,
+                isPaid: false,
+                ...baseExtra,
             });
-            if (!reserveAndWaitlist) throw new AppError(404);
 
             return res.status(201).json({
                 success: true,
                 data: 'saved',
+                qrToken: reservation.qr,
+                reservationId: reservation._id,
             });
         }
 
-        const reserve = await Reservation.create({
+        const reservation = await createAndLog({
             participant: user.participant,
             event: eventId,
-            checkInDeadline: twoDaysBefore,
+            checkInDeadline,
             isJoined: true,
+            isPaid: isFreeEvent,
+            ...baseExtra,
         });
-        if (!reserve) throw new AppError(404);
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             data: 'saved',
+            checkInOpensHoursBeforeStart: checkInHours,
+            qrToken: reservation.qr,
+            reservationId: reservation._id,
         });
     } catch (err) {
         next(err);
@@ -693,8 +798,23 @@ export const checkIn = async (req, res, next) => {
         const eventId = zodValidation.eventId.parse(req.body?.eventId);
 
         // check if event exists
-        const eventExists = await Event.findById(eventId);
+        const eventExists = await Event.findById(eventId).select('startTime status style');
         if (!eventExists) throw new AppError(404);
+
+        if (eventExists.status === 'cancelled') {
+            throw new AppError(403, 'This event has been cancelled');
+        }
+
+        const now = new Date();
+        const checkInHours = await resolveCheckInOpensHours(eventExists);
+        const opensAt = checkInOpensAt(eventExists.startTime, checkInHours);
+
+        if (now < opensAt) {
+            throw new AppError(403, 'Check-in is not open yet for this event');
+        }
+        if (now >= eventExists.startTime) {
+            throw new AppError(403, 'Check-in closed — event has already started');
+        }
 
         // check if already reserved this event
         const alreadyReserved = await Reservation.findOne({
@@ -977,14 +1097,19 @@ export const endPhoto = async (req, res, next) => {
         const user = req.user;
         const eventId = zodValidation.eventId.parse(data.eventId);
 
-        const eventExists = await Event.findById(eventId);
+        const eventExists = await Event.findById(eventId).select('endTime');
         if (!eventExists) throw new AppError(404, 'Event not found');
+
+        const endedAt = eventExists.endTime ? new Date(eventExists.endTime) : null;
+        if (!endedAt || Date.now() < endedAt.getTime()) {
+            throw new AppError(403, 'Photos can only be uploaded after the event has ended');
+        }
 
         const isReserved = await Reservation.findOne({
             participant: user.participant,
             event: eventId,
         });
-        if (!isReserved) throw new AppError(403, 'You are not a participant of this event.');
+        if (!isReserved) throw new AppError(403, 'You are not a gamer of this event.');
 
         const alreadySubmitted = await EventEndPhoto.exists({ user: user._id, event: eventId });
         if (alreadySubmitted) {
@@ -1000,6 +1125,34 @@ export const endPhoto = async (req, res, next) => {
         res.status(201).json({
             success: true,
             message: 'Photo submitted successfully',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/** After event end — shared memories (gamer + coach uploads). Prefer GET route `/get-event/:eventId/end-photos` for consistent access rules. */
+export const getEventEndPhotos = async (req, res, next) => {
+    try {
+        if (!req.user) throw new AppError(401);
+
+        const eventId = zodValidation.eventId.parse(req.body?.eventId);
+
+        const eventDoc = await Event.findById(eventId).select('endTime');
+        if (!eventDoc) throw new AppError(404, 'Event not found');
+
+        const endedAt = eventDoc.endTime ? new Date(eventDoc.endTime) : null;
+        const ended = !!(endedAt && Date.now() >= endedAt.getTime());
+        const hasAny = await EventEndPhoto.exists({ event: eventId });
+        if (!ended && !hasAny) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        const data = await loadMappedEventEndPhotos(eventId);
+
+        res.status(200).json({
+            success: true,
+            data,
         });
     } catch (err) {
         next(err);
@@ -1088,7 +1241,7 @@ export const getParticipantDetails = async (req, res, next) => {
             },
             { path: 'sportGoal' },
         ]);
-        if (!participant) throw new AppError(404, 'participant not found');
+        if (!participant) throw new AppError(404, 'gamer not found');
 
         const user = await User.find({
             participant: participantId,
@@ -1119,11 +1272,21 @@ export const getMyReservations = async (req, res, next) => {
         const perPage = parseInt(req.body?.perPage) || 10;
         const skip = (page - 1) * perPage;
 
+        const scopeRaw = req.body?.reservationScope;
+        const reservationScope =
+            scopeRaw === 'registered' || scopeRaw === 'participated' ? scopeRaw : 'all';
+
         // Build query for reservations
         const query = {
             participant: user.participant,
             isCancelled: false,
         };
+
+        if (reservationScope === 'registered') {
+            query.isCheckedIn = false;
+        } else if (reservationScope === 'participated') {
+            query.isCheckedIn = true;
+        }
 
         // Count total
         const total = await Reservation.countDocuments(query);
@@ -1141,6 +1304,10 @@ export const getMyReservations = async (req, res, next) => {
                     { path: 'salon', select: 'name' },
                     { path: 'club', select: 'name' },
                     { path: 'group', select: 'name' },
+                    {
+                        path: 'series',
+                        select: 'name frequency interval sessionCount priceType participationFeePerSession status',
+                    },
                 ],
             })
             .sort({ createdAt: -1 })
@@ -1172,6 +1339,43 @@ export const getMyReservations = async (req, res, next) => {
                 totalPages: Math.ceil(total / perPage),
                 total,
                 perPage,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const enrollInSeries = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const parsed = zodValidation.enrollSeriesSchema.parse(req.body);
+        const consent = consentFieldsFromParsed(parsed);
+        const legalVersionIds = {
+            distanceSellingVersionId: parsed.distanceSellingVersionId,
+            eventContractVersionId: parsed.eventContractVersionId,
+        };
+
+        const result = await enrollParticipantInSeries({
+            user,
+            seriesId: parsed.seriesId,
+            consent,
+            legalVersionIds,
+            req,
+            logRegistrationConsent,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `Enrolled in ${result.reservationCount} upcoming session(s).`,
+            data: {
+                enrollmentId: result.enrollment._id,
+                reservationCount: result.reservationCount,
+                totalFee: result.totalFee,
             },
         });
     } catch (err) {

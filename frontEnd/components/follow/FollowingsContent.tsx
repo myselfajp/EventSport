@@ -335,7 +335,7 @@ const FollowingsContent: React.FC = () => {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-slate-700">
         <p className="text-gray-700 dark:text-gray-200">
-          Create a participant profile to start following coaches, facilities,
+          Create a gamer profile to start following coaches, facilities,
           clubs, companies, and groups.
         </p>
       </div>
@@ -454,7 +454,7 @@ const FollowingsContent: React.FC = () => {
                         >
                           {info.photoPath ? (
                             <img
-                              src={`${EP.API_ASSETS_BASE}/${info.photoPath}`}
+                              src={EP.assetUrl(info.photoPath)}
                               alt={info.name}
                               className="w-full h-full object-cover"
                             />

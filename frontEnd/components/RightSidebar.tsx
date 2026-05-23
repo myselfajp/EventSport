@@ -13,6 +13,8 @@ import AddEventModal from "./event/AddEventModal";
 import ViewEventModal from "./event/ViewEventModal";
 import CoachDetailModal from "./CoachDetailModal";
 import FacilityDetailsModal from "./profile/FacilityDetailsModal";
+import ClubViewModal, { type ClubViewModalClub } from "./ClubViewModal";
+import GroupViewModal, { type GroupViewModalGroup } from "./GroupViewModal";
 import { useMe } from "@/app/hooks/useAuth";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -40,6 +42,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const { data: user, isLoading: userLoading } = useMe();
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const isCoach = user?.coach != null;
+  const canManageEvents = isCoach || user?.role === 0;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedDateEvents, setSelectedDateEvents] = useState<any[]>([]);
@@ -53,6 +56,11 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [showFacilityModal, setShowFacilityModal] = useState(false);
+  const [selectedClub, setSelectedClub] = useState<ClubViewModalClub | null>(null);
+  const [showClubModal, setShowClubModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [monthMarkerEvents, setMonthMarkerEvents] = useState<any[]>([]);
 
   // Set currentDate to today on mount if not already set
   useEffect(() => {
@@ -75,81 +83,113 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch all events/reservations for calendar markers
+  const fetchAllCalendarEvents = useCallback(async (): Promise<any[]> => {
+    const endpoint = user?.participant
+      ? EP.PARTICIPANT.myReservations
+      : EP.EVENTS.getEvents;
+
+    const response = await fetchJSON(endpoint, {
+      method: "POST",
+      body: {
+        perPage: 100,
+        pageNumber: 1,
+        sortBy: "startTime",
+        sortType: "asc",
+      },
+    });
+
+    if (!response?.success || !Array.isArray(response?.data)) {
+      return [];
+    }
+
+    let collected = [...response.data];
+    const totalPages = response.pagination?.totalPages ?? 1;
+    for (let page = 2; page <= totalPages; page++) {
+      try {
+        const nextResponse = await fetchJSON(endpoint, {
+          method: "POST",
+          body: {
+            perPage: 100,
+            pageNumber: page,
+            sortBy: "startTime",
+            sortType: "asc",
+          },
+        });
+        if (nextResponse?.success && Array.isArray(nextResponse?.data)) {
+          collected.push(...nextResponse.data);
+        }
+      } catch (err) {
+        console.error(`Error fetching calendar page ${page}:`, err);
+        break;
+      }
+    }
+    return collected;
+  }, [user?.participant]);
+
   // Fetch events for a specific date
   const fetchDateEvents = useCallback(async (date: Date) => {
     setIsLoadingEvents(true);
     try {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const response = await fetchJSON(EP.EVENTS.getEvents, {
-        method: "POST",
-        body: {
-          perPage: 100,
-          pageNumber: 1,
-          sortBy: "startTime",
-          sortType: "asc",
-        },
+      const allEvents = await fetchAllCalendarEvents();
+      const filteredEvents = allEvents.filter((event: any) => {
+        if (!event || !event.startTime) return false;
+        const eventStart = new Date(event.startTime);
+        return (
+          eventStart.getDate() === date.getDate() &&
+          eventStart.getMonth() === date.getMonth() &&
+          eventStart.getFullYear() === date.getFullYear()
+        );
       });
-
-      if (response?.success && response?.data) {
-        // Filter events for the specific date
-        const filteredEvents = response.data.filter((event: any) => {
-          if (!event || !event.startTime) return false;
-          const eventStart = new Date(event.startTime);
-          return (
-            eventStart.getDate() === date.getDate() &&
-            eventStart.getMonth() === date.getMonth() &&
-            eventStart.getFullYear() === date.getFullYear()
-          );
-        });
-
-        // If there are more pages, fetch them
-        if (response.pagination && response.pagination.totalPages > 1) {
-          for (let page = 2; page <= response.pagination.totalPages; page++) {
-            try {
-              const nextResponse = await fetchJSON(EP.EVENTS.getEvents, {
-                method: "POST",
-                body: {
-                  perPage: 100,
-                  pageNumber: page,
-                  sortBy: "startTime",
-                  sortType: "asc",
-                },
-              });
-
-              if (nextResponse?.success && nextResponse?.data) {
-                const nextFiltered = nextResponse.data.filter((event: any) => {
-                  if (!event || !event.startTime) return false;
-                  const eventStart = new Date(event.startTime);
-                  return (
-                    eventStart.getDate() === date.getDate() &&
-                    eventStart.getMonth() === date.getMonth() &&
-                    eventStart.getFullYear() === date.getFullYear()
-                  );
-                });
-                filteredEvents.push(...nextFiltered);
-              }
-            } catch (err) {
-              console.error(`Error fetching page ${page}:`, err);
-              break;
-            }
-          }
-        }
-
-        setSelectedDateEvents(filteredEvents);
-      } else {
-        setSelectedDateEvents([]);
-      }
+      setSelectedDateEvents(filteredEvents);
     } catch (err) {
       console.error("Error fetching date events:", err);
       setSelectedDateEvents([]);
     } finally {
       setIsLoadingEvents(false);
     }
-  }, []);
+  }, [fetchAllCalendarEvents]);
+
+  const fetchMonthMarkerEvents = useCallback(async () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    try {
+      const collected = await fetchAllCalendarEvents();
+      const inMonth = collected.filter((event: any) => {
+        if (!event?.startTime) return false;
+        const eventStart = new Date(event.startTime);
+        return (
+          eventStart.getFullYear() === year && eventStart.getMonth() === month
+        );
+      });
+      setMonthMarkerEvents(inMonth);
+    } catch (err) {
+      console.error("Error fetching month marker events:", err);
+      setMonthMarkerEvents([]);
+    }
+  }, [currentDate, fetchAllCalendarEvents]);
+
+  useEffect(() => {
+    if (isOpen) {
+      void fetchMonthMarkerEvents();
+    }
+  }, [isOpen, currentDate, fetchMonthMarkerEvents, events]);
+
+  const getEventsForCalendarDay = useCallback(
+    (date: Date) => {
+      return monthMarkerEvents.filter((event: any) => {
+        if (!event?.startTime) return false;
+        const eventStart = new Date(event.startTime);
+        return (
+          eventStart.getDate() === date.getDate() &&
+          eventStart.getMonth() === date.getMonth() &&
+          eventStart.getFullYear() === date.getFullYear()
+        );
+      });
+    },
+    [monthMarkerEvents]
+  );
 
   // Get days of the month
   const getMonthDays = useCallback(() => {
@@ -242,7 +282,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
           </h3>
           {userLoading ? (
             <div className="w-28 h-10 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
-          ) : isCoach ? (
+          ) : canManageEvents ? (
             <button
               onClick={() => setIsAddEventModalOpen(true)}
               className="bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm"
@@ -367,17 +407,25 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
 
                 const isToday =
                   day.toDateString() === new Date().toDateString();
+                const dayEvents = getEventsForCalendarDay(day);
+                const eventColors = Array.from(
+                  new Set(
+                    dayEvents
+                      .map((e: any) => e.eventStyle?.color || "#06b6d4")
+                      .filter(Boolean)
+                  )
+                );
 
                 return (
                   <div
                     key={index}
                     onClick={() => handleDateClick(day)}
-                    className={`relative text-center py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded cursor-pointer transition-colors ${
+                    className={`relative flex flex-col items-center justify-center min-h-[2.75rem] py-1.5 pb-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded cursor-pointer transition-colors ${
                       isToday ? "ring-2 ring-cyan-500" : ""
-                    }`}
+                    } ${dayEvents.length > 0 ? "bg-cyan-50/60 dark:bg-cyan-900/15" : ""}`}
                   >
                     <div
-                      className={`text-base font-semibold ${
+                      className={`text-base font-semibold leading-none ${
                         isToday
                           ? "text-cyan-600 dark:text-cyan-400 font-bold"
                           : "text-gray-700 dark:text-slate-300"
@@ -385,6 +433,25 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     >
                       {day.getDate()}
                     </div>
+                    {dayEvents.length > 0 && (
+                      <div
+                        className="flex flex-wrap gap-0.5 justify-center mt-1 max-w-full px-0.5"
+                        aria-label={`${dayEvents.length} event(s)`}
+                      >
+                        {eventColors.slice(0, 3).map((color, idx) => (
+                          <span
+                            key={idx}
+                            className="h-1.5 w-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                        {eventColors.length > 3 && (
+                          <span className="text-[8px] leading-none text-gray-500 dark:text-slate-400">
+                            +
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -546,7 +613,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                   <p className="text-gray-500 dark:text-slate-400 text-lg mb-4">
                     No events scheduled for this day
                   </p>
-                  {isCoach && (
+                  {canManageEvents && (
                     <button
                       onClick={() => {
                         setShowEventModal(false);
@@ -569,6 +636,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                         ? event.owner._id
                         : event.owner;
                     const isOwner = ownerId === user?._id;
+                    const canEditEvent = isOwner;
 
                     return (
                       <div
@@ -605,7 +673,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                                 <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-full text-xs font-medium">
                                   {event.sport?.name || "Event"}
                                 </span>
-                                {isOwner && (
+                                {canEditEvent && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -655,6 +723,19 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
               setShowFacilityModal(true);
             }
           }}
+          onClubClick={(club) => {
+            if (club?._id && club?.name) {
+              setSelectedClub({ _id: club._id, name: club.name });
+              setShowClubModal(true);
+            }
+          }}
+          onGroupClick={(group) => {
+            if (group?._id && group?.name) {
+              setSelectedGroup({ _id: group._id, name: group.name });
+              setShowGroupModal(true);
+            }
+          }}
+          onEventUpdated={onEventCreated}
         />
       )}
 
@@ -674,6 +755,24 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
           setSelectedFacility(null);
         }}
         facility={selectedFacility}
+      />
+
+      <ClubViewModal
+        isOpen={showClubModal}
+        onClose={() => {
+          setShowClubModal(false);
+          setSelectedClub(null);
+        }}
+        club={selectedClub}
+      />
+
+      <GroupViewModal
+        isOpen={showGroupModal}
+        onClose={() => {
+          setShowGroupModal(false);
+          setSelectedGroup(null);
+        }}
+        group={selectedGroup}
       />
     </div>
   );

@@ -20,6 +20,8 @@ import { useMe } from "@/app/hooks/useAuth";
 import { EP } from "@/app/lib/endpoints";
 import UserProfileModal from "@/components/UserProfileModal";
 import FacilityDetailsModal from "@/components/profile/FacilityDetailsModal";
+import ClubViewModal, { type ClubViewModalClub } from "@/components/ClubViewModal";
+import GroupViewModal, { type GroupViewModalGroup } from "@/components/GroupViewModal";
 import ViewEventModal from "@/components/event/ViewEventModal";
 
 type TypeMeta = {
@@ -113,6 +115,8 @@ const FavoritesContent: React.FC = () => {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
   const [selectedFacility, setSelectedFacility] = useState<any | null>(null);
+  const [selectedClub, setSelectedClub] = useState<ClubViewModalClub | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
   const grouped = data?.data ?? defaultFavorites;
@@ -196,7 +200,7 @@ const FavoritesContent: React.FC = () => {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-slate-700">
         <p className="text-gray-700 dark:text-gray-200">
-          Create a participant profile to add favorites.
+          Create a gamer profile to add favorites.
         </p>
       </div>
     );
@@ -313,7 +317,7 @@ const FavoritesContent: React.FC = () => {
                         >
                           {info.photoPath ? (
                             <img
-                              src={`${EP.API_ASSETS_BASE}/${info.photoPath}`}
+                              src={EP.assetUrl(info.photoPath)}
                               alt={info.name}
                               className="w-full h-full object-cover"
                             />
@@ -373,6 +377,28 @@ const FavoritesContent: React.FC = () => {
             setSelectedFacility(facility);
           }
         }}
+        onClubClick={(club) => {
+          if (club?._id && club?.name) {
+            setSelectedEvent(null);
+            setSelectedClub({ _id: club._id, name: club.name });
+          }
+        }}
+        onGroupClick={(group) => {
+          if (group?._id && group?.name) {
+            setSelectedEvent(null);
+            setSelectedGroup({ _id: group._id, name: group.name });
+          }
+        }}
+      />
+      <ClubViewModal
+        isOpen={!!selectedClub}
+        onClose={() => setSelectedClub(null)}
+        club={selectedClub}
+      />
+      <GroupViewModal
+        isOpen={!!selectedGroup}
+        onClose={() => setSelectedGroup(null)}
+        group={selectedGroup}
       />
       <UserProfileModal
         isOpen={!!selectedCoachId}

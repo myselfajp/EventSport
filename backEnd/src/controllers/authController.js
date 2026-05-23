@@ -8,12 +8,64 @@ import {
     SearchQuerySchema,
     loginSchema,
     signupSchema,
+    sendRegistrationOtpSchema,
     editUserSchema,
 } from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
 import { generateTokens, sendTokens } from '../utils/jwtHelper.js';
 import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '../middleware/accountLockout.js';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
+import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
+import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
+import { sendRegistrationOtpEmail } from '../utils/emailService.js';
+import {
+    assertCanResendOtp,
+    generateOtpCode,
+    saveRegistrationOtp,
+    verifyAndConsumeRegistrationOtp,
+} from '../utils/registrationOtp.js';
+import { assertNotBlacklisted } from '../utils/blacklistHelper.js';
+import { District } from '../models/locationModel.js';
+
+export const sendRegistrationOtp = async (req, res, next) => {
+    try {
+        const { email, firstName } = sendRegistrationOtpSchema.parse(req.body || {});
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            throw new AppError(409, 'Email already registered');
+        }
+
+        await assertNotBlacklisted({ email });
+
+        await assertCanResendOtp(email);
+
+        const otp = generateOtpCode();
+        await saveRegistrationOtp(email, otp);
+
+        const mailResult = await sendRegistrationOtpEmail({
+            to: email,
+            firstName,
+            otp,
+        });
+
+        const payload = {
+            success: true,
+            message: mailResult.sent
+                ? 'Doğrulama kodu e-posta adresinize gönderildi.'
+                : 'SMTP ayarlı değil; geliştirme kodu yanıtta gösterildi.',
+            emailSent: mailResult.sent,
+        };
+
+        if (!mailResult.sent) {
+            payload.devOtp = otp;
+        }
+
+        res.status(200).json(payload);
+    } catch (err) {
+        next(err);
+    }
+};
 
 export const signUp = async (req, res, next) => {
     try {
@@ -41,16 +93,46 @@ export const signUp = async (req, res, next) => {
             throw new AppError(400, 'Invalid or inactive KVKK version.');
         }
 
-        const email = result.email;
+        const email = result.email.trim().toLowerCase();
         const existingUser = await User.findOne({ email });
         if (existingUser) throw new AppError(409, 'Email already registered');
 
+        await assertNotBlacklisted({ email, phone: result.phone });
+
+        await verifyAndConsumeRegistrationOtp(email, result.otp);
+
+        const districtExists = await District.exists({ _id: result.district });
+        if (!districtExists) {
+            throw new AppError(400, 'Invalid district.');
+        }
+
+        if (result.marketingConsent) {
+            const cmDoc = await LegalDocument.findById(result.commercialMessagesVersionId).lean();
+            if (!cmDoc || cmDoc.docType !== 'commercial_messages' || !cmDoc.isActive) {
+                throw new AppError(400, 'Invalid or inactive commercial messages consent version.');
+            }
+        }
+
         const hashedPassword = await argon2.hash(result.password);
-        const { password, agreeTerms, agreeKvkk, termsVersionId, kvkkVersionId, ...userData } = result;
+        const {
+            password,
+            agreeTerms,
+            agreeKvkk,
+            termsVersionId,
+            kvkkVersionId,
+            otp: _otp,
+            marketingConsent,
+            commercialMessagesVersionId,
+            district,
+            ...userData
+        } = result;
 
         const user = await User.create({
             ...userData,
+            email,
             password: hashedPassword,
+            location: { district },
+            isEmailVerified: true,
             termsAccepted: {
                 versionId: new Types.ObjectId(termsVersionId),
                 acceptedAt: new Date(),
@@ -60,7 +142,36 @@ export const signUp = async (req, res, next) => {
                 versionId: new Types.ObjectId(kvkkVersionId),
                 consentedAt: new Date(),
             },
+            marketingConsent: {
+                agreed: Boolean(marketingConsent),
+                consentedAt: marketingConsent ? new Date() : null,
+            },
         });
+
+        const acceptanceTasks = [
+            recordLegalAcceptance(req, user._id, {
+                versionId: termsVersionId,
+                expectedDocType: 'terms',
+                context: 'signup',
+            }),
+            recordLegalAcceptance(req, user._id, {
+                versionId: kvkkVersionId,
+                expectedDocType: 'kvkk',
+                context: 'signup',
+            }),
+        ];
+
+        if (marketingConsent && commercialMessagesVersionId) {
+            acceptanceTasks.push(
+                recordLegalAcceptance(req, user._id, {
+                    versionId: commercialMessagesVersionId,
+                    expectedDocType: 'commercial_messages',
+                    context: 'signup',
+                })
+            );
+        }
+
+        await Promise.all(acceptanceTasks);
 
         const { password: pass, ...userWithoutPassword } = user.toObject();
 
@@ -103,6 +214,16 @@ export const signIn = async (req, res, next) => {
             }
             throw new AppError(401, 'Invalid email or password');
         }
+
+        if (getUser.isActive === false) {
+            throw new AppError(403, 'Your account has been deactivated. Contact support.');
+        }
+
+        await assertNotBlacklisted({
+            email: getUser.email,
+            phone: getUser.phone,
+            userId: getUser._id,
+        });
 
         await handleSuccessfulLogin(getUser, ipAddress);
 
@@ -253,10 +374,19 @@ export const getUser = async (req, res, next) => {
 
 export const getCurrentUser = async (req, res, next) => {
     try {
-        if (!req.user) throw new AppError(401);
+        // Oturum yoksa 401 fırlatmıyoruz: bu uç nokta sayfa açılışında çalışıyor ve
+        // misafir kullanıcılar için 401 hata olarak değerlendirilmemeli.
+        if (!req.user) {
+            return res.status(200).json({
+                success: true,
+                data: null,
+            });
+        }
 
-        const user = await User.findById(req.user._id).select('-__v');
-        if (!user) throw new AppError(404);
+        const user = await User.findById(req.user._id)
+            .select('-__v')
+            .populate({ path: 'location.district', select: 'name' });
+        if (!user) throw new AppError(404, 'Kullanıcı bulunamadı.');
 
         res.status(200).json({
             success: true,
@@ -276,6 +406,11 @@ export const editUser = async (req, res, next) => {
         if (body.age) {
             body.age = new Date(body.age);
         }
+
+        // Admin-only fields must never be set via self-service profile update
+        delete body.isActive;
+        delete body.role;
+        delete body.adminPermissionGroups;
 
         // Add deletePhoto to body if it exists
         if (req.body.deletePhoto) {
@@ -329,9 +464,16 @@ export const editUser = async (req, res, next) => {
             delete result.newPassword;
         }
 
-        const editUser = await User.findByIdAndUpdate(req.user._id, { ...result }, { new: true });
+        const userUpdate = await mergeLocationIntoPayload(result);
+        const editUser = await User.findByIdAndUpdate(req.user._id, { $set: userUpdate }, { new: true });
 
         if (!editUser) throw new AppError(404);
+
+        if (userUpdate.location && editUser.participant) {
+            await Participant.findByIdAndUpdate(editUser.participant, {
+                $set: { location: userUpdate.location },
+            });
+        }
 
         // Update Coach name if user has coach and name changed
         if (editUser.coach && (result.firstName || result.lastName)) {

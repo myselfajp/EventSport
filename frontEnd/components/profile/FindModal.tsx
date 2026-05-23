@@ -55,6 +55,13 @@ import {
   useFollowMutation,
   useUnfollowMutation,
 } from "@/app/hooks/useFollows";
+import LocationFields, {
+  emptyLocationValue,
+} from "@/components/location/LocationFields";
+import {
+  buildLocationSearchPayload,
+  type LocationValue,
+} from "@/app/lib/location-api";
 
 interface FindModalProps {
   isOpen: boolean;
@@ -101,6 +108,9 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [sportGroupFilter, setSportGroupFilter] = useState("");
   const [sportFilter, setSportFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState<LocationValue>(
+    emptyLocationValue()
+  );
   const [sportGroups, setSportGroups] = useState<SportGroup[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
   const [isLoadingSportGroups, setIsLoadingSportGroups] = useState(false);
@@ -206,7 +216,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     e.stopPropagation();
     if (!id) return;
     if (!canFollow) {
-      alert("Create a participant profile to follow.");
+      alert("Create a gamer profile to follow.");
       return;
     }
 
@@ -303,6 +313,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const locationPayload = () => buildLocationSearchPayload(locationFilter);
+
   const searchCoaches = async (filters: {
     search?: string;
     sport?: string;
@@ -331,6 +343,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.isVerified !== undefined) {
         payload.isVerified = filters.isVerified;
       }
+
+      Object.assign(payload, locationPayload());
 
       const response = await fetchJSON(EP.COACH.getCoachList, {
         method: "POST",
@@ -383,6 +397,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         payload.sport = filters.sport;
       }
 
+      Object.assign(payload, locationPayload());
+
       const response = await fetchJSON(EP.PARTICIPANT_LIST.getParticipantList, {
         method: "POST",
         body: payload,
@@ -398,11 +414,11 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
           perPage: response.pagination?.perPage || response.perPage || 5,
         });
       } else {
-        setError(response?.message || "Failed to search participants");
+        setError(response?.message || "Failed to search gamers");
         setSearchResults([]);
       }
     } catch (err) {
-      setError("An error occurred while searching participants");
+      setError("An error occurred while searching gamers");
       setSearchResults([]);
       console.error("Error searching participants:", err);
     } finally {
@@ -433,6 +449,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.sport) {
         payload.mainSport = filters.sport;
       }
+
+      Object.assign(payload, locationPayload());
 
       const response: FacilitySearchResponse = await fetchJSON(
         EP.FACILITY.getFacility,
@@ -465,6 +483,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   const searchCompanies = async (filters: {
     search?: string;
+    sport?: string;
     pageNumber?: number;
     perPage?: number;
   }) => {
@@ -481,6 +500,12 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.search && filters.search.trim().length >= 2) {
         payload.search = filters.search.trim();
       }
+
+      if (filters.sport) {
+        payload.mainSport = filters.sport;
+      }
+
+      Object.assign(payload, locationPayload());
 
       const response: CompanySearchResponse = await fetchJSON(
         EP.COMPANY.getCompany,
@@ -513,6 +538,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   const searchClubs = async (filters: {
     search?: string;
+    sport?: string;
     creator?: string;
     pageNumber?: number;
     perPage?: number;
@@ -534,6 +560,12 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.creator) {
         payload.creator = filters.creator;
       }
+
+      if (filters.sport) {
+        payload.mainSport = filters.sport;
+      }
+
+      Object.assign(payload, locationPayload());
 
       const response: ClubSearchResponse = await fetchJSON(EP.CLUB.getClub, {
         method: "POST",
@@ -563,6 +595,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   const searchGroups = async (filters: {
     search?: string;
+    sport?: string;
     pageNumber?: number;
     perPage?: number;
   }) => {
@@ -579,6 +612,12 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.search && filters.search.trim().length >= 2) {
         payload.search = filters.search.trim();
       }
+
+      if (filters.sport) {
+        payload.mainSport = filters.sport;
+      }
+
+      Object.assign(payload, locationPayload());
 
       const response: GroupSearchResponse = await fetchJSON(EP.GROUP.getGroup, {
         method: "POST",
@@ -615,7 +654,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     e.stopPropagation();
     if (!id) return;
     if (!canFavorite) {
-      alert("Create a participant profile to add favorites.");
+      alert("Create a gamer profile to add favorites.");
       return;
     }
     const currentlyFav = isFavorited(favorites, type, id);
@@ -669,18 +708,21 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     } else if (selectedType === "company") {
       searchCompanies({
         search: searchQuery.trim().length >= 2 ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: 1,
         perPage: pagination.perPage,
       });
     } else if (selectedType === "club") {
       searchClubs({
         search: searchQuery.trim().length >= 2 ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: 1,
         perPage: pagination.perPage,
       });
     } else if (selectedType === "group") {
       searchGroups({
         search: searchQuery.trim().length >= 2 ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: 1,
         perPage: pagination.perPage,
       });
@@ -713,19 +755,71 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     } else if (selectedType === "company") {
       searchCompanies({
         search: hasSearched ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: page,
         perPage: pagination.perPage,
       });
     } else if (selectedType === "club") {
       searchClubs({
         search: hasSearched ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: page,
         perPage: pagination.perPage,
       });
     } else if (selectedType === "group") {
       searchGroups({
         search: hasSearched ? searchQuery : "",
+        sport: sportFilter || undefined,
         pageNumber: page,
+        perPage: pagination.perPage,
+      });
+    }
+  };
+
+  const hasActiveLocationFilter = () => Boolean(locationFilter.district);
+
+  const runFilterSearch = () => {
+    if (selectedType === "coach") {
+      searchCoaches({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+        isVerified: true,
+      });
+    } else if (selectedType === "participant") {
+      searchParticipants({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    } else if (selectedType === "facility") {
+      searchFacilities({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    } else if (selectedType === "company") {
+      searchCompanies({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    } else if (selectedType === "club") {
+      searchClubs({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    } else if (selectedType === "group") {
+      searchGroups({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        sport: sportFilter || undefined,
+        pageNumber: 1,
         perPage: pagination.perPage,
       });
     }
@@ -734,8 +828,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   // Load initial data when modal opens
   useEffect(() => {
     if (isOpen) {
+      fetchSportsAndGroups();
       if (selectedType === "coach") {
-        fetchSportsAndGroups();
         // Load initial coaches - only verified ones
         searchCoaches({
           pageNumber: 1,
@@ -743,8 +837,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
           isVerified: true,
         });
       } else if (selectedType === "participant") {
-        fetchSportsAndGroups();
-        // Load initial participants
         searchParticipants({
           pageNumber: 1,
           perPage: pagination.perPage,
@@ -785,43 +877,22 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   // Handle sport filter changes - make API call
   useEffect(() => {
-    // Skip if modal is not open or not on a tab that uses sport filter
-    if (!isOpen || (selectedType !== "coach" && selectedType !== "participant" && selectedType !== "facility")) {
+    if (!isOpen) return;
+    if (!hasSearched && !searchQuery && !sportFilter && !hasActiveLocationFilter()) {
       return;
     }
-    
-    // Only trigger search if user has searched before OR if sport filter is selected
-    // This prevents unnecessary API calls when just opening the modal for the first time
-    if (!hasSearched && !searchQuery && !sportFilter) {
-      return;
-    }
-    
-    // If user has searched or selected a sport filter, perform search
-    if (selectedType === "coach") {
-      searchCoaches({
-        search: hasSearched && searchQuery ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-        isVerified: true,
-      });
-    } else if (selectedType === "participant") {
-      searchParticipants({
-        search: hasSearched && searchQuery ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
-    } else if (selectedType === "facility") {
-      searchFacilities({
-        search: hasSearched && searchQuery ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
-    }
+    runFilterSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportFilter]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!hasSearched && !searchQuery && !sportFilter && !hasActiveLocationFilter()) {
+      return;
+    }
+    runFilterSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationFilter.district]);
 
   // Clear results when type changes to ensure proper filtering
   useEffect(() => {
@@ -834,11 +905,9 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     });
     setError(null);
     setHasSearched(false);
-    // Clear sport filters when changing type
-    if (selectedType === "facility" || selectedType === "company") {
-      setSportGroupFilter("");
-      setSportFilter("");
-    }
+    setSportGroupFilter("");
+    setSportFilter("");
+    setLocationFilter(emptyLocationValue());
   }, [selectedType]);
 
   const handleUserSelect = (
@@ -998,7 +1067,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                       : "text-gray-400"
                   }`}
                 >
-                  Participant
+                  Gamer
                 </span>
               </button>
 
@@ -1131,10 +1200,12 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
             </div>
           </form>
 
-          {/* Filters - Show for coach, participant, and facility */}
-          {(selectedType === "coach" || selectedType === "participant" || selectedType === "facility") && (
-            <div className="mb-6">
-              <div className="flex gap-3">
+          {/* Sport filters — all tabs */}
+          <div className="mb-4">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+              Sport type
+            </p>
+            <div className="flex gap-3">
                 <select
                   value={sportGroupFilter}
                   onChange={(e) => {
@@ -1195,8 +1266,18 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                     ))}
                 </select>
               </div>
-            </div>
-          )}
+          </div>
+
+          <div className="mb-6">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+              Istanbul district
+            </p>
+            <LocationFields
+              value={locationFilter}
+              onChange={setLocationFilter}
+              showAddressLine={false}
+            />
+          </div>
 
           {/* Search Results */}
           <div className="flex-1 overflow-auto max-h-96">
@@ -1368,7 +1449,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                             </div>
                             <div className="flex gap-1 mt-1">
                               <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs rounded-full">
-                                Participant
+                                Gamer
                               </span>
                               <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 text-xs rounded-full">
                                 {participant.membershipLevel}
@@ -1393,9 +1474,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                                 src={
                                   typeof facility.photo === "string"
                                     ? facility.photo
-                                    : `${EP.API_ASSETS_BASE}${
-                                        (facility.photo as any).path
-                                      }`
+                                    : EP.assetUrl((facility.photo as any).path)
                                 }
                                 alt={facility.name}
                                 className="w-10 h-10 rounded-full object-cover"
@@ -1521,9 +1600,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                                 src={
                                   typeof company.photo === "string"
                                     ? company.photo
-                                    : `${EP.API_ASSETS_BASE}${
-                                        (company.photo as any).path
-                                      }`
+                                    : EP.assetUrl((company.photo as any).path)
                                 }
                                 alt={company.name}
                                 className="w-10 h-10 rounded-full object-cover"
@@ -1597,9 +1674,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                                 src={
                                   typeof club.photo === "string"
                                     ? club.photo
-                                    : `${EP.API_ASSETS_BASE}/${
-                                        (club.photo as any).path
-                                      }`.replace(/\\/g, "/")
+                                    : EP.assetUrl((club.photo as any).path)
                                 }
                                 alt={club.name}
                                 className="w-10 h-10 rounded-full object-cover"
@@ -1675,9 +1750,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                                 src={
                                   typeof group.photo === "string"
                                     ? group.photo
-                                    : `${EP.API_ASSETS_BASE}/${
-                                        (group.photo as any).path
-                                      }`.replace(/\\/g, "/")
+                                    : EP.assetUrl((group.photo as any).path)
                                 }
                                 alt={group.name}
                                 className="w-10 h-10 rounded-full object-cover"

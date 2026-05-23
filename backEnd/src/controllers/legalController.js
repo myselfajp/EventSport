@@ -2,13 +2,16 @@ import LegalDocument from '../models/legalDocumentModel.js';
 import { AppError } from '../utils/appError.js';
 import { mongoObjectId } from '../utils/validation.js';
 
-const DOC_TYPES = ['kvkk', 'terms'];
+const DOC_TYPES = ['kvkk', 'terms', 'distance_selling', 'event_contract', 'commercial_messages'];
 
 export const getActive = async (req, res, next) => {
     try {
         const type = req.query?.type;
         if (!type || !DOC_TYPES.includes(type)) {
-            throw new AppError(400, 'Invalid or missing type. Use type=kvkk or type=terms.');
+            throw new AppError(
+                400,
+                `Invalid or missing type. Valid values: ${DOC_TYPES.join(', ')}.`
+            );
         }
 
         const doc = await LegalDocument.findOne({ docType: type, isActive: true }).lean();
@@ -59,7 +62,10 @@ export const create = async (req, res, next) => {
         const isActive = !!req.body?.isActive;
 
         if (!docType || !DOC_TYPES.includes(docType)) {
-            throw new AppError(400, 'docType is required and must be kvkk or terms.');
+            throw new AppError(
+                400,
+                `docType is required and must be one of: ${DOC_TYPES.join(', ')}.`
+            );
         }
         if (!title || typeof title !== 'string' || !title.trim()) {
             throw new AppError(400, 'title is required.');

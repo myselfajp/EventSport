@@ -56,6 +56,13 @@ const eventStyleSchema = new mongoose.Schema(
             match: /^#([0-9A-F]{6}|[0-9A-F]{3})$/i,
             required: true,
         },
+        /** Hours before event startTime when check-in / late join window opens */
+        checkInOpensHoursBeforeStart: {
+            type: Number,
+            default: 48,
+            min: 0,
+            max: 720,
+        },
     },
     { timestamps: true }
 );

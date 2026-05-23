@@ -4,7 +4,7 @@ const legalDocumentSchema = new mongoose.Schema(
     {
         docType: {
             type: String,
-            enum: ['kvkk', 'terms'],
+            enum: ['kvkk', 'terms', 'distance_selling', 'event_contract', 'commercial_messages'],
             required: true,
         },
         version: {

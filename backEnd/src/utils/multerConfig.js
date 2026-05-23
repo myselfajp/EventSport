@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
 const allowedSize = 5 * 1024 * 1024;
-const allowed = ['image/jpeg', 'image/png'];
+const allowed = ['image/jpeg', 'image/png', 'image/webp'];
 
 export const createMulter = () => {
     const storage = multer.diskStorage({

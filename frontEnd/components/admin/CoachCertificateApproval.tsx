@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
+import UserProfileModal from "../UserProfileModal";
 
 interface Branch {
   _id: string;
+  certificateLevel?: string;
   coach: {
     _id: string;
     name: string;
@@ -25,6 +27,7 @@ interface Branch {
   };
   status: string;
   user?: {
+    _id: string;
     firstName: string;
     lastName: string;
     email: string;
@@ -47,6 +50,8 @@ export default function CoachCertificateApproval() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [totalPending, setTotalPending] = useState(0);
 
   useEffect(() => {
     fetchPendingBranches();
@@ -71,6 +76,7 @@ export default function CoachCertificateApproval() {
       if (response?.success) {
         setBranches(response.data);
         setTotalPages(response.totalPages || 1);
+        setTotalPending(typeof response.total === "number" ? response.total : response.data?.length ?? 0);
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch pending certificates");
@@ -115,21 +121,26 @@ export default function CoachCertificateApproval() {
 
   const getCertificateUrl = (path: string) => {
     if (path.startsWith("http")) return path;
-    return `${EP.API_ASSETS_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+    return EP.assetUrl(path);
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
           Coach Certificate Approval
         </h2>
+        {!loading && totalPending > 0 && (
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+            {totalPending} pending approval{totalPending !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder="Search by coach name or sport..."
+          placeholder="Coach name, sport, branch ID, or coach profile ID..."
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -163,6 +174,9 @@ export default function CoachCertificateApproval() {
                     Level
                   </th>
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    Cert. class
+                  </th>
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Certificate
                   </th>
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
@@ -172,7 +186,10 @@ export default function CoachCertificateApproval() {
               </thead>
               <tbody>
                 {branches.map((branch) => (
-                  <tr key={branch._id}>
+                  <tr
+                    key={branch._id}
+                    className="border-l-4 border-l-amber-400 bg-amber-50/60 dark:border-l-amber-500 dark:bg-amber-950/25"
+                  >
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       <div>
                         <div className="font-medium">
@@ -194,6 +211,9 @@ export default function CoachCertificateApproval() {
                       {branch.level}
                     </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
+                      {branch.certificateLevel || "—"}
+                    </td>
+                    <td className="border border-gray-300 dark:border-slate-600 p-2">
                       <button
                         onClick={() => setSelectedBranch(branch)}
                         className="text-cyan-600 hover:underline"
@@ -202,7 +222,16 @@ export default function CoachCertificateApproval() {
                       </button>
                     </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        {branch.user?._id ? (
+                          <button
+                            type="button"
+                            onClick={() => setProfileUserId(branch.user!._id)}
+                            className="px-3 py-1 rounded border border-cyan-600 text-cyan-700 hover:bg-cyan-50 dark:border-cyan-500 dark:text-cyan-300 dark:hover:bg-cyan-950/40"
+                          >
+                            View profile
+                          </button>
+                        ) : null}
                         <button
                           onClick={() => handleApprove(branch._id)}
                           className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
@@ -274,6 +303,10 @@ export default function CoachCertificateApproval() {
                 <strong>Level:</strong> {selectedBranch.level}
               </div>
               <div>
+                <strong>Certificate class:</strong>{" "}
+                {selectedBranch.certificateLevel || "—"}
+              </div>
+              <div>
                 <strong>File:</strong> {selectedBranch.certificate.originalName}
               </div>
               <div className="mt-4">
@@ -294,7 +327,19 @@ export default function CoachCertificateApproval() {
                   </a>
                 )}
               </div>
-              <div className="flex gap-2 mt-4">
+              <div className="flex flex-wrap gap-2 mt-4">
+                {selectedBranch.user?._id ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileUserId(selectedBranch.user!._id);
+                      setSelectedBranch(null);
+                    }}
+                    className="px-4 py-2 border border-cyan-600 text-cyan-700 rounded-lg hover:bg-cyan-50 dark:border-cyan-500 dark:text-cyan-300 dark:hover:bg-cyan-950/40"
+                  >
+                    View profile
+                  </button>
+                ) : null}
                 <button
                   onClick={() => {
                     handleApprove(selectedBranch._id);
@@ -318,6 +363,13 @@ export default function CoachCertificateApproval() {
           </div>
         </div>
       )}
+
+      <UserProfileModal
+        isOpen={!!profileUserId}
+        onClose={() => setProfileUserId(null)}
+        userId={profileUserId}
+        context="coach"
+      />
     </div>
   );
 }

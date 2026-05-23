@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { locationSubSchema } from './locationModel.js';
 
 const clubGroupSchema = new mongoose.Schema(
     {
@@ -19,6 +20,12 @@ const clubGroupSchema = new mongoose.Schema(
         name: {
             type: String,
             required: true,
+        },
+        location: locationSubSchema,
+        mainSport: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Sport',
+            default: null,
         },
         description: {
             type: String,

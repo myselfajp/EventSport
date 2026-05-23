@@ -280,7 +280,7 @@ const UserSearch: React.FC<UserSearchProps> = ({
                     <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center">
                       {user.photo?.path ? (
                         <img
-                          src={`${EP.API_ASSETS_BASE}/${user.photo.path}`}
+                          src={EP.assetUrl(user.photo.path)}
                           alt={`${user.firstName} ${user.lastName}`}
                           className="w-10 h-10 rounded-full object-cover"
                         />
@@ -296,7 +296,7 @@ const UserSearch: React.FC<UserSearchProps> = ({
                       <div className="flex gap-1 mt-1">
                         {user.participant && (
                           <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            Participant
+                            Gamer
                           </span>
                         )}
                         {user.coach && (
