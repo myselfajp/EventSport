@@ -1,80 +1,86 @@
 services:
   mongodb:
     image: mongo:7
-    container_name: eventSport_mongodb_prod
+    container_name: ${MONGO_CONTAINER_NAME}
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DB:-sportsevents}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
     command: mongod --quiet --logpath /dev/null
     volumes:
-      - mongodb_data_prod:/data/db
-    ports:
-      - "27017:27017"
+      - mongodb_data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - eventSport_network
+      - eventsport_network
     restart: unless-stopped
     logging:
       driver: "none"
 
   backend:
+    image: ${BACKEND_IMAGE}
     build:
       context: ./backEnd
       dockerfile: Dockerfile
-    container_name: eventSport_backend_prod
+    container_name: ${BACKEND_CONTAINER_NAME}
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - MONGODB_URI=${MONGODB_URI:-mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB:-sportsevents}?authSource=admin}
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${BACKEND_PORT}
+      - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - ADMIN_FIRST_NAME=${ADMIN_FIRST_NAME}
       - ADMIN_LAST_NAME=${ADMIN_LAST_NAME}
       - ADMIN_PHONE=${ADMIN_PHONE}
       - ADMIN_AGE=${ADMIN_AGE}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-      - LISTING_PRICE_PER_SLOT=${LISTING_PRICE_PER_SLOT:-50}
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - LISTING_PRICE_PER_SLOT=${LISTING_PRICE_PER_SLOT}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - CHECK_IN_REMINDERS_ENABLED=${CHECK_IN_REMINDERS_ENABLED}
+      - CHECK_IN_REMINDER_INTERVAL_MS=${CHECK_IN_REMINDER_INTERVAL_MS}
+      - PUBLIC_FRONTEND_URL=${PUBLIC_FRONTEND_URL}
+      - FRONTEND_URL=${FRONTEND_URL}
     volumes:
       - ./backEnd/uploads:/app/uploads
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
-      - eventSport_network
+      - eventsport_network
     restart: unless-stopped
 
   frontend:
+    image: ${FRONTEND_IMAGE}
     build:
       context: ./frontEnd
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_V1_BASE=${NEXT_PUBLIC_API_V1_BASE:-http://localhost:3000/api/v1}
-        - NEXT_PUBLIC_API_ASSETS_BASE=${NEXT_PUBLIC_API_ASSETS_BASE:-http://localhost:3000}
-    container_name: eventSport_frontend_prod
+        NEXT_PUBLIC_API_V1_BASE: ${NEXT_PUBLIC_API_V1_BASE}
+        NEXT_PUBLIC_API_ASSETS_BASE: ${NEXT_PUBLIC_API_ASSETS_BASE}
+    container_name: ${FRONTEND_CONTAINER_NAME}
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-    ports:
-      - "${FRONTEND_PORT:-3001}:3001"
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${FRONTEND_PORT}
     depends_on:
       - backend
     networks:
-      - eventSport_network
+      - eventsport_network
     restart: unless-stopped
 
 volumes:
-  mongodb_data_prod:
+  mongodb_data:
 
 networks:
-  eventSport_network:
+  eventsport_network:
     driver: bridge
