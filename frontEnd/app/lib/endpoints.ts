@@ -9,6 +9,36 @@ const API_ASSETS_URL = (process.env.NEXT_PUBLIC_API_ASSETS_BASE || "").replace(
   ""
 );
 
+/** Public URL root where Express serves `uploads/` (see backend `app.use('/uploads', static)`). */
+function uploadsPublicRoot(): string {
+  const apiOrigin = API_V1_BASE.replace(/\/api\/v1\/?$/i, "").replace(
+    /\/+$/,
+    ""
+  );
+  const base = (API_ASSETS_URL || apiOrigin).replace(/\/+$/, "");
+  if (!base) return "";
+  return base.toLowerCase().endsWith("/uploads") ? base : `${base}/uploads`;
+}
+
+/**
+ * Builds a browser URL for a path stored in Mongo (relative to the uploads folder, or with optional `uploads/` prefix).
+ */
+export function assetUrl(pathFromDb: string | undefined | null): string {
+  if (pathFromDb == null || pathFromDb === "") return "";
+  const raw = String(pathFromDb).replace(/\\/g, "/").trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  let rel = raw.replace(/^\/+/, "");
+  const lower = rel.toLowerCase();
+  if (lower.startsWith("uploads/")) {
+    rel = rel.slice("uploads/".length);
+  }
+  const root = uploadsPublicRoot();
+  if (!root) {
+    return rel ? `/uploads/${rel}` : "";
+  }
+  return `${root}/${rel}`.replace(/([^:]\/)\/+/g, "$1");
+}
+
 if (!API_V1_BASE) {
   if (typeof window !== "undefined") {
     console.warn("NEXT_PUBLIC_API_V1_BASE is not set");
@@ -25,12 +55,28 @@ const PARTICIPANT_DATA_API = `${API_V1_BASE}/participant`;
 const COACH_DATA_API = `${API_V1_BASE}/coach`;
 const FACILITY_API = `${API_V1_BASE}/facility`;
 const COMPANY_API = `${API_V1_BASE}/company`;
+const LOCATION_API = `${API_V1_BASE}/location`;
 
 export const EP = {
   API_BASE: API_V1_BASE,
-  API_ASSETS_BASE: API_ASSETS_URL,
+  /** Same origin as uploaded files (`…/uploads`). Prefer `assetUrl()` for file paths from the API. */
+  API_ASSETS_BASE: uploadsPublicRoot(),
+  assetUrl,
+  /** Public read-only; admin creates pages under Static Pages with matching `name`. */
+  PUBLIC: {
+    staticPageByName: (name: string) =>
+      `${API_V1_BASE}/public/static-page/${encodeURIComponent(name)}`,
+    suggestion: `${API_V1_BASE}/public/suggestion`,
+    dashboardHeroSlides: `${API_V1_BASE}/public/dashboard-hero-slides`,
+    heroClick: (slideId: string) =>
+      `${API_V1_BASE}/public/hero-click/${encodeURIComponent(slideId)}`,
+  },
+  LOCATION: {
+    districts: `${LOCATION_API}/districts`,
+  },
   AUTH: {
     signIn: `${AUTH_API}/sign-in`,
+    sendRegistrationOtp: `${AUTH_API}/send-registration-otp`,
     signUp: `${AUTH_API}/sign-up`,
     signOut: `${AUTH_API}/sign-out`,
     me: `${AUTH_API}/get-current-user`,
@@ -39,19 +85,44 @@ export const EP = {
     getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,
   },
   LEGAL: {
-    getActive: (type: "kvkk" | "terms") =>
-      `${LEGAL_API}/active?type=${type}`,
+    getActive: (
+      type:
+        | "kvkk"
+        | "terms"
+        | "distance_selling"
+        | "event_contract"
+        | "commercial_messages"
+    ) => `${LEGAL_API}/active?type=${type}`,
   },
   ADMIN: {
     panel: `${ADMIN_API}/panel`,
+    permissionCatalog: `${ADMIN_API}/permission-catalog`,
+    permissionGroups: {
+      list: `${ADMIN_API}/permission-groups`,
+      create: `${ADMIN_API}/permission-groups`,
+      update: (groupId: string) => `${ADMIN_API}/permission-groups/${groupId}`,
+      delete: (groupId: string) => `${ADMIN_API}/permission-groups/${groupId}`,
+    },
     legal: {
-      list: (type?: "kvkk" | "terms") =>
-        type ? `${ADMIN_API}/legal?type=${type}` : `${ADMIN_API}/legal`,
+      list: (
+        type?:
+          | "kvkk"
+          | "terms"
+          | "distance_selling"
+          | "event_contract"
+          | "commercial_messages"
+      ) => (type ? `${ADMIN_API}/legal?type=${type}` : `${ADMIN_API}/legal`),
       create: `${ADMIN_API}/legal`,
       getById: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
       update: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
       activate: (documentId: string) =>
         `${ADMIN_API}/legal/${documentId}/activate`,
+    },
+    blacklist: {
+      list: `${ADMIN_API}/blacklist`,
+      create: `${ADMIN_API}/blacklist/create`,
+      fromUser: (userId: string) => `${ADMIN_API}/blacklist/from-user/${userId}`,
+      remove: (entryId: string) => `${ADMIN_API}/blacklist/${entryId}`,
     },
     users: {
       getAll: `${ADMIN_API}/users`,
@@ -82,6 +153,51 @@ export const EP = {
       create: `${ADMIN_API}/static-pages`,
       update: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
       delete: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
+    },
+    contractAcceptances: {
+      list: (params?: {
+        userId?: string;
+        contractKey?: string;
+        context?: string;
+        from?: string;
+        to?: string;
+        page?: number;
+        limit?: number;
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.userId) q.set("userId", params.userId);
+        if (params?.contractKey) q.set("contractKey", params.contractKey);
+        if (params?.context) q.set("context", params.context);
+        if (params?.from) q.set("from", params.from);
+        if (params?.to) q.set("to", params.to);
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        const qs = q.toString();
+        return `${ADMIN_API}/contract-acceptances${qs ? `?${qs}` : ""}`;
+      },
+      byUser: (userId: string) =>
+        `${ADMIN_API}/users/${userId}/contract-acceptances`,
+    },
+    suggestions: `${ADMIN_API}/suggestions`,
+    dashboardHeroSlides: {
+      list: `${ADMIN_API}/dashboard-hero-slides`,
+      create: `${ADMIN_API}/dashboard-hero-slides`,
+      update: (slideId: string) => `${ADMIN_API}/dashboard-hero-slides/${slideId}`,
+      delete: (slideId: string) => `${ADMIN_API}/dashboard-hero-slides/${slideId}`,
+      analytics: (params?: {
+        days?: number;
+        slideId?: string;
+        from?: string;
+        to?: string;
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.days) q.set("days", String(params.days));
+        if (params?.slideId) q.set("slideId", params.slideId);
+        if (params?.from) q.set("from", params.from);
+        if (params?.to) q.set("to", params.to);
+        const qs = q.toString();
+        return `${ADMIN_API}/dashboard-hero-analytics${qs ? `?${qs}` : ""}`;
+      },
     },
   },
   REFERENCE: {
@@ -130,8 +246,11 @@ export const EP = {
     favoriteFacility: `${PARTICIPANT_DATA_API}/favorite-facility`,
     favoriteEvent: `${PARTICIPANT_DATA_API}/favorite-event`,
     makeReservation: `${PARTICIPANT_DATA_API}/make-reservation`,
+    enrollSeries: `${PARTICIPANT_DATA_API}/enroll-series`,
     checkIn: `${PARTICIPANT_DATA_API}/check-in`,
     confirmPayment: `${PARTICIPANT_DATA_API}/confirm-payment`,
+    addEndPhoto: `${PARTICIPANT_DATA_API}/add-end-photo`,
+    eventEndPhotos: `${PARTICIPANT_DATA_API}/event-end-photos`,
     myReservations: `${PARTICIPANT_DATA_API}/my-reservations`,
     unfavorite: (type: "coach" | "facility" | "event") =>
       `${PARTICIPANT_DATA_API}/favorite/${type}`,
@@ -156,12 +275,16 @@ export const EP = {
     editCoach: `${COACH_DATA_API}/edit-coach`,
     createEvent: `${COACH_DATA_API}/create-event`,
     editEvent: (eventId: string) => `${COACH_DATA_API}/edit-event/${eventId}`,
+    cancelEvent: (eventId: string) => `${COACH_DATA_API}/cancel-event/${eventId}`,
+    listingQuote: (sessionCount: number) =>
+      `${COACH_DATA_API}/listing-quote?sessionCount=${sessionCount}`,
     getCurrentBranches: `${COACH_DATA_API}/current-branches`,
     getCoachDetails: `${COACH_DATA_API}/get-by-detail`,
     getCoachById: (coachId: string) =>
       `${COACH_DATA_API}/get-by-detail/${coachId}`,
     getCoachList: `${API_V1_BASE}/get-coach-list`,
     myCreatedEvents: `${COACH_DATA_API}/my-events`,
+    addEndPhoto: `${COACH_DATA_API}/add-end-photo/`,
     getEventParticipants: (eventId: string) =>
       `${COACH_DATA_API}/event/participants/${eventId}`,
   },
@@ -204,7 +327,13 @@ export const EP = {
     getClubs: `${API_V1_BASE}/get-club`,
   },
   EVENT_STYLE: { getEventStyle: `${API_V1_BASE}/get-event-style` },
-  EVENTS: { getEvents: `${API_V1_BASE}/get-event` },
+  EVENTS: {
+    getEvents: `${API_V1_BASE}/get-event`,
+    getEventSeries: (seriesId: string) =>
+      `${API_V1_BASE}/get-event-series/${encodeURIComponent(seriesId)}`,
+    eventEndPhotos: (eventId: string) =>
+      `${API_V1_BASE}/get-event/${eventId}/end-photos`,
+  },
   NOTIFICATIONS: {
     getAll: `${API_V1_BASE}/notifications`,
     getUnreadCount: `${API_V1_BASE}/notifications/unread-count`,

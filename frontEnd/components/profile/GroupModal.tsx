@@ -3,6 +3,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Upload, Loader, Check, Search as SearchIcon, Layers } from "lucide-react";
 import { getClubs } from "@/app/lib/club-api";
+import { fetchJSON } from "@/app/lib/api";
+import { EP } from "@/app/lib/endpoints";
+import LocationFields, {
+  emptyLocationValue,
+} from "@/components/location/LocationFields";
+import type { LocationValue } from "@/app/lib/location-api";
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -10,6 +16,8 @@ interface GroupModalProps {
   onSubmit: (clubId: string, formData: FormData) => Promise<any> | any;
   initialData?: GroupFormData | null;
   userId?: string;
+  /** Admin without a coach profile must specify which coach owns the new group */
+  requireOwnerCoachId?: boolean;
 }
 
 interface GroupFormData {
@@ -36,6 +44,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
   onSubmit,
   initialData = null,
   userId,
+  requireOwnerCoachId = false,
 }) => {
   const [formData, setFormData] = useState<GroupFormData>({
     club: "",
@@ -51,12 +60,33 @@ const GroupModal: React.FC<GroupModalProps> = ({
   const [generalError, setGeneralError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [ownerCoachId, setOwnerCoachId] = useState("");
   
   // Club search states
   const [clubSearch, setClubSearch] = useState("");
   const [clubResults, setClubResults] = useState<ClubSearchResult[]>([]);
   const [isSearchingClubs, setIsSearchingClubs] = useState(false);
   const [showClubDropdown, setShowClubDropdown] = useState(false);
+  const [locationValue, setLocationValue] = useState<LocationValue>(
+    emptyLocationValue()
+  );
+  const [mainSport, setMainSport] = useState("");
+  const [sports, setSports] = useState<{ _id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        const res = await fetchJSON(EP.REFERENCE.sport.get, {
+          method: "POST",
+          body: { perPage: 200, pageNumber: 1 },
+        });
+        if (res?.success && Array.isArray(res.data)) setSports(res.data);
+      } catch {
+        setSports([]);
+      }
+    })();
+  }, [isOpen]);
 
   const searchClubs = async (query: string) => {
     if (query.trim().length < 2) {
@@ -124,6 +154,7 @@ const GroupModal: React.FC<GroupModalProps> = ({
     setGeneralError("");
     setClubSearch("");
     setClubResults([]);
+    setOwnerCoachId("");
   };
 
   const handleInputChange = (
@@ -164,6 +195,13 @@ const GroupModal: React.FC<GroupModalProps> = ({
     if (!initialData) {
       if (!formData.club) newErrors.club = "Club is required";
       if (!formData.name) newErrors.name = "Sport Community Name is required";
+      if (
+        requireOwnerCoachId &&
+        !/^[a-fA-F0-9]{24}$/.test(ownerCoachId.trim())
+      ) {
+        newErrors.ownerCoachId =
+          "Valid 24-character coach profile ID (Mongo ObjectId) is required";
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -192,8 +230,17 @@ const GroupModal: React.FC<GroupModalProps> = ({
       const groupData: any = {
         name: formData.name,
       };
+
+      if (mainSport) groupData.mainSport = mainSport;
+      if (locationValue.district) {
+        groupData.district = locationValue.district;
+        if (locationValue.addressLine) groupData.addressLine = locationValue.addressLine;
+      }
       
       if (formData.description) groupData.description = formData.description;
+      if (requireOwnerCoachId && !initialData) {
+        groupData.ownerCoachId = ownerCoachId.trim();
+      }
 
       submitData.append("data", JSON.stringify(groupData));
       
@@ -312,6 +359,34 @@ const GroupModal: React.FC<GroupModalProps> = ({
                     </div>
                   )}
 
+                  {!isEditing && requireOwnerCoachId && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Coach profile ID{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={ownerCoachId}
+                        onChange={(e) => {
+                          setOwnerCoachId(e.target.value);
+                          setErrors((prev) => ({ ...prev, ownerCoachId: "" }));
+                          setGeneralError("");
+                        }}
+                        placeholder="24-character MongoDB ObjectId"
+                        className={`w-full px-3 py-2.5 font-mono text-sm border rounded-lg focus:outline-none focus:ring-2 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
+                          errors.ownerCoachId
+                            ? "border-red-300 focus:ring-red-200 dark:border-red-500"
+                            : "border-gray-200 dark:border-gray-600 focus:ring-cyan-500"
+                        }`}
+                        disabled={isLoading}
+                      />
+                      {errors.ownerCoachId && (
+                        <p className="mt-1 text-xs text-red-500">{errors.ownerCoachId}</p>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Sport Community Name {!initialData && <span className="text-red-500">*</span>}
@@ -327,6 +402,36 @@ const GroupModal: React.FC<GroupModalProps> = ({
                       disabled={isLoading}
                     />
                     {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Main sport
+                    </label>
+                    <select
+                      value={mainSport}
+                      onChange={(e) => setMainSport(e.target.value)}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                      disabled={isLoading}
+                    >
+                      <option value="">Select sport (optional)</option>
+                      {sports.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Istanbul district
+                    </label>
+                    <LocationFields
+                      value={locationValue}
+                      onChange={setLocationValue}
+                      disabled={isLoading}
+                    />
                   </div>
 
                   <div>

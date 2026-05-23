@@ -18,6 +18,8 @@ import coachRouter from './routes/couchRouter.js';
 import facilityRouter from './routes/facilityRouter.js';
 import companyRouter from './routes/companyRouter.js';
 import getDataRouter from './routes/getDataRouter.js';
+import locationRouter from './routes/locationRouter.js';
+import publicContentRouter from './routes/publicContentRouter.js';
 import adminRouter from './routes/adminRouter.js';
 import legalRouter from './routes/legalRouter.js';
 import notificationRouter from './routes/notificationRouter.js';
@@ -87,10 +89,17 @@ app.get('/mid', authMiddleware, (req, res) => {
 });
 
 app.post('/api/v1/auth/sign-in', authRateLimiter, validateCSRFToken, authController.signIn);
+app.post(
+    '/api/v1/auth/send-registration-otp',
+    signupRateLimiter,
+    validateCSRFToken,
+    authController.sendRegistrationOtp
+);
 app.post('/api/v1/auth/sign-up', signupRateLimiter, validateCSRFToken, authController.signUp);
 app.use('/api/v1/auth', validateCSRFToken, authMiddleware, authRouter);
 app.use('/api/v1/legal', validateCSRFToken, legalRouter);
 app.use('/api/v1/participant', authMiddleware, participantRouter);
+app.use('/api/v1/location', authMiddleware, locationRouter);
 app.use('/api/v1/reference-data', authMiddleware, (req, res, next) => {
     console.log('Reference data router - URL:', req.url);
     console.log('Reference data router - Method:', req.method);
@@ -101,6 +110,7 @@ app.use('/api/v1/facility', authMiddleware, facilityRouter);
 app.use('/api/v1/company', authMiddleware, companyRouter);
 app.use('/api/v1/admin', validateCSRFToken, authMiddleware, adminMiddleware, adminRouter);
 app.use('/api/v1/notifications', authMiddleware, notificationRouter);
+app.use('/api/v1', publicContentRouter);
 app.use('/api/v1', getDataRouter);
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

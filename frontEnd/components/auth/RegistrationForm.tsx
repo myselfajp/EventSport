@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSignUp } from "@/app/hooks/useAuth";
+import { sendRegistrationOtp } from "@/app/lib/auth-api";
 import {
   PHONE_PREFIX,
   PHONE_DIGITS_LENGTH,
@@ -12,6 +13,8 @@ import {
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import LegalContentModal from "./LegalContentModal";
+import LocationFields, { emptyLocationValue } from "@/components/location/LocationFields";
+import type { LocationValue } from "@/app/lib/location-api";
 
 interface RegistrationFormProps {
   onToggleForm: () => void;
@@ -41,28 +44,46 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreeKvkk, setAgreeKvkk] = useState(false);
+  const [agreeCommercialMessages, setAgreeCommercialMessages] = useState(false);
   const [validationError, setValidationError] = useState("");
   const [activeTerms, setActiveTerms] = useState<ActiveLegal | null>(null);
   const [activeKvkk, setActiveKvkk] = useState<ActiveLegal | null>(null);
+  const [activeCommercialMessages, setActiveCommercialMessages] = useState<ActiveLegal | null>(null);
   const [legalModal, setLegalModal] = useState<{ title: string; content: string } | null>(null);
   const [legalLoading, setLegalLoading] = useState(true);
+  const [otp, setOtp] = useState("");
+  const [otpMessage, setOtpMessage] = useState("");
+  const [devOtpHint, setDevOtpHint] = useState("");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [locationValue, setLocationValue] = useState<LocationValue>(emptyLocationValue());
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLegalLoading(true);
       try {
-        const [termsRes, kvkkRes] = await Promise.all([
+        const [termsRes, kvkkRes, commercialRes] = await Promise.all([
           fetchJSON(EP.LEGAL.getActive("terms"), { method: "GET" }, { skipAuth: true }),
           fetchJSON(EP.LEGAL.getActive("kvkk"), { method: "GET" }, { skipAuth: true }),
+          fetchJSON(
+            EP.LEGAL.getActive("commercial_messages"),
+            { method: "GET" },
+            { skipAuth: true }
+          ).catch(() => null),
         ]);
         if (cancelled) return;
         if (termsRes?.success && termsRes?.data) setActiveTerms(termsRes.data);
         if (kvkkRes?.success && kvkkRes?.data) setActiveKvkk(kvkkRes.data);
+        if (commercialRes?.success && commercialRes?.data) {
+          setActiveCommercialMessages(commercialRes.data);
+        } else {
+          setActiveCommercialMessages(null);
+        }
       } catch {
         if (!cancelled) {
           setActiveTerms(null);
           setActiveKvkk(null);
+          setActiveCommercialMessages(null);
         }
       } finally {
         if (!cancelled) setLegalLoading(false);
@@ -91,18 +112,39 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }
 
     if (password !== confirmPassword) {
-      setValidationError("Passwords do not match");
+      setValidationError("Şifreler eşleşmiyor.");
       return;
     }
 
-    if (password.length < 8) {
-      setValidationError("Password must be at least 8 characters long");
+    const PASSWORD_RULE_MESSAGE =
+      "Şifre en az 8 karakter olmalı ve en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir.";
+    const passwordRulesValid =
+      password.length >= 8 &&
+      /[a-z]/.test(password) &&
+      /[A-Z]/.test(password) &&
+      /\d/.test(password) &&
+      /[^A-Za-z0-9]/.test(password);
+    if (!passwordRulesValid) {
+      setValidationError(PASSWORD_RULE_MESSAGE);
       return;
     }
 
     const phoneDigits = getPhoneDigits(phoneNumber);
     if (phoneDigits.length < PHONE_DIGITS_LENGTH) {
-      setValidationError(`Please enter a complete Turkish phone number (9 digits after ${PHONE_PREFIX})`);
+      setValidationError(
+        `Lütfen tam bir telefon numarası giriniz (${PHONE_PREFIX} sonrası 9 rakam).`
+      );
+      return;
+    }
+
+    const otpDigits = otp.replace(/\D/g, "");
+    if (otpDigits.length !== 6) {
+      setValidationError("E-postanıza gelen 6 haneli doğrulama kodunu girin.");
+      return;
+    }
+
+    if (!locationValue.district) {
+      setValidationError("Please select your Istanbul district.");
       return;
     }
 
@@ -111,13 +153,47 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       lastName,
       phone: phoneNumber,
       age: birthday,
-      email,
+      email: email.trim().toLowerCase(),
       password,
+      otp: otpDigits,
+      district: locationValue.district,
       agreeTerms: true,
       agreeKvkk: true,
       termsVersionId: activeTerms._id,
       kvkkVersionId: activeKvkk._id,
+      marketingConsent: agreeCommercialMessages,
+      ...(agreeCommercialMessages && activeCommercialMessages
+        ? { commercialMessagesVersionId: activeCommercialMessages._id }
+        : {}),
     });
+  };
+
+  const handleSendOtp = async () => {
+    setValidationError("");
+    setOtpMessage("");
+    setDevOtpHint("");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setValidationError("Geçerli bir e-posta adresi girin.");
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const result = await sendRegistrationOtp({
+        email: normalizedEmail,
+        firstName: firstName.trim() || undefined,
+      });
+      setOtpMessage(result.message);
+      if (result.devOtp) {
+        setDevOtpHint(`Geliştirme kodu: ${result.devOtp}`);
+      }
+    } catch (err: unknown) {
+      setValidationError(
+        err instanceof Error ? err.message : "Doğrulama kodu gönderilemedi."
+      );
+    } finally {
+      setSendingOtp(false);
+    }
   };
 
   const openTermsModal = (e: React.MouseEvent) => {
@@ -128,6 +204,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const openKvkkModal = (e: React.MouseEvent) => {
     e.preventDefault();
     if (activeKvkk) setLegalModal({ title: activeKvkk.title, content: activeKvkk.content });
+  };
+
+  const openCommercialMessagesModal = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (activeCommercialMessages) {
+      setLegalModal({
+        title: activeCommercialMessages.title,
+        content: activeCommercialMessages.content,
+      });
+    }
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -241,19 +327,67 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              District (Istanbul) <span className="text-red-500">*</span>
+            </label>
+            <LocationFields
+              value={locationValue}
+              onChange={setLocationValue}
+              showAddressLine={false}
+            />
+          </div>
+
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Email <span className="text-red-500">*</span>
             </label>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email address"
+                className="flex-1 min-w-0 px-3 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg 
+                           bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
+                           placeholder:text-gray-400 dark:placeholder:text-slate-500
+                           focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 
+                           transition-colors"
+                required
+              />
+              <button
+                type="button"
+                onClick={handleSendOtp}
+                disabled={sendingOtp}
+                className="shrink-0 px-3 py-2.5 text-xs font-medium border border-cyan-500 text-cyan-600 dark:text-cyan-400 rounded-lg hover:bg-cyan-50 dark:hover:bg-cyan-900/20 disabled:opacity-60 whitespace-nowrap"
+              >
+                {sendingOtp ? "..." : "Kod gönder"}
+              </button>
+            </div>
+            {otpMessage && (
+              <p className="text-xs text-cyan-700 dark:text-cyan-400 mt-1">{otpMessage}</p>
+            )}
+            {devOtpHint && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{devOtpHint}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              E-posta doğrulama kodu <span className="text-red-500">*</span>
+            </label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email address"
-              className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg 
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6 haneli kod"
+              className="w-full px-3 py-2.5 text-sm tracking-[0.3em] border border-gray-200 dark:border-slate-600 rounded-lg 
                          bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
-                         placeholder:text-gray-400 dark:placeholder:text-slate-500
+                         placeholder:tracking-normal placeholder:text-gray-400 dark:placeholder:text-slate-500
                          focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 
                          transition-colors"
               required
@@ -291,7 +425,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-              Use 8+ characters with letters, numbers & symbols
+              En az 8 karakter; en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir. Üst sınır yoktur.
             </p>
           </div>
 
@@ -381,6 +515,34 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             </label>
           </div>
 
+          {/* Commercial electronic messages (IYS) — optional */}
+          {activeCommercialMessages && (
+            <div className="flex items-start gap-3 py-2">
+              <input
+                type="checkbox"
+                id="commercial-messages"
+                checked={agreeCommercialMessages}
+                onChange={(e) => setAgreeCommercialMessages(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900"
+              />
+              <label
+                htmlFor="commercial-messages"
+                className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed"
+              >
+                I consent to receiving commercial electronic messages (SMS, email, phone) including
+                campaigns and promotions. I have read the{" "}
+                <button
+                  type="button"
+                  onClick={openCommercialMessagesModal}
+                  className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors underline"
+                >
+                  Commercial Electronic Messages Consent (IYS)
+                </button>
+                . (Optional)
+              </label>
+            </div>
+          )}
+
           {legalLoading && (
             <p className="text-xs text-gray-500 dark:text-slate-400">
               Loading Terms and KVKK...
@@ -396,7 +558,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded-lg">
               {validationError ||
                 (error as any)?.message ||
-                "Registration failed"}
+                "Kayıt oluşturulamadı. Lütfen bilgileri kontrol edip tekrar deneyin."}
             </div>
           )}
 

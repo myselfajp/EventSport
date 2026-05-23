@@ -37,6 +37,7 @@ interface EventStyle {
   _id: string;
   name: string;
   color: string;
+  checkInOpensHoursBeforeStart?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,7 +93,11 @@ export default function EnumManagement() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState({ name: "", color: "#000000" });
+  const [formData, setFormData] = useState({
+    name: "",
+    color: "#000000",
+    checkInOpensHoursBeforeStart: 48,
+  });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
 
@@ -213,13 +218,17 @@ export default function EnumManagement() {
 
   const handleCreateSportGroup = () => {
     setEditingSportGroup(null);
-    setFormData({ name: "", color: "#000000" });
+    setFormData({ name: "", color: "#000000", checkInOpensHoursBeforeStart: 48 });
     setShowSportGroupModal(true);
   };
 
   const handleEditSportGroup = (sportGroup: SportGroup) => {
     setEditingSportGroup(sportGroup);
-    setFormData({ name: sportGroup.name, color: "#000000" });
+    setFormData({
+      name: sportGroup.name,
+      color: "#000000",
+      checkInOpensHoursBeforeStart: 48,
+    });
     setShowSportGroupModal(true);
   };
 
@@ -275,7 +284,7 @@ export default function EnumManagement() {
       return;
     }
     setEditingSport(null);
-    setFormData({ name: "", color: "#000000" });
+    setFormData({ name: "", color: "#000000", checkInOpensHoursBeforeStart: 48 });
     setIconFile(null);
     setIconPreview(null);
     setShowSportModal(true);
@@ -283,7 +292,11 @@ export default function EnumManagement() {
 
   const handleEditSport = (sport: Sport) => {
     setEditingSport(sport);
-    setFormData({ name: sport.name, color: "#000000" });
+    setFormData({
+      name: sport.name,
+      color: "#000000",
+      checkInOpensHoursBeforeStart: 48,
+    });
     setIconFile(null);
     if (sport.icon?.path) {
       setIconPreview(getImageUrl(sport.icon.path) || null);
@@ -333,13 +346,7 @@ export default function EnumManagement() {
     }
   };
 
-  const getImageUrl = (path: string) => {
-    if (!path) return "";
-    // Use API_ASSETS_BASE with the path from database
-    // If path starts with /, use it directly, otherwise add /
-    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
-  };
+  const getImageUrl = (path: string) => EP.assetUrl(path);
 
   const handleSubmitSport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,13 +389,17 @@ export default function EnumManagement() {
 
   const handleCreateSportGoal = () => {
     setEditingSportGoal(null);
-    setFormData({ name: "", color: "#000000" });
+    setFormData({ name: "", color: "#000000", checkInOpensHoursBeforeStart: 48 });
     setShowSportGoalModal(true);
   };
 
   const handleEditSportGoal = (goal: SportGoal) => {
     setEditingSportGoal(goal);
-    setFormData({ ...formData, name: goal.name });
+    setFormData({
+      ...formData,
+      name: goal.name,
+      checkInOpensHoursBeforeStart: 48,
+    });
     setShowSportGoalModal(true);
   };
 
@@ -439,13 +450,17 @@ export default function EnumManagement() {
 
   const handleCreateEventStyle = () => {
     setEditingEventStyle(null);
-    setFormData({ name: "", color: "#000000" });
+    setFormData({ name: "", color: "#000000", checkInOpensHoursBeforeStart: 48 });
     setShowEventStyleModal(true);
   };
 
   const handleEditEventStyle = (style: EventStyle) => {
     setEditingEventStyle(style);
-    setFormData({ name: style.name, color: style.color });
+    setFormData({
+      name: style.name,
+      color: style.color,
+      checkInOpensHoursBeforeStart: style.checkInOpensHoursBeforeStart ?? 48,
+    });
     setShowEventStyleModal(true);
   };
 
@@ -479,7 +494,13 @@ export default function EnumManagement() {
 
       const response = await fetchJSON(url, {
         method: isEdit ? "PUT" : "POST",
-        body: { name: formData.name, color: formData.color },
+        body: {
+          name: formData.name,
+          color: formData.color,
+          checkInOpensHoursBeforeStart: Number(
+            formData.checkInOpensHoursBeforeStart ?? 48
+          ),
+        },
       });
 
       if (response?.success) {
@@ -903,9 +924,16 @@ export default function EnumManagement() {
                           className="w-6 h-6 rounded border border-gray-300 dark:border-slate-600"
                           style={{ backgroundColor: style.color }}
                         />
-                        <span className="font-medium text-gray-900 dark:text-slate-100">
-                          {style.name}
-                        </span>
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-slate-100">
+                            {style.name}
+                          </span>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            Check-in opens{" "}
+                            {style.checkInOpensHoursBeforeStart ?? 48}h before
+                            start
+                          </p>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -1250,6 +1278,10 @@ export default function EnumManagement() {
             <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-slate-100">
               {editingEventStyle ? "Edit Event Style" : "Create Event Style"}
             </h3>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+              Set when participants can check in (and use the late join / pay
+              window) before the event starts.
+            </p>
             <form onSubmit={handleSubmitEventStyle} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
@@ -1289,6 +1321,30 @@ export default function EnumManagement() {
                     placeholder="#000000"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+                  Check-in opens (hours before event start)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  max={720}
+                  step={1}
+                  value={formData.checkInOpensHoursBeforeStart}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      checkInOpensHoursBeforeStart: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Example: 48 = two days before start. Check-in closes when the
+                  event starts.
+                </p>
               </div>
               <div className="flex gap-2">
                 <button

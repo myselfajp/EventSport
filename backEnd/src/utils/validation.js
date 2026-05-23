@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 const passwordMin = 8;
-const passwordMax = 50;
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+// Yalnızca aşırı uzunluk / istismar (DoS) saldırılarına karşı sert tavan; ürün açısından "üst sınır yok" kabul edilebilir.
+const passwordMax = 1024;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const PASSWORD_RULE_MESSAGE =
+    'Şifre en az 8 karakter olmalı ve en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir.';
 const hexRegex = /^#([0-9A-F]{6}|[0-9A-F]{3})$/i;
 const MongoObjectIdRegex = /^[a-fA-F\d]{24}$/;
 
@@ -16,9 +19,37 @@ export const color = z
     })
     .regex(hexRegex, 'Provide a valid color hex.');
 
+export const checkInOpensHoursBeforeStart = z.coerce
+    .number()
+    .int('Check-in hours must be a whole number.')
+    .min(0, 'Check-in hours cannot be negative.')
+    .max(720, 'Check-in hours cannot exceed 720 (30 days).')
+    .default(48);
+
+export const recurrenceInputSchema = z.object({
+    frequency: z.enum(['weekly', 'daily', 'monthly'], {
+        errorMap: () => ({ message: 'Frequency must be weekly, daily, or monthly.' }),
+    }),
+    interval: z.coerce.number().int().min(1).max(30).default(1),
+    sessionCount: z.coerce.number().int().min(2).max(52),
+});
+
+export const eventEditScopeSchema = z.enum(['single', 'following']).default('single');
+
 export const mongoObjectId = z
     .string({ error: (iss) => (iss.input === undefined ? 'ID is required.' : 'Invalid ID.') })
     .regex(MongoObjectIdRegex, 'Provide a valid ID.');
+
+/** Istanbul district (+ optional street detail). */
+export const locationInputSchema = z.object({
+    district: mongoObjectId,
+    addressLine: z.string().trim().optional(),
+});
+
+export const optionalLocationFieldsSchema = z.object({
+    district: mongoObjectId.optional(),
+    addressLine: z.string().trim().optional(),
+});
 
 export const coachId = z
     .string({
@@ -93,15 +124,12 @@ export const signupSchema = z.object({
         .string({
             error: (iss) =>
                 iss.input === undefined
-                    ? { message: 'Password is required.' }
-                    : { message: 'Invalid input.' },
+                    ? { message: 'Şifre alanı zorunludur.' }
+                    : { message: 'Geçersiz şifre.' },
         })
-        .min(passwordMin, `Password must be at least ${passwordMin} characters`)
-        .max(passwordMax, `Password must be at most ${passwordMax} characters`)
-        .regex(
-            passwordRegex,
-            `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-        ),
+        .min(passwordMin, PASSWORD_RULE_MESSAGE)
+        .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+        .regex(passwordRegex, PASSWORD_RULE_MESSAGE),
 
     age: z.date({
         error: (iss) =>
@@ -116,6 +144,50 @@ export const signupSchema = z.object({
     }),
     termsVersionId: z.string().regex(MongoObjectIdRegex, 'Invalid terms version ID.'),
     kvkkVersionId: z.string().regex(MongoObjectIdRegex, 'Invalid KVKK version ID.'),
+
+    otp: z
+        .string({
+            error: (iss) =>
+                iss.input === undefined
+                    ? { message: 'Doğrulama kodu gerekli.' }
+                    : { message: 'Geçersiz doğrulama kodu.' },
+        })
+        .length(6, 'Doğrulama kodu 6 haneli olmalıdır.')
+        .regex(/^\d{6}$/, 'Doğrulama kodu 6 haneli olmalıdır.'),
+
+    /** Optional IYS / commercial electronic messages opt-in at signup. */
+    marketingConsent: z.boolean().optional().default(false),
+    commercialMessagesVersionId: z
+        .string()
+        .regex(MongoObjectIdRegex, 'Invalid commercial messages version ID.')
+        .optional(),
+
+    /** Required Istanbul district at registration. */
+    district: z
+        .string({
+            error: (iss) =>
+                iss.input === undefined
+                    ? { message: 'District is required.' }
+                    : { message: 'Invalid district.' },
+        })
+        .regex(MongoObjectIdRegex, 'Provide a valid district ID.'),
+}).superRefine((data, ctx) => {
+    if (data.marketingConsent && !data.commercialMessagesVersionId) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Commercial messages consent version is required when opting in.',
+            path: ['commercialMessagesVersionId'],
+        });
+    }
+});
+
+export const sendRegistrationOtpSchema = z.object({
+    email: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .email('Geçerli bir e-posta adresi girin.'),
+    firstName: z.string().trim().optional(),
 });
 
 export const adminCreateUserSchema = z.object({
@@ -149,34 +221,35 @@ export const adminCreateUserSchema = z.object({
         .string({
             error: (iss) =>
                 iss.input === undefined
-                    ? { message: 'Password is required.' }
-                    : { message: 'Invalid input.' },
+                    ? { message: 'Şifre alanı zorunludur.' }
+                    : { message: 'Geçersiz şifre.' },
         })
-        .min(passwordMin, `Password must be at least ${passwordMin} characters`)
-        .max(passwordMax, `Password must be at most ${passwordMax} characters`)
-        .regex(
-            passwordRegex,
-            `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-        ),
+        .min(passwordMin, PASSWORD_RULE_MESSAGE)
+        .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+        .regex(passwordRegex, PASSWORD_RULE_MESSAGE),
     age: z.date({
         error: (iss) =>
             iss.input === undefined ? { message: 'Age is required.' } : { message: 'Invalid age.' },
     }),
+    role: z.union([z.literal(0), z.literal(1)]).optional().default(1),
+    isActive: z.boolean().optional().default(true),
+    adminPermissionGroups: z.array(mongoObjectId).max(32).optional(),
 });
 
 export const loginSchema = z.object({
     email: z
         .string({
-            error: (iss) => (iss.input === undefined ? 'Email is required.' : 'Invalid input.'),
+            error: (iss) => (iss.input === undefined ? 'E-posta zorunludur.' : 'Geçersiz e-posta.'),
         })
-        .email('Please provide a valid email address'),
+        .email('Geçerli bir e-posta adresi giriniz.'),
 
     password: z
         .string({
-            error: (iss) => (iss.input === undefined ? 'Password is required.' : 'Invalid input.'),
+            error: (iss) =>
+                iss.input === undefined ? 'Şifre zorunludur.' : 'Geçersiz şifre.',
         })
-        .min(passwordMin, `Password must be at least ${passwordMin} characters`)
-        .max(passwordMax, `Password must be at most ${passwordMax} characters`),
+        .min(1, 'Şifre zorunludur.')
+        .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`),
 });
 
 export const editUserSchema = z
@@ -226,29 +299,22 @@ export const editUserSchema = z
             .string({
                 error: (iss) =>
                     iss.input === undefined
-                        ? { message: 'New password is required.' }
-                        : { message: 'Invalid input.' },
+                        ? { message: 'Yeni şifre zorunludur.' }
+                        : { message: 'Geçersiz yeni şifre.' },
             })
-            .min(passwordMin, `New password must be at least ${passwordMin} characters`)
-            .max(passwordMax, `New password must be at most ${passwordMax} characters`)
-            .regex(
-                passwordRegex,
-                `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-            )
+            .min(passwordMin, PASSWORD_RULE_MESSAGE)
+            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .regex(passwordRegex, PASSWORD_RULE_MESSAGE)
             .optional(),
         oldPassword: z
             .string({
                 error: (iss) =>
                     iss.input === undefined
-                        ? { message: 'Old password is required.' }
-                        : { message: 'Invalid input.' },
+                        ? { message: 'Mevcut şifre zorunludur.' }
+                        : { message: 'Geçersiz mevcut şifre.' },
             })
-            .min(passwordMin, `Old password must be at least ${passwordMin} characters`)
-            .max(passwordMax, `Old password must be at most ${passwordMax} characters`)
-            .regex(
-                passwordRegex,
-                `Password must be ${passwordMin} characters and include uppercase, lowercase, number, and symbol.`
-            )
+            .min(1, 'Mevcut şifre zorunludur.')
+            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
             .optional(),
         photo: z
             .string()
@@ -256,6 +322,8 @@ export const editUserSchema = z
         deletePhoto: z
             .string()
             .optional(),
+        district: mongoObjectId.optional(),
+        addressLine: z.string().trim().optional(),
     })
     .refine(
         (data) =>
@@ -267,11 +335,109 @@ export const editUserSchema = z
             data.photo !== undefined ||
             data.newPassword !== undefined ||
             data.oldPassword !== undefined ||
-            data.deletePhoto !== undefined,
+            data.deletePhoto !== undefined ||
+            data.district !== undefined ||
+            data.addressLine !== undefined,
         {
             message:
-                'At least one of first name, last name, phone, email, age, photo, new password, old password, or deletePhoto must be provided.',
+                'At least one of first name, last name, phone, email, age, photo, password, location, or deletePhoto must be provided.',
             path: [], // set to [] to attach error to the global object
+        }
+    );
+
+/** Admin-only user updates (includes role, active flag, permission groups). */
+export const adminEditUserSchema = z
+    .object({
+        firstName: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'First name is required.' }
+                        : { message: 'Invalid first name.' },
+            })
+            .optional(),
+        lastName: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Last name is required.' }
+                        : { message: 'Invalid last name.' },
+            })
+            .optional(),
+        phone: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Phone is required.' }
+                        : { message: 'Invalid phone number.' },
+            })
+            .optional(),
+        email: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Email is required.' }
+                        : { message: 'Invalid email.' },
+            })
+            .email('Provide a valid email address.')
+            .optional(),
+        age: z
+            .date({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Age is required.' }
+                        : { message: 'Invalid age.' },
+            })
+            .optional(),
+        newPassword: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Yeni şifre zorunludur.' }
+                        : { message: 'Geçersiz yeni şifre.' },
+            })
+            .min(passwordMin, PASSWORD_RULE_MESSAGE)
+            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .regex(passwordRegex, PASSWORD_RULE_MESSAGE)
+            .optional(),
+        oldPassword: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
+                        ? { message: 'Mevcut şifre zorunludur.' }
+                        : { message: 'Geçersiz mevcut şifre.' },
+            })
+            .min(1, 'Mevcut şifre zorunludur.')
+            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .optional(),
+        photo: z.string().optional(),
+        deletePhoto: z.string().optional(),
+        district: mongoObjectId.optional(),
+        addressLine: z.string().trim().optional(),
+        isActive: z.boolean().optional(),
+        role: z.union([z.literal(0), z.literal(1)]).optional(),
+        adminPermissionGroups: z.array(mongoObjectId).max(32).optional(),
+    })
+    .refine(
+        (data) =>
+            data.firstName !== undefined ||
+            data.lastName !== undefined ||
+            data.phone !== undefined ||
+            data.email !== undefined ||
+            data.age !== undefined ||
+            data.photo !== undefined ||
+            data.newPassword !== undefined ||
+            data.oldPassword !== undefined ||
+            data.deletePhoto !== undefined ||
+            data.district !== undefined ||
+            data.addressLine !== undefined ||
+            data.isActive !== undefined ||
+            data.role !== undefined ||
+            data.adminPermissionGroups !== undefined,
+        {
+            message:
+                'At least one field must be provided for update.',
+            path: [],
         }
     );
 
@@ -383,32 +549,38 @@ export const SearchQuerySchema = z
         isVerified: z.boolean().optional(),
         creator: z.string().regex(MongoObjectIdRegex, 'CreatorId must be a valid ID').optional(),
         owner: z.string().regex(MongoObjectIdRegex, 'OwnerId must be a valid ID').optional(),
+        /** Admin event list: active | cancelled | all (handled in get-event extraFilter) */
+        status: z.enum(['active', 'cancelled', 'all']).optional(),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        district: z.string().regex(MongoObjectIdRegex, 'DistrictId must be a valid ID').optional(),
     })
     .strict();
 
 // coach/branch
-export const createCoachSchema = z.array(
-    z.object({
-        sport: z
-            .string({
-                error: (iss) =>
-                    iss.input === undefined
-                        ? { message: 'Sport id required.' }
-                        : { message: 'Invalid sport id.' },
-            })
-            .regex(MongoObjectIdRegex, 'Provide a valid sport ID.'),
-
-        branchOrder: z.number({
+export const createCoachBranchItemSchema = z.object({
+    sport: z
+        .string({
             error: (iss) =>
                 iss.input === undefined
-                    ? 'Branch order is required.'
-                    : 'BranchOrder: Invalid input.',
-        }),
-        level: z.number({
-            error: (iss) =>
-                iss.input === undefined ? 'level is required.' : 'Level: Invalid input.',
-        }),
-        certificate: z.object({
+                    ? { message: 'Sport id required.' }
+                    : { message: 'Invalid sport id.' },
+        })
+        .regex(MongoObjectIdRegex, 'Provide a valid sport ID.'),
+
+    branchOrder: z.number({
+        error: (iss) =>
+            iss.input === undefined
+                ? 'Branch order is required.'
+                : 'BranchOrder: Invalid input.',
+    }),
+    level: z.number({
+        error: (iss) =>
+            iss.input === undefined ? 'level is required.' : 'Level: Invalid input.',
+    }),
+    certificateLevel: z.enum(['A', 'B', 'C']).default('A'),
+    certificate: z
+        .object({
             path: z
                 .string({
                     error: (iss) =>
@@ -442,9 +614,53 @@ export const createCoachSchema = z.array(
                         iss.input === undefined ? 'Size is required.' : 'Size: Invalid input.',
                 })
                 .optional(),
-        }).optional(),
+        })
+        .optional(),
+});
+
+export const createCoachSchema = z.array(createCoachBranchItemSchema);
+
+export const coachProfilePayloadSchema = z
+    .object({
+        branches: createCoachSchema,
+        agreeCoachAgreement: z.boolean().optional(),
+        marketingConsent: z.boolean().optional(),
+        commercialMessagesVersionId: z
+            .string()
+            .regex(MongoObjectIdRegex, 'Invalid commercial messages version ID.')
+            .optional(),
     })
-);
+    .superRefine((data, ctx) => {
+        if (data.marketingConsent && !data.commercialMessagesVersionId) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Commercial messages consent version is required when opting in.',
+                path: ['commercialMessagesVersionId'],
+            });
+        }
+    });
+
+/**
+ * @param {string} dataString - req.body.data (JSON string): either a branch array (legacy) or { branches, agreeCoachAgreement?, marketingConsent? }
+ */
+export const parseCoachProfileFormData = (dataString) => {
+    const raw = JSON.parse(dataString);
+    if (Array.isArray(raw)) {
+        return {
+            branches: createCoachSchema.parse(raw),
+            agreeCoachAgreement: undefined,
+            marketingConsent: undefined,
+            commercialMessagesVersionId: undefined,
+        };
+    }
+    const obj = coachProfilePayloadSchema.parse(raw);
+    return {
+        branches: obj.branches,
+        agreeCoachAgreement: obj.agreeCoachAgreement,
+        marketingConsent: obj.marketingConsent,
+        commercialMessagesVersionId: obj.commercialMessagesVersionId,
+    };
+};
 
 export const editCoachSchema = z
     .object({
@@ -595,6 +811,12 @@ export const createEventSchema = z
                     ? { message: 'Recurring status is required.' }
                     : { message: 'Invalid Recurring status.' },
         }),
+        checkInOpensHoursBeforeStart: z.coerce
+            .number()
+            .int('Check-in hours must be a whole number.')
+            .min(0, 'Check-in hours cannot be negative.')
+            .max(720, 'Check-in hours cannot exceed 720 (30 days).')
+            .optional(),
         facility: z
             .string({
                 error: (iss) =>
@@ -621,23 +843,111 @@ export const createEventSchema = z
                         : { message: 'Invalid location.' },
             })
             .optional(),
+        district: z
+            .string()
+            .regex(MongoObjectIdRegex, 'Provide a valid district ID.')
+            .optional(),
         equipment: z.string({
             error: (iss) =>
                 iss.input === undefined
                     ? { message: 'Equipment is required.' }
                     : { message: 'Invalid equipment.' },
         }),
+        eventDetails: z
+            .string()
+            .max(5000, 'Event details must be at most 5000 characters')
+            .optional()
+            .default(''),
+
+        eventLink: z
+            .string()
+            .trim()
+            .max(500, 'Event link must be at most 500 characters')
+            .optional()
+            .refine(
+                (v) => !v || /^https?:\/\/.+/i.test(v),
+                'Event link must be a valid http or https URL.'
+            )
+            .default(''),
     })
-    .refine(
-        (data) => {
-            const keysToCheck = ['facility', 'salon', 'location'];
-            return keysToCheck.some((key) => data[key] !== undefined);
-        },
-        {
-            message: 'At least one of facility, salon, location must be provided.',
-            path: [],
+    .superRefine((data, ctx) => {
+        const isOnline = data.type === 'Online';
+
+        if (!isOnline) {
+            const hasVenue = Boolean(data.facility || data.salon || data.location);
+            if (!hasVenue) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: 'At least one of facility, salon, location must be provided.',
+                    path: [],
+                });
+            }
+
+            const hasDistrictSource = Boolean(data.district || data.facility || data.salon);
+            if (!hasDistrictSource) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message:
+                        'District is required for non-online events. Select a district or a facility/salon with a district.',
+                    path: ['district'],
+                });
+            }
         }
-    );
+    });
+
+/** Parsed client payload for create-event (includes recurrence extras). */
+export const createEventPayloadSchema = createEventSchema
+    .extend({
+        recurrence: recurrenceInputSchema.optional(),
+        listingPurchaseConfirmed: z.boolean().optional().default(false),
+    })
+    .superRefine((data, ctx) => {
+        const isOnline = data.type === 'Online';
+
+        if (!isOnline) {
+            const hasVenue = Boolean(data.facility || data.salon || data.location);
+            if (!hasVenue) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: 'At least one of facility, salon, location must be provided.',
+                    path: [],
+                });
+            }
+
+            const hasDistrictSource = Boolean(data.district || data.facility || data.salon);
+            if (!hasDistrictSource) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message:
+                        'District is required for non-online events. Select a district or a facility/salon with a district.',
+                    path: ['district'],
+                });
+            }
+        }
+
+        if (data.isRecurring) {
+            if (!data.recurrence) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: 'Recurrence settings are required when isRecurring is true.',
+                    path: ['recurrence'],
+                });
+            }
+            if (!data.listingPurchaseConfirmed) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: 'You must confirm listing purchase for a recurring series.',
+                    path: ['listingPurchaseConfirmed'],
+                });
+            }
+        } else if (data.recurrence) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Recurrence is only allowed when isRecurring is true.',
+                path: ['recurrence'],
+            });
+        }
+    });
 
 export const editEventSchema = createEventSchema.partial();
 
@@ -653,6 +963,11 @@ export const createGroupSchema = z.object({
                 iss.input === undefined ? 'description is required.' : 'Invalid input.',
         })
         .optional(),
+
+    mainSport: mongoObjectId.optional(),
+
+    district: mongoObjectId.optional(),
+    addressLine: z.string().trim().optional(),
 });
 
 export const editGroupSchema = z
@@ -671,10 +986,22 @@ export const editGroupSchema = z
             .optional(),
 
         photo: z.object({}).passthrough().optional(),
+
+        mainSport: mongoObjectId.optional(),
+
+        district: mongoObjectId.optional(),
+        addressLine: z.string().trim().optional(),
     })
     .refine(
         (data) => {
-            const keysToCheck = ['name', 'description', 'photo'];
+            const keysToCheck = [
+                'name',
+                'description',
+                'photo',
+                'mainSport',
+                'district',
+                'addressLine',
+            ];
             return keysToCheck.some((key) => data[key] !== undefined);
         },
         {
@@ -684,12 +1011,18 @@ export const editGroupSchema = z
     );
 
 // club
-export const createClubSchema = z.object({
-    name: z.string({
-        error: (iss) => (iss.input === undefined ? 'name is required.' : 'Invalid input.'),
-    }),
+export const createClubSchema = z
+    .object({
+        name: z.string({
+            error: (iss) => (iss.input === undefined ? 'name is required.' : 'Invalid input.'),
+        }),
 
-    vision: z
+        mainSport: mongoObjectId.optional(),
+
+        district: mongoObjectId.optional(),
+        addressLine: z.string().trim().optional(),
+
+        vision: z
         .string({
             error: (iss) => (iss.input === undefined ? 'vision is required.' : 'Invalid input.'),
         })
@@ -706,7 +1039,7 @@ export const createClubSchema = z.object({
         })
         .optional(),
     coaches: z.array(mongoObjectId).optional(),
-});
+    });
 
 export const editClubSchema = z
     .object({
@@ -715,6 +1048,11 @@ export const editClubSchema = z
                 error: (iss) => (iss.input === undefined ? 'name is required.' : 'Invalid input.'),
             })
             .optional(),
+
+        mainSport: mongoObjectId.optional(),
+
+        district: mongoObjectId.optional(),
+        addressLine: z.string().trim().optional(),
 
         vision: z
             .string({
@@ -739,7 +1077,16 @@ export const editClubSchema = z
     .refine(
         (data) => {
             // Dynamically check only specific optional keys:
-            const keysToCheck = ['name', 'vision', 'conditions', 'president', 'coaches'];
+            const keysToCheck = [
+                'name',
+                'vision',
+                'conditions',
+                'president',
+                'coaches',
+                'mainSport',
+                'district',
+                'addressLine',
+            ];
             return keysToCheck.some((key) => data[key] !== undefined);
         },
         {
@@ -789,6 +1136,39 @@ export const joinClubSchema = z.object({
         .regex(MongoObjectIdRegex, 'Provide a valid club ID.'),
 });
 
+/** Required affirmations when joining an event (gamers). */
+export const makeReservationBodySchema = z.object({
+    eventId,
+    acceptHealthNoIllness: z.literal(true),
+    acceptHealthNoDisability: z.literal(true),
+    acceptHealthNoMedication: z.literal(true),
+    acceptHealthSportOk: z.literal(true),
+    acceptDistantSelling: z.literal(true),
+    acceptEventPurchaseTerms: z.literal(true),
+    distanceSellingVersionId: z
+        .string()
+        .regex(MongoObjectIdRegex, 'Invalid distance selling document version ID.'),
+    eventContractVersionId: z
+        .string()
+        .regex(MongoObjectIdRegex, 'Invalid event contract document version ID.'),
+});
+
+/** Bulk enrollment in a recurring event series (Phase 3). */
+export const enrollSeriesSchema = makeReservationBodySchema.omit({ eventId: true }).extend({
+    seriesId: z
+        .string({
+            error: (iss) =>
+                iss.input === undefined
+                    ? { message: 'Series id required.' }
+                    : { message: 'Invalid series id.' },
+        })
+        .regex(MongoObjectIdRegex, 'Provide a valid series ID.'),
+});
+
+export const listingQuoteQuerySchema = z.object({
+    sessionCount: z.coerce.number().int().min(2).max(52).default(2),
+});
+
 export const joinEventSchema = z.object({
     userId: z
         .string({
@@ -810,7 +1190,8 @@ export const joinEventSchema = z.object({
 });
 
 // facility
-export const createFacilitySchema = z.object({
+export const createFacilitySchema = z
+    .object({
     name: z.string({
         error: (iss) =>
             iss.input === undefined
@@ -818,12 +1199,14 @@ export const createFacilitySchema = z.object({
                 : { message: 'Invalid name.' },
     }),
 
-    address: z.string({
-        error: (iss) =>
-            iss.input === undefined
-                ? { message: 'Address is required.' }
-                : { message: 'Invalid address.' },
-    }),
+    address: z
+        .string({
+            error: (iss) => ({ message: 'Invalid address.' }),
+        })
+        .optional(),
+
+    district: mongoObjectId.optional(),
+    addressLine: z.string().trim().optional(),
 
     phone: z.string({
         error: (iss) =>
@@ -857,7 +1240,12 @@ export const createFacilitySchema = z.object({
         .optional(),
 
     private: z.boolean().optional(),
-});
+})
+    .refine(
+        (data) =>
+            (data.address && String(data.address).trim()) || Boolean(data.district),
+        { message: 'Select an Istanbul district or enter a legacy address.' }
+    );
 
 export const editFacilitySchema = z.object({
     name: z
@@ -871,6 +1259,9 @@ export const editFacilitySchema = z.object({
             error: (iss) => ({ message: 'Invalid address.' }),
         })
         .optional(),
+
+    district: mongoObjectId.optional(),
+    addressLine: z.string().trim().optional(),
 
     phone: z
         .string({
@@ -1078,7 +1469,8 @@ export const editCalendarSchema = z
     );
 
 // company
-export const createCompanySchema = z.object({
+export const createCompanySchema = z
+    .object({
     name: z.string({
         error: (iss) =>
             iss.input === undefined
@@ -1086,12 +1478,16 @@ export const createCompanySchema = z.object({
                 : { message: 'Invalid name.' },
     }),
 
-    address: z.string({
-        error: (iss) =>
-            iss.input === undefined
-                ? { message: 'Address is required.' }
-                : { message: 'Invalid address.' },
-    }),
+    address: z
+        .string({
+            error: (iss) => ({ message: 'Invalid address.' }),
+        })
+        .optional(),
+
+    district: mongoObjectId.optional(),
+    addressLine: z.string().trim().optional(),
+
+    mainSport: mongoObjectId.optional(),
 
     phone: z
         .string({
@@ -1105,7 +1501,19 @@ export const createCompanySchema = z.object({
         })
         .email('Provide a valid email address.')
         .optional(),
-});
+
+    companyType: z.enum(['sponsor', 'sport'], {
+        error: (iss) =>
+            iss.input === undefined
+                ? { message: 'Company type is required.' }
+                : { message: 'Invalid company type.' },
+    }),
+})
+    .refine(
+        (data) =>
+            (data.address && String(data.address).trim()) || Boolean(data.district),
+        { message: 'Select an Istanbul district or enter a legacy address.' }
+    );
 
 export const editCompanySchema = z.object({
     name: z
@@ -1120,6 +1528,11 @@ export const editCompanySchema = z.object({
         })
         .optional(),
 
+    district: mongoObjectId.optional(),
+    addressLine: z.string().trim().optional(),
+
+    mainSport: mongoObjectId.optional(),
+
     phone: z
         .string({
             error: (iss) => ({ message: 'Invalid phone.' }),
@@ -1132,4 +1545,24 @@ export const editCompanySchema = z.object({
         })
         .email('Provide a valid email address.')
         .optional(),
+
+    companyType: z
+        .enum(['sponsor', 'sport'], {
+            error: (iss) => ({ message: 'Invalid company type.' }),
+        })
+        .optional(),
+});
+
+/** Public suggestion form (footer). */
+export const suggestionSubmitSchema = z.object({
+    message: z
+        .string({
+            error: (iss) =>
+                iss.input === undefined ? { message: 'Mesaj zorunludur.' } : { message: 'Geçersiz mesaj.' },
+        })
+        .trim()
+        .min(10, 'Mesaj en az 10 karakter olmalıdır.')
+        .max(4000, 'Mesaj en fazla 4000 karakter olabilir.'),
+    email: z.string().email('Geçerli bir e-posta girin.').optional(),
+    contactName: z.string().trim().max(120, 'İsim en fazla 120 karakter olabilir.').optional(),
 });

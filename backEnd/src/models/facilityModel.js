@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { locationSubSchema } from './locationModel.js';
 
 const facilitySchema = new mongoose.Schema(
     {
@@ -6,9 +7,10 @@ const facilitySchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        location: locationSubSchema,
         address: {
             type: String,
-            required: true,
+            default: '',
         },
         phone: {
             type: String,

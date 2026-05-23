@@ -5,9 +5,17 @@ import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import LegalContentModal from "../auth/LegalContentModal";
 
+type LegalDocType =
+  | "kvkk"
+  | "terms"
+  | "distance_selling"
+  | "event_contract"
+  | "commercial_messages";
+type DocTypeFilter = LegalDocType | "all";
+
 interface LegalDocument {
   _id: string;
-  docType: "kvkk" | "terms";
+  docType: LegalDocType;
   version: number;
   title: string;
   content: string;
@@ -16,7 +24,26 @@ interface LegalDocument {
   updatedAt: string;
 }
 
-type DocTypeFilter = "kvkk" | "terms" | "all";
+const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
+  kvkk: "KVKK",
+  terms: "Terms & Conditions",
+  distance_selling: "Distance selling agreement",
+  event_contract: "Event contract",
+  commercial_messages: "Commercial messages (IYS)",
+};
+
+const DEFAULT_TITLE: Record<LegalDocType, string> = {
+  kvkk: "KVKK",
+  terms: "Terms & Conditions",
+  distance_selling: "Distance Selling Agreement",
+  event_contract: "Event Contract",
+  commercial_messages: "Commercial Electronic Messages Consent (IYS)",
+};
+
+function docTypeFromFilter(f: DocTypeFilter): LegalDocType {
+  if (f === "all") return "kvkk";
+  return f;
+}
 
 export default function LegalManagement() {
   const [filter, setFilter] = useState<DocTypeFilter>("all");
@@ -26,7 +53,11 @@ export default function LegalManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingDoc, setEditingDoc] = useState<LegalDocument | null>(null);
   const [viewModal, setViewModal] = useState<{ title: string; content: string } | null>(null);
-  const [formData, setFormData] = useState({ docType: "kvkk" as "kvkk" | "terms", title: "", content: "" });
+  const [formData, setFormData] = useState({
+    docType: "kvkk" as LegalDocType,
+    title: "",
+    content: "",
+  });
 
   useEffect(() => {
     fetchDocs();
@@ -52,10 +83,10 @@ export default function LegalManagement() {
 
   const handleCreate = () => {
     setEditingDoc(null);
-    const docType = filter === "terms" ? "terms" : filter === "kvkk" ? "kvkk" : "kvkk";
+    const docType = docTypeFromFilter(filter);
     setFormData({
       docType,
-      title: docType === "terms" ? "Terms & Conditions" : "KVKK",
+      title: DEFAULT_TITLE[docType],
       content: "",
     });
     setShowModal(true);
@@ -125,43 +156,51 @@ export default function LegalManagement() {
 
   const filtered = docs.filter((d) => filter === "all" || d.docType === filter);
 
+  const filterButtons: { key: DocTypeFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "kvkk", label: DOC_TYPE_LABELS.kvkk },
+    { key: "terms", label: DOC_TYPE_LABELS.terms },
+    { key: "distance_selling", label: DOC_TYPE_LABELS.distance_selling },
+    { key: "event_contract", label: DOC_TYPE_LABELS.event_contract },
+    { key: "commercial_messages", label: DOC_TYPE_LABELS.commercial_messages },
+  ];
+
   return (
     <div className="space-y-4">
+      <p className="text-xs text-gray-500 dark:text-slate-400 max-w-3xl leading-relaxed">
+        Site footer ve doğrudan adresler:{" "}
+        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">/legal/kvkk</code>,{" "}
+        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">/legal/terms</code>,{" "}
+        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">
+          /legal/distance_selling
+        </code>
+        ,{" "}
+        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">
+          /legal/event_contract
+        </code>
+        ,{" "}
+        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">
+          /legal/commercial_messages
+        </code>
+        . Only the <strong>active</strong> version is shown on the site and at registration. These
+        texts are not edited under Static Pages.
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setFilter("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filter === "all"
-                ? "bg-cyan-600 text-white"
-                : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
-            }`}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter("kvkk")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filter === "kvkk"
-                ? "bg-cyan-600 text-white"
-                : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
-            }`}
-          >
-            KVKK
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter("terms")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filter === "terms"
-                ? "bg-cyan-600 text-white"
-                : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
-            }`}
-          >
-            Terms & Conditions
-          </button>
+        <div className="flex gap-2 flex-wrap">
+          {filterButtons.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                filter === key
+                  ? "bg-cyan-600 text-white"
+                  : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <button
           type="button"
@@ -211,7 +250,7 @@ export default function LegalManagement() {
                 {filtered.map((doc) => (
                   <tr key={doc._id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
                     <td className="border-b border-gray-300 dark:border-slate-600 p-3 text-sm text-gray-900 dark:text-slate-100">
-                      {doc.docType === "kvkk" ? "KVKK" : "Terms & Conditions"}
+                      {DOC_TYPE_LABELS[doc.docType]}
                     </td>
                     <td className="border-b border-gray-300 dark:border-slate-600 p-3 text-sm">
                       v{doc.version}
@@ -276,13 +315,21 @@ export default function LegalManagement() {
                     </label>
                     <select
                       value={formData.docType}
-                      onChange={(e) =>
-                        setFormData({ ...formData, docType: e.target.value as "kvkk" | "terms" })
-                      }
+                      onChange={(e) => {
+                        const docType = e.target.value as LegalDocType;
+                        setFormData({
+                          docType,
+                          title: DEFAULT_TITLE[docType],
+                          content: formData.content,
+                        });
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
                     >
-                      <option value="kvkk">KVKK</option>
-                      <option value="terms">Terms & Conditions</option>
+                      {(Object.keys(DOC_TYPE_LABELS) as LegalDocType[]).map((dt) => (
+                        <option key={dt} value={dt}>
+                          {DOC_TYPE_LABELS[dt]}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -307,7 +354,7 @@ export default function LegalManagement() {
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     rows={12}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 resize-y"
-                    placeholder="Plain text content..."
+                    placeholder="Plain text veya HTML içerik…"
                   />
                 </div>
               </div>

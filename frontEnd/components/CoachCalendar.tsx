@@ -9,6 +9,8 @@ import ViewEventModal from "./event/ViewEventModal";
 import AddEventModal from "./event/AddEventModal";
 import CoachDetailModal from "./CoachDetailModal";
 import FacilityDetailsModal from "./profile/FacilityDetailsModal";
+import ClubViewModal, { type ClubViewModalClub } from "./ClubViewModal";
+import GroupViewModal, { type GroupViewModalGroup } from "./GroupViewModal";
 import { Facility } from "@/app/lib/types";
 
 interface CoachCalendarProps {
@@ -44,6 +46,7 @@ interface Event {
 const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
   const { data: user, isLoading: userLoading } = useMe();
   const coachId = user?._id; // User ID is used as owner for events
+  const isAdmin = user?.role === 0;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -58,6 +61,10 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [showFacilityModal, setShowFacilityModal] = useState(false);
+  const [selectedClub, setSelectedClub] = useState<ClubViewModalClub | null>(null);
+  const [showClubModal, setShowClubModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
+  const [showGroupModal, setShowGroupModal] = useState(false);
   
   // Participants modal state
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
@@ -120,7 +127,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
           const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
           const isOwner = ownerId === coachId;
           const isBackupCoach = backupCoachId === coachId;
-          if (!isOwner && !isBackupCoach) return false;
+          if (!isAdmin && !isOwner && !isBackupCoach) return false;
           
           const eventStart = new Date(event.startTime);
           const eventDate = new Date(
@@ -164,7 +171,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                   const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
                   const isOwner = ownerId === coachId;
                   const isBackupCoach = backupCoachId === coachId;
-                  if (!isOwner && !isBackupCoach) return false;
+                  if (!isAdmin && !isOwner && !isBackupCoach) return false;
                   
                   const eventStart = new Date(event.startTime);
                   const eventDate = new Date(
@@ -203,7 +210,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     } finally {
       setIsLoadingMonthEvents(false);
     }
-  }, [currentDate, coachId, userLoading, getMonthStartEnd]);
+  }, [currentDate, coachId, userLoading, getMonthStartEnd, isAdmin]);
 
   // Fetch events for a specific date
   const fetchDateEvents = useCallback(async (date: Date) => {
@@ -232,7 +239,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
           const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
           const isOwner = ownerId === coachId;
           const isBackupCoach = backupCoachId === coachId;
-          if (!isOwner && !isBackupCoach) return false;
+          if (!isAdmin && !isOwner && !isBackupCoach) return false;
           
           const eventStart = new Date(event.startTime);
           return (
@@ -265,7 +272,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                   const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
                   const isOwner = ownerId === coachId;
                   const isBackupCoach = backupCoachId === coachId;
-                  if (!isOwner && !isBackupCoach) return false;
+                  if (!isAdmin && !isOwner && !isBackupCoach) return false;
                   
                   const eventStart = new Date(event.startTime);
                   return (
@@ -293,9 +300,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     } finally {
       setIsLoadingDateEvents(false);
     }
-  }, [coachId]);
-
-  // Fetch month events when date changes
+  }, [coachId, isAdmin]);
   useEffect(() => {
     if (coachId && !userLoading) {
       fetchMonthEvents();
@@ -693,6 +698,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                   {selectedDateEvents.map((event) => {
                     const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
                     const isOwner = ownerId === coachId;
+                    const canEditEvent = isOwner;
                     
                     return (
                       <div
@@ -748,12 +754,12 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                                 <button
                                   onClick={(e) => handleShowParticipants(e, event)}
                                   className="px-3 py-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                                  title="View Participants"
+                                  title="View Gamers"
                                 >
                                   <Users className="w-3 h-3" />
-                                  Participants
+                                  Gamers
                                 </button>
-                                {isOwner && (
+                                {canEditEvent && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -803,6 +809,24 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
               setShowFacilityModal(true);
             }
           }}
+          onClubClick={(club) => {
+            if (club?._id && club?.name) {
+              setSelectedClub({ _id: club._id, name: club.name });
+              setShowClubModal(true);
+            }
+          }}
+          onGroupClick={(group) => {
+            if (group?._id && group?.name) {
+              setSelectedGroup({ _id: group._id, name: group.name });
+              setShowGroupModal(true);
+            }
+          }}
+          onEventUpdated={() => {
+            if (selectedDate) {
+              void fetchDateEvents(selectedDate);
+            }
+            void fetchMonthEvents();
+          }}
         />
       )}
 
@@ -841,6 +865,24 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         facility={selectedFacility}
       />
 
+      <ClubViewModal
+        isOpen={showClubModal}
+        onClose={() => {
+          setShowClubModal(false);
+          setSelectedClub(null);
+        }}
+        club={selectedClub}
+      />
+
+      <GroupViewModal
+        isOpen={showGroupModal}
+        onClose={() => {
+          setShowGroupModal(false);
+          setSelectedGroup(null);
+        }}
+        group={selectedGroup}
+      />
+
       {/* Participants Modal */}
       {showParticipantsModal && selectedEventForParticipants && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-[60] p-4">
@@ -848,7 +890,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Event Participants
+                  Event Gamers
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                   {selectedEventForParticipants.name}
@@ -870,7 +912,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
               ) : participants.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-slate-400">
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No participants yet</p>
+                  <p>No gamers yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -888,7 +930,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                             {p.user?.firstName} {p.user?.lastName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-slate-400">
-                            {p.participant?.name || "Participant"}
+                            {p.participant?.name || "Gamer"}
                           </div>
                         </div>
                       </div>
@@ -923,7 +965,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
             
             <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
               <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
-                <span>Total: {participants.length} participants</span>
+                <span>Total: {participants.length} gamers</span>
                 <span>
                   Checked In: {participants.filter((p: any) => p.isCheckedIn).length}
                 </span>

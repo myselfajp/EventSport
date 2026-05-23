@@ -8,12 +8,27 @@ import {
   normalizePhoneForDisplay,
   isPhoneComplete,
 } from "@/app/lib/phone-utils";
+import {
+  COMPANY_TYPE_OPTIONS,
+  type CompanyType,
+} from "@/app/lib/company-types";
+import { EP } from "@/app/lib/endpoints";
+import { fetchJSON } from "@/app/lib/api";
+import LocationFields, {
+  emptyLocationValue,
+} from "@/components/location/LocationFields";
+import type { LocationValue } from "@/app/lib/location-api";
+
+type CompanyModalInitialData = Omit<CompanyFormData, "photo"> & {
+  _id?: string;
+  photo?: string | { path: string };
+};
 
 interface CompanyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (formData: CompanyFormData) => void;
-  initialData?: CompanyFormData | null;
+  initialData?: CompanyModalInitialData | null;
 }
 
 interface CompanyFormData {
@@ -22,6 +37,10 @@ interface CompanyFormData {
   phone: string;
   email: string;
   photo: string;
+  companyType: CompanyType | "";
+  mainSport: string;
+  district?: string;
+  addressLine?: string;
 }
 
 const CompanyModal: React.FC<CompanyModalProps> = ({
@@ -30,37 +49,86 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
   onSubmit,
   initialData = null,
 }) => {
-  const [formData, setFormData] = useState<CompanyFormData>({
+  const emptyForm: CompanyFormData = {
     name: "",
     address: "",
     phone: PHONE_PREFIX,
     email: "",
     photo: "",
-  });
+    companyType: "",
+    mainSport: "",
+  };
+
+  const [formData, setFormData] = useState<CompanyFormData>(emptyForm);
+  const [locationValue, setLocationValue] = useState<LocationValue>(
+    emptyLocationValue()
+  );
+  const [sports, setSports] = useState<{ _id: string; name: string }[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        ...initialData,
-        phone: normalizePhoneForDisplay(initialData.phone) || PHONE_PREFIX,
-      });
-      if (initialData.photo) {
-        setPhotoPreview(initialData.photo);
+    if (!isOpen) return;
+    (async () => {
+      try {
+        const res = await fetchJSON(EP.REFERENCE.sport.get, {
+          method: "POST",
+          body: { perPage: 200, pageNumber: 1 },
+        });
+        if (res?.success && Array.isArray(res.data)) {
+          setSports(res.data);
+        }
+      } catch {
+        setSports([]);
       }
-    } else {
+    })();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (initialData) {
+      const rawPhoto = initialData.photo;
+      const photo =
+        typeof rawPhoto === "string"
+          ? rawPhoto
+          : rawPhoto &&
+              typeof rawPhoto === "object" &&
+              "path" in rawPhoto &&
+              rawPhoto.path
+            ? EP.assetUrl(rawPhoto.path)
+            : "";
+      const type = initialData.companyType;
       setFormData({
-        name: "",
-        address: "",
-        phone: PHONE_PREFIX,
-        email: "",
-        photo: "",
+        name: initialData.name ?? "",
+        address: initialData.address ?? "",
+        phone: normalizePhoneForDisplay(initialData.phone) || PHONE_PREFIX,
+        email: initialData.email ?? "",
+        photo,
+        companyType:
+          type === "sponsor" || type === "sport" ? type : "sport",
+        mainSport:
+          typeof initialData.mainSport === "string"
+            ? initialData.mainSport
+            : (initialData.mainSport as { _id?: string })?._id || "",
       });
+      const loc = (initialData as { location?: { district?: string; addressLine?: string } })
+        .location;
+      if (loc?.district) {
+        setLocationValue({
+          district: String(loc.district),
+          addressLine: loc.addressLine || "",
+        });
+      } else {
+        setLocationValue(emptyLocationValue());
+      }
+      if (photo) setPhotoPreview(photo);
+      else setPhotoPreview(null);
+    } else {
+      setFormData(emptyForm);
       setPhotoPreview(null);
+      setLocationValue(emptyLocationValue());
     }
-  }, [initialData]);
+  }, [initialData, isOpen]);
 
   useEffect(() => {
     if (!phoneInputRef.current) return;
@@ -103,8 +171,13 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     e.preventDefault();
     setError("");
 
-    if (!formData.name || !formData.address) {
-      setError("Please fill in all required fields");
+    if (!formData.name || (!locationValue.district && !formData.address?.trim())) {
+      setError("Name and Istanbul district (or address) are required");
+      return;
+    }
+
+    if (!formData.companyType) {
+      setError("Please select a company type");
       return;
     }
 
@@ -121,28 +194,20 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
       return;
     }
 
-    onSubmit(formData);
-    onClose();
-    setFormData({
-      name: "",
-      address: "",
-      phone: PHONE_PREFIX,
-      email: "",
-      photo: "",
+    onSubmit({
+      ...formData,
+      district: locationValue.district,
+      addressLine: locationValue.addressLine,
     });
+    onClose();
+    setFormData(emptyForm);
     setPhotoPreview(null);
   };
 
   const handleClose = () => {
     onClose();
     setError("");
-    setFormData({
-      name: "",
-      address: "",
-      phone: PHONE_PREFIX,
-      email: "",
-      photo: "",
-    });
+    setFormData(emptyForm);
     setPhotoPreview(null);
   };
 
@@ -184,18 +249,69 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
                 />
               </div>
 
-              {/* Address */}
+              {/* Company type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Address <span className="text-red-500">*</span>
+                  Company type <span className="text-red-500">*</span>
                 </label>
-                <textarea
-                  value={formData.address}
-                  onChange={(e) => handleInputChange("address", e.target.value)}
-                  placeholder="Enter address"
-                  rows={4}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                  required
+                <div className="space-y-2">
+                  {COMPANY_TYPE_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                        formData.companyType === option.value
+                          ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20"
+                          : "border-gray-200 dark:border-gray-600 hover:border-cyan-300 dark:hover:border-cyan-600"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="companyType"
+                        value={option.value}
+                        checked={formData.companyType === option.value}
+                        onChange={() =>
+                          handleInputChange("companyType", option.value)
+                        }
+                        className="mt-1 w-4 h-4 text-cyan-500 border-gray-300 dark:border-gray-600 focus:ring-cyan-500"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-gray-800 dark:text-white">
+                          {option.label}
+                        </span>
+                        <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {option.description}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Main sport
+                </label>
+                <select
+                  value={formData.mainSport}
+                  onChange={(e) => handleInputChange("mainSport", e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Select sport (optional)</option>
+                  {sports.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Istanbul district <span className="text-red-500">*</span>
+                </label>
+                <LocationFields
+                  value={locationValue}
+                  onChange={setLocationValue}
                 />
               </div>
 

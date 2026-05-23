@@ -16,14 +16,34 @@ import EventEndPhoto from '../models/eventEndPhotoModel.js';
 import { genSecret } from '../utils/secretIdGen.js';
 import * as zodValidation from '../utils/validation.js';
 import { unlink } from 'fs/promises';
+import {
+    COACH_PROFILE_STATIC_SLUGS,
+    recordLegalAcceptance,
+    recordMarketingConsent,
+    recordStaticAcceptancesBySlugs,
+} from '../utils/contractAcceptanceHelper.js';
+import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
+import { resolveEventDistrict, notifyUsersInEventDistrict } from '../utils/eventDistrictHelper.js';
+import { createRecurringEventSeries, cancelEventsWithScope, applyEventEditWithScope } from '../utils/eventSeriesService.js';
+import { getListingPricePerSlot } from '../utils/recurrenceHelper.js';
+import EventSeries from '../models/eventSeriesModel.js';
 
 export const createBranch = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
 
-        const data = JSON.parse(req.body.data);
         const user = req.user;
-        const result = zodValidation.createCoachSchema.parse(data);
+        const {
+            branches: result,
+            agreeCoachAgreement,
+            marketingConsent,
+            commercialMessagesVersionId,
+        } = zodValidation.parseCoachProfileFormData(req.body.data);
+
+        const isFirstCoachProfile = !user.coach;
+        if (isFirstCoachProfile && agreeCoachAgreement !== true) {
+            throw new AppError(400, 'You must accept the Trainer Agreement.');
+        }
 
         // Separate branches by certificate presence (infer behavior)
         const branchesNeedingPhotos = result.filter((branch) => !branch.certificate); // no certificate = need upload
@@ -152,6 +172,35 @@ export const createBranch = async (req, res, next) => {
             processedBranches.map((branch) => ({ coach: coach._id, ...branch }))
         );
 
+        if (isFirstCoachProfile && typeof marketingConsent === 'boolean') {
+            await User.findByIdAndUpdate(user._id, {
+                marketingConsent: {
+                    agreed: marketingConsent,
+                    consentedAt: marketingConsent ? new Date() : null,
+                },
+            });
+        }
+
+        if (isFirstCoachProfile && agreeCoachAgreement === true) {
+            await recordStaticAcceptancesBySlugs(
+                req,
+                user._id,
+                COACH_PROFILE_STATIC_SLUGS,
+                'coach_profile'
+            );
+            if (typeof marketingConsent === 'boolean') {
+                if (marketingConsent && commercialMessagesVersionId) {
+                    await recordLegalAcceptance(req, user._id, {
+                        versionId: commercialMessagesVersionId,
+                        expectedDocType: 'commercial_messages',
+                        context: 'coach_profile',
+                    });
+                } else if (marketingConsent) {
+                    await recordMarketingConsent(req, user._id, marketingConsent, 'coach_profile');
+                }
+            }
+        }
+
         res.status(201).json({
             success: true,
             message: 'Coach/Branch created successfully',
@@ -176,8 +225,17 @@ export const createBranch = async (req, res, next) => {
 
 export const currentBranches = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
-            throw new AppError(!req.user ? 401 : 403);
+        if (!req.user) {
+            throw new AppError(401);
+        }
+        if (!req.user.coach && req.user.role !== 0) {
+            throw new AppError(403);
+        }
+        if (!req.user.coach) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+            });
         }
 
         const user = req.user;
@@ -210,7 +268,7 @@ export const createEvent = async (req, res, next) => {
     try {
         if (Object.keys(req.fileMeta).length !== 2)
             throw new AppError(400, 'Both event banner and event photo is required');
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -225,21 +283,22 @@ export const createEvent = async (req, res, next) => {
             data.endTime = new Date(data.endTime);
         }
 
-        const result = zodValidation.createEventSchema.parse(data ?? {});
+        const result = zodValidation.createEventPayloadSchema.parse(data ?? {});
+
+        const { recurrence, listingPurchaseConfirmed, ...eventFields } = result;
 
         // Convert empty strings to undefined for optional fields
-        if (result.club === '') result.club = undefined;
-        if (result.group === '') result.group = undefined;
+        if (eventFields.club === '') eventFields.club = undefined;
+        if (eventFields.group === '') eventFields.group = undefined;
 
-        // check if data exist
         const checks = [
-            ...(result.club ? [{ id: result.club, model: Club, name: 'Club' }] : []),
-            ...(result.group ? [{ id: result.group, model: ClubGroup, name: 'ClubGroup' }] : []),
-            { id: result.sportGroup, model: SportGroup, name: 'SportGroup' },
-            { id: result.sport, model: Sport, name: 'sport' },
-            ...(result.salon ? [{ id: result.salon, model: Salon, name: 'Salon' }] : []),
-            ...(result.facility
-                ? [{ id: result.facility, model: Facility, name: 'Facility' }]
+            ...(eventFields.club ? [{ id: eventFields.club, model: Club, name: 'Club' }] : []),
+            ...(eventFields.group ? [{ id: eventFields.group, model: ClubGroup, name: 'ClubGroup' }] : []),
+            { id: eventFields.sportGroup, model: SportGroup, name: 'SportGroup' },
+            { id: eventFields.sport, model: Sport, name: 'sport' },
+            ...(eventFields.salon ? [{ id: eventFields.salon, model: Salon, name: 'Salon' }] : []),
+            ...(eventFields.facility
+                ? [{ id: eventFields.facility, model: Facility, name: 'Facility' }]
                 : []),
         ];
 
@@ -257,30 +316,69 @@ export const createEvent = async (req, res, next) => {
         }
 
         // Fetch EventStyle to populate eventStyle field
-        const eventStyleData = await EventStyle.findById(result.style);
+        const eventStyleData = await EventStyle.findById(eventFields.style);
         if (!eventStyleData) {
             throw new AppError(404, 'EventStyle not found');
         }
-        result.eventStyle = {
+        eventFields.eventStyle = {
             name: eventStyleData.name,
             color: eventStyleData.color,
         };
 
-        if (result.private && result.private === true) {
-            result.secretId = genSecret();
+        if (eventFields.private && eventFields.private === true) {
+            eventFields.secretId = genSecret();
         }
 
-        if (result.priceType === 'Free') {
-            result.participationFee = 0;
+        if (eventFields.priceType === 'Free') {
+            eventFields.participationFee = 0;
         }
 
         // insert photos to result object
-        result.banner = req.fileMeta['event-banner'][0];
-        result.photo = req.fileMeta['event-photo'][0];
+        eventFields.banner = req.fileMeta['event-banner'][0];
+        eventFields.photo = req.fileMeta['event-photo'][0];
 
-        const createEvent = await Event.create({ owner: user._id, ...result });
+        const resolvedDistrict = await resolveEventDistrict({
+            type: eventFields.type,
+            district: eventFields.district,
+            facility: eventFields.facility,
+            salon: eventFields.salon,
+        });
+        eventFields.district = resolvedDistrict;
+
+        if (eventFields.isRecurring && recurrence) {
+            const seriesResult = await createRecurringEventSeries({
+                user,
+                eventPayload: eventFields,
+                recurrence,
+                listingPurchaseConfirmed,
+            });
+
+            const firstEvent = seriesResult.events[0]?.toObject?.() ?? seriesResult.events[0];
+            if (firstEvent?.secretId) delete firstEvent.secretId;
+
+            return res.status(201).json({
+                success: true,
+                message: `Recurring series created with ${seriesResult.events.length} sessions`,
+                data: firstEvent,
+                series: seriesResult.series,
+                sessions: seriesResult.events.map((e) => {
+                    const o = e.toObject ? e.toObject() : e;
+                    delete o.secretId;
+                    return o;
+                }),
+                listing: seriesResult.listingSummary,
+            });
+        }
+
+        const createEvent = await Event.create({ owner: user._id, ...eventFields, isRecurring: false });
         if (!createEvent) throw new AppError(500);
         const { secretId, ...event } = createEvent.toObject();
+
+        const coachName =
+            user.firstName && user.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : 'A coach';
+        void notifyUsersInEventDistrict(createEvent, user._id, coachName);
 
         res.status(201).json({
             success: true,
@@ -304,9 +402,12 @@ export const editEvent = async (req, res, next) => {
         const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404, 'Event not found');
 
-        // Allow admin or event owner to edit
-        if (!(eventExists.owner.equals(user._id) || user.role === 0)) {
-            throw new AppError(403, 'You are not Event creator or admin');
+        if (!eventExists.owner.equals(user._id)) {
+            throw new AppError(403, 'Only the event creator can edit this event');
+        }
+
+        if (eventExists.status === 'cancelled') {
+            throw new AppError(400, 'Cancelled events cannot be edited');
         }
 
         const data = req.body.data ? JSON.parse(req.body.data) : req.body;
@@ -396,6 +497,42 @@ export const editEvent = async (req, res, next) => {
         Object.assign(updateData, result);
         delete updateData.style; // Remove style as we use eventStyle
 
+        const effectiveType = result.type ?? eventExists.type;
+        const effectiveFacility =
+            result.facility !== undefined ? result.facility : eventExists.facility;
+        const effectiveSalon = result.salon !== undefined ? result.salon : eventExists.salon;
+
+        if (
+            result.type !== undefined ||
+            result.district !== undefined ||
+            result.facility !== undefined ||
+            result.salon !== undefined
+        ) {
+            if (effectiveType === 'Online') {
+                updateData.district = null;
+            } else {
+                updateData.district = await resolveEventDistrict({
+                    type: effectiveType,
+                    district: result.district ?? eventExists.district,
+                    facility: effectiveFacility || undefined,
+                    salon: effectiveSalon || undefined,
+                });
+            }
+        }
+
+        const scope = zodValidation.eventEditScopeSchema.parse(data.scope ?? 'single');
+
+        if (eventExists.series && scope === 'following') {
+            await applyEventEditWithScope(eventExists, updateData, scope);
+            const updatedEvent = await Event.findById(eventId).select('-secretId');
+            return res.status(200).json({
+                success: true,
+                message: 'Event series updated (this and following sessions)',
+                data: updatedEvent,
+                scope,
+            });
+        }
+
         const updatedEvent = await Event.findByIdAndUpdate(
             eventId,
             { $set: updateData },
@@ -414,6 +551,57 @@ export const editEvent = async (req, res, next) => {
     }
 };
 
+export const cancelEvent = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw new AppError(401);
+        }
+
+        const user = req.user;
+        const eventId = zodValidation.mongoObjectId.parse(req.params.eventId);
+
+        const eventExists = await Event.findById(eventId);
+        if (!eventExists) throw new AppError(404, 'Event not found');
+
+        if (!eventExists.owner.equals(user._id)) {
+            throw new AppError(403, 'Only the event creator can cancel this event');
+        }
+
+        if (eventExists.status === 'cancelled') {
+            throw new AppError(400, 'Event is already cancelled');
+        }
+
+        const scope = zodValidation.eventEditScopeSchema.parse(req.body?.scope ?? 'single');
+
+        if (eventExists.series) {
+            const outcome = await cancelEventsWithScope(eventExists, scope, user._id);
+            return res.status(200).json({
+                success: true,
+                message:
+                    scope === 'following'
+                        ? 'This and following sessions cancelled'
+                        : 'Event cancelled successfully',
+                scope,
+                ...outcome,
+            });
+        }
+
+        const updated = await Event.findByIdAndUpdate(
+            eventId,
+            { status: 'cancelled', cancelledAt: new Date() },
+            { new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Event cancelled successfully',
+            data: updated,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const deleteEvent = async (req, res, next) => {
     try {
         if (!req.user) {
@@ -426,9 +614,8 @@ export const deleteEvent = async (req, res, next) => {
         const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404, 'Event not found');
         
-        // Allow admin or event owner to delete
-        if (!(eventExists.owner.equals(user._id) || user.role === 0)) {
-            throw new AppError(403, 'You are not Event creator or admin');
+        if (!eventExists.owner.equals(user._id)) {
+            throw new AppError(403, 'Only the event creator can delete this event');
         }
 
         await Event.findByIdAndDelete(eventId);
@@ -444,7 +631,7 @@ export const deleteEvent = async (req, res, next) => {
 
 export const joinBackupCoach = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -477,27 +664,47 @@ export const joinBackupCoach = async (req, res, next) => {
 
 export const createGroup = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
         const user = req.user;
-        const data = JSON.parse(req.body.data);
-        const result = zodValidation.createGroupSchema.parse(data);
+        const rawData = JSON.parse(req.body.data);
+        let ownerCoach = user.coach;
+
+        if (user.role === 0 && !user.coach) {
+            const oid = rawData.ownerCoachId;
+            delete rawData.ownerCoachId;
+            ownerCoach = zodValidation.mongoObjectId.parse(oid);
+            const coachExists = await Coach.exists({ _id: ownerCoach });
+            if (!coachExists) throw new AppError(404, 'Coach not found');
+        }
+
+        const result = zodValidation.createGroupSchema.parse(rawData);
         const clubId = zodValidation.mongoObjectId.parse(req.params.clubId);
 
         const clubExists = await Club.findById(clubId);
         if (!clubExists) throw new AppError(404, 'Club not found');
 
+        if (!result.mainSport && clubExists.mainSport) {
+            result.mainSport = clubExists.mainSport;
+        }
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+
         if (req.fileMeta) {
             result.photo = req.fileMeta;
         }
 
+        const groupPayload = await mergeLocationIntoPayload(result);
         const createGroup = await ClubGroup.create({
-            owner: user.coach,
+            owner: ownerCoach,
             clubId,
             clubName: clubExists.name,
-            ...result,
+            ...groupPayload,
+            isApproved: true,
         });
 
         res.status(201).json({
@@ -512,7 +719,7 @@ export const createGroup = async (req, res, next) => {
 
 export const editGroup = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -531,7 +738,12 @@ export const editGroup = async (req, res, next) => {
         if (!(groupExists.owner.equals(user.coach) || user.role === 0))
             throw new AppError(403, 'You are not group creator');
 
-        const editGroup = await ClubGroup.findByIdAndUpdate(groupId, { ...result }, { new: true });
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+        const groupUpdate = await mergeLocationIntoPayload(result);
+        const editGroup = await ClubGroup.findByIdAndUpdate(groupId, { ...groupUpdate }, { new: true });
 
         res.status(201).json({
             success: true,
@@ -545,7 +757,7 @@ export const editGroup = async (req, res, next) => {
 
 export const deleteGroup = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -555,10 +767,10 @@ export const deleteGroup = async (req, res, next) => {
         const groupExists = await ClubGroup.findById(groupId);
         if (!groupExists) throw new AppError(404, 'Group not found');
         if (!(groupExists.owner.equals(user.coach) || user.role === 0)) {
-            await ClubGroup.findByIdAndDelete(groupId);
-        } else {
             throw new AppError(403, 'You are not group creator');
         }
+
+        await ClubGroup.findByIdAndDelete(groupId);
 
         res.status(204).json({
             success: true,
@@ -600,13 +812,20 @@ export const createClub = async (req, res, next) => {
             }
         }
 
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+
         if (req.fileMeta) {
             result.photo = req.fileMeta;
         }
 
+        const clubPayload = await mergeLocationIntoPayload(result);
         const createClub = await Club.create({
             creator: user._id,
-            ...result,
+            ...clubPayload,
+            isApproved: true,
         });
 
         res.status(201).json({
@@ -659,11 +878,17 @@ export const editClub = async (req, res, next) => {
             }
         }
 
+        if (result.mainSport) {
+            const sportExists = await Sport.exists({ _id: result.mainSport });
+            if (!sportExists) throw new AppError(404, 'MainSport not found');
+        }
+
         if (req.fileMeta) {
             result.photo = req.fileMeta;
         }
 
-        const editClub = await Club.findByIdAndUpdate(clubId, { ...result }, { new: true });
+        const clubUpdate = await mergeLocationIntoPayload(result);
+        const editClub = await Club.findByIdAndUpdate(clubId, { ...clubUpdate }, { new: true });
 
         res.status(201).json({
             success: true,
@@ -708,7 +933,7 @@ export const deleteClub = async (req, res, next) => {
 
 export const approveJoinGroup = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -748,7 +973,7 @@ export const approveJoinGroup = async (req, res, next) => {
 
 export const approveJoinClub = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -789,7 +1014,7 @@ export const approveJoinClub = async (req, res, next) => {
 // invite requests
 export const inviteGroup = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -810,15 +1035,21 @@ export const inviteGroup = async (req, res, next) => {
             throw new AppError(403, 'You are not the owner');
         }
 
+        const inviterCoach =
+            user.coach || (user.role === 0 ? groupExists.owner : null);
+        if (!inviterCoach) {
+            throw new AppError(400, 'Cannot record invitation without a coach profile.');
+        }
+
         // check if already invited to this group
         const alreadyInvited = await Invite.exists({
-            invitee: user._id,
+            invitee: result.userId,
             group: result.groupId,
         });
         if (alreadyInvited) throw new AppError(409, 'You already invited this user.');
 
         const invite = await Invite.create({
-            inviter: user.coach,
+            inviter: inviterCoach,
             invitee: result.userId,
             group: result.groupId,
         });
@@ -834,7 +1065,7 @@ export const inviteGroup = async (req, res, next) => {
 
 export const inviteEvent = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -855,6 +1086,18 @@ export const inviteEvent = async (req, res, next) => {
             throw new AppError(403, 'You are not the owner or backupCoach');
         }
 
+        let inviterCoach = user.coach;
+        if (!inviterCoach) {
+            const ownerUser = await User.findById(eventExists.owner).select('coach').lean();
+            inviterCoach = ownerUser?.coach || null;
+        }
+        if (!inviterCoach) {
+            throw new AppError(
+                400,
+                'Event organizer must have a coach profile to record invitations.'
+            );
+        }
+
         // check if already invited to this event
         const alreadyInvited = await Invite.exists({
             invitee: result.userId,
@@ -863,7 +1106,7 @@ export const inviteEvent = async (req, res, next) => {
         if (alreadyInvited) throw new AppError(409, 'You already invited this user.');
 
         const invite = await Invite.create({
-            inviter: user.coach,
+            inviter: inviterCoach,
             invitee: result.userId,
             event: result.eventId,
         });
@@ -881,7 +1124,7 @@ export const inviteEvent = async (req, res, next) => {
 export const endPhoto = async (req, res, next) => {
     try {
         if (!req.fileMeta) throw new AppError(400, 'No certificate uploaded');
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -893,6 +1136,11 @@ export const endPhoto = async (req, res, next) => {
         const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404, 'Event not found');
 
+        const endedAt = eventExists.endTime ? new Date(eventExists.endTime) : null;
+        if (!endedAt || Date.now() < endedAt.getTime()) {
+            throw new AppError(403, 'Photos can only be uploaded after the event has ended');
+        }
+
         if (
             !eventExists.owner.equals(user._id) &&
             !eventExists.backupCoach?.equals(user._id) &&
@@ -901,13 +1149,16 @@ export const endPhoto = async (req, res, next) => {
             throw new AppError(403, 'You are not the owner or backupCoach');
         }
 
-        const alreadySubmitted = await EventEndPhoto.exists({ coach: user.coach, event: eventId });
+        const dupFilter = user.coach
+            ? { coach: user.coach, event: eventId }
+            : { event: eventId, user: user._id };
+        const alreadySubmitted = await EventEndPhoto.exists(dupFilter);
         if (alreadySubmitted) {
             throw new AppError(409, 'You already submitted a photo');
         }
 
         const submitPhoto = await EventEndPhoto.create({
-            coach: user.coach,
+            ...(user.coach ? { coach: user.coach } : { user: user._id }),
             event: eventId,
             photo,
         });
@@ -923,7 +1174,7 @@ export const endPhoto = async (req, res, next) => {
 
 export const getEventParticipants = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -987,7 +1238,7 @@ export const getEventParticipants = async (req, res, next) => {
 
 export const approveReservation = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -1041,8 +1292,13 @@ export const getCoachDetails = async (req, res, next) => {
             select: 'name groupName icon',
         });
         const event = await Event.find({
-            $or: [{ owner: user._id }, { backupCoach: user._id }],
-        }).populate([
+            $and: [
+                { $or: [{ owner: user._id }, { backupCoach: user._id }] },
+                { $or: [{ status: 'active' }, { status: { $exists: false } }] },
+            ],
+        })
+            .sort({ startTime: -1 })
+            .populate([
             { path: 'club', select: 'name' },
             { path: 'group', select: 'name' },
             { path: 'sport', select: 'name' },
@@ -1072,8 +1328,11 @@ export const getCoachDetails = async (req, res, next) => {
 
 export const getMyCreatedEvents = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.coach) {
-            throw new AppError(!req.user ? 401 : 403);
+        if (!req.user) {
+            throw new AppError(401);
+        }
+        if (!req.user.coach && req.user.role !== 0) {
+            throw new AppError(403);
         }
 
         const user = req.user;
@@ -1081,13 +1340,12 @@ export const getMyCreatedEvents = async (req, res, next) => {
         const perPage = parseInt(req.body?.perPage) || 10;
         const skip = (page - 1) * perPage;
 
-        // Find events where user is owner or backupCoach
-        const query = {
-            $or: [
-                { owner: user._id },
-                { backupCoach: user._id },
-            ],
-        };
+        const query =
+            user.role === 0 && !user.coach
+                ? {}
+                : {
+                      $or: [{ owner: user._id }, { backupCoach: user._id }],
+                  };
 
         const total = await Event.countDocuments(query);
 
@@ -1128,6 +1386,31 @@ export const getMyCreatedEvents = async (req, res, next) => {
                 totalPages: Math.ceil(total / perPage),
                 total,
                 perPage,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getListingQuote = async (req, res, next) => {
+    try {
+        if (!req.user) throw new AppError(401);
+        if (!req.user.coach && req.user.role !== 0) {
+            throw new AppError(403);
+        }
+
+        const { sessionCount } = zodValidation.listingQuoteQuerySchema.parse(req.query);
+        const unitPrice = getListingPricePerSlot();
+        const totalAmount = unitPrice * sessionCount;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                quantity: sessionCount,
+                unitPrice,
+                totalAmount,
+                currency: 'TRY',
             },
         });
     } catch (err) {

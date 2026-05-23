@@ -58,6 +58,7 @@ import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import FacilityDetailsModal from "./FacilityDetailsModal";
 import UserProfileModal from "@/components/UserProfileModal";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
 import UserEditModal from "./UserEditModal";
 import { EP } from "@/app/lib/endpoints";
 import { defaultFavorites, useFavorites } from "@/app/hooks/useFavorites";
@@ -66,6 +67,7 @@ import { fetchJSON } from "@/app/lib/api";
 
 interface ProfileSidebarProps {
   onLogout: () => void;
+  gamerProfileOpenSignal?: number;
   onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
@@ -76,6 +78,7 @@ interface ProfileSidebarProps {
 
 const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   onLogout,
+  gamerProfileOpenSignal = 0,
   onShowCalendar,
   onShowFollowings,
   onShowFavorites,
@@ -87,6 +90,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const { data: user } = useMe();
   const queryClient = useQueryClient();
   const hasCoachProfile = !!user?.coach;
+  const hasGamerProfile = !!user?.participant;
+  const canUseCoachCalendar = hasCoachProfile || user?.role === 0;
   const [staticPages, setStaticPages] = useState<Array<{ _id: string; name: string; title: string }>>([]);
 
   const [activePanel, setActivePanel] = useState<"home" | "profile">("home");
@@ -253,6 +258,12 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     };
     fetchStaticPages();
   }, []);
+
+  useEffect(() => {
+    if (!gamerProfileOpenSignal) return;
+    setActivePanel("profile");
+    setIsParticipantModalOpen(true);
+  }, [gamerProfileOpenSignal]);
 
   const handleCreateParticipant = async (formData: any) => {
     console.log("Participant profile saved:", formData);
@@ -589,6 +600,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
       formDataToSend.append("name", formData.name);
       formDataToSend.append("address", formData.address);
+      formDataToSend.append("companyType", formData.companyType);
       if (formData.phone) formDataToSend.append("phone", formData.phone);
       if (formData.email) formDataToSend.append("email", formData.email);
 
@@ -787,7 +799,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
             ) : user?.photo ? (
               <img
-                src={`${EP.API_ASSETS_BASE}/${user.photo.path}`}
+                src={EP.assetUrl(user.photo.path)}
                 alt="Profile"
                 className="w-full h-full object-cover"
               />
@@ -854,6 +866,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           {user?.email || ""}
         </p>
       </div>
+
+      {!hasGamerProfile && activePanel === "home" && (
+        <GamerProfileRequiredBanner className="mb-4" />
+      )}
 
       <div className="flex justify-between mb-6 sm:mb-8 text-center gap-3">
         <button
@@ -924,7 +940,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </div>
             </button>
 
-            {hasCoachProfile && onShowCalendar && (
+            {canUseCoachCalendar && onShowCalendar && (
               <button
                 onClick={onShowCalendar}
                 className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -1014,18 +1030,29 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           {/* Participant Section */}
           <button
             onClick={() => setIsParticipantModalOpen(true)}
-            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
+            className={`w-full rounded-lg p-3 transition-all group flex items-center justify-between border ${
+              hasGamerProfile
+                ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
+                : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 ring-1 ring-amber-200/80 dark:ring-amber-800/60"
+            }`}
           >
             <div className="flex items-center gap-2.5">
               <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
                 <User className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
               </div>
               <div>
-                <div className="font-medium text-gray-800 dark:text-white text-sm">
-                  Participant Profile
+                <div className="font-medium text-gray-800 dark:text-white text-sm flex items-center flex-wrap gap-2">
+                  Gamer Profile
+                  {!hasGamerProfile && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
+                      Required
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  View and edit your participant information
+                  {hasGamerProfile
+                    ? "View and edit your gamer information"
+                    : "Create your profile to join events"}
                 </div>
               </div>
             </div>
@@ -1092,84 +1119,89 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             </h4>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Add or edit your coach profile and manage facility, salon, club,
-              or group resources.
+              or sport community resources.
             </p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <button
+                type="button"
                 onClick={() => setIsFacilitiesListOpen(true)}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
+                className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
               >
-                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
-                  <Home className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+                  <Home className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
                   My Facilities
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {facilities.length} {facilities.length === 1 ? "facility" : "facilities"}
-                </div>
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                  {facilities.length}
+                </span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsCompaniesListOpen(true)}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
+                className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
               >
-                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
-                  <Building className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+                  <Building className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
                   My Companies
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {companies.length} {companies.length === 1 ? "company" : "companies"}
-                </div>
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                  {companies.length}
+                </span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsClubsListOpen(true)}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
+                className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
               >
-                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
-                  <Shield className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+                  <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-                <div className="font-medium text-gray-800 dark:text-white text-sm">
+                <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
                   My Clubs
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {myClubs.length} {myClubs.length === 1 ? "club" : "clubs"}
-                </div>
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                  {myClubs.length}
+                </span>
               </button>
 
-              {hasCoachProfile ? (
+              {hasCoachProfile || user?.role === 0 ? (
                 <button
+                  type="button"
                   onClick={() => setIsGroupsListOpen(true)}
-                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
+                  className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
                 >
-                  <div className="bg-cyan-50 dark:bg-cyan-900/50 p-2 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70 mb-2">
-                    <Layers className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                  <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+                    <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
                   </div>
-                  <div className="font-medium text-gray-800 dark:text-white text-sm">
-                    My Groups
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {myGroups.length} {myGroups.length === 1 ? "group" : "groups"}
-                  </div>
+                  <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
+                    My Communities
+                  </span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                    {myGroups.length}
+                  </span>
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleOpenCoachModal}
-                  className="bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-lg p-3 transition-all group flex flex-col items-center text-center"
+                  className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-all"
                 >
-                  <div className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-md group-hover:bg-orange-200 dark:group-hover:bg-orange-900/70 mb-2">
-                    <Users className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/50 mb-1">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
                   </div>
-                  <div className="font-medium text-gray-800 dark:text-white text-sm">
-                    Apply for Coaching
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Become a coach
-                  </div>
+                  <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
+                    Apply
+                  </span>
+                  <span className="text-[10px] text-orange-600 dark:text-orange-400 text-center leading-tight">
+                    coach
+                  </span>
                 </button>
               )}
             </div>
@@ -1295,7 +1327,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                           ...facility,
                           isPrivate: facility.private || false,
                           photo: facility.photo
-                            ? `${EP.API_ASSETS_BASE}/${facility.photo.path}`
+                            ? EP.assetUrl(facility.photo.path)
                             : "",
                         };
                         handleEditFacility(editData);
@@ -1319,7 +1351,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
                       {facility.photo && (
                         <img
-                          src={`${EP.API_ASSETS_BASE}/${facility.photo.path}`}
+                          src={EP.assetUrl(facility.photo.path)}
                           alt={facility.name}
                           className="w-full h-40 object-cover rounded-lg mb-3"
                         />
@@ -1488,9 +1520,16 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                           className="w-full h-40 object-cover rounded-lg mb-3"
                         />
                       )}
-                      <h3 className="font-semibold text-gray-800 dark:text-white text-base sm:text-lg mb-2 pr-16 sm:pr-20">
+                      <h3 className="font-semibold text-gray-800 dark:text-white text-base sm:text-lg mb-1 pr-16 sm:pr-20">
                         {company.name}
                       </h3>
+                      {company.companyType && (
+                        <p className="text-xs text-cyan-600 dark:text-cyan-400 mb-2 pr-16 sm:pr-20">
+                          {company.companyType === "sponsor"
+                            ? "Sponsor company"
+                            : "Sport company"}
+                        </p>
+                      )}
                       <div className="space-y-2 text-xs sm:text-sm">
                         <div className="flex items-start">
                           <span className="font-medium text-gray-600 dark:text-gray-400 w-20 sm:w-24">
@@ -1591,7 +1630,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                         const editData = {
                           ...club,
                           photo: club.photo
-                            ? `${EP.API_ASSETS_BASE}/${club.photo.path}`
+                            ? EP.assetUrl(club.photo.path)
                             : "",
                         };
                         handleEditClub(editData);
@@ -1614,7 +1653,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
                       {club.photo ? (
                         <img
-                          src={`${EP.API_ASSETS_BASE}/${club.photo.path}`}
+                          src={EP.assetUrl(club.photo.path)}
                           alt={club.name}
                           className="w-full h-40 object-cover rounded-lg mb-3"
                         />
@@ -1695,7 +1734,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                My Sport Communities
+                My Communities
               </h2>
               <div className="flex items-center gap-2">
                 <button
@@ -1736,7 +1775,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                           club: group.clubId,
                           clubName: group.clubName,
                           photo: group.photo
-                            ? `${EP.API_ASSETS_BASE}/${group.photo.path}`
+                            ? EP.assetUrl(group.photo.path)
                             : "",
                         };
                         handleEditGroup(editData);
@@ -1759,7 +1798,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
                       {group.photo ? (
                         <img
-                          src={`${EP.API_ASSETS_BASE}/${group.photo.path}`}
+                          src={EP.assetUrl(group.photo.path)}
                           alt={group.name}
                           className="w-full h-40 object-cover rounded-lg mb-3"
                         />
@@ -1862,6 +1901,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         onSubmit={handleCreateGroup}
         initialData={editingGroup}
         userId={user?._id}
+        requireOwnerCoachId={user?.role === 0 && !user?.coach}
       />
 
       {/* Group Delete Confirmation Modal */}

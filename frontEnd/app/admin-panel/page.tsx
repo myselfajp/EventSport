@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Home } from "lucide-react";
 import { useMe } from "../hooks/useAuth";
@@ -13,15 +13,98 @@ import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
 import LegalManagement from "../../components/admin/LegalManagement";
 import StaticPagesManagement from "../../components/admin/StaticPagesManagement";
+import SuggestionsManagement from "../../components/admin/SuggestionsManagement";
+import DashboardHeroManagement from "../../components/admin/DashboardHeroManagement";
+import ContractAcceptanceManagement from "../../components/admin/ContractAcceptanceManagement";
+import AdminPermissionGroupsManagement from "../../components/admin/AdminPermissionGroupsManagement";
+import BlacklistManagement from "../../components/admin/BlacklistManagement";
 
-type TabType = "users" | "coaches" | "enums" | "events" | "notifications" | "legal" | "static-pages";
+type TabType =
+  | "users"
+  | "blacklist"
+  | "coaches"
+  | "enums"
+  | "events"
+  | "notifications"
+  | "legal"
+  | "contract-acceptances"
+  | "static-pages"
+  | "suggestions"
+  | "dashboard-hero"
+  | "permission-groups";
+
+const TAB_ORDER: TabType[] = [
+  "users",
+  "blacklist",
+  "coaches",
+  "enums",
+  "events",
+  "notifications",
+  "legal",
+  "contract-acceptances",
+  "static-pages",
+  "dashboard-hero",
+  "suggestions",
+  "permission-groups",
+];
+
+const TAB_LABEL: Record<TabType, string> = {
+  users: "Users",
+  blacklist: "Blacklist",
+  coaches: "Coach Certificates",
+  enums: "Enum Management",
+  events: "Events",
+  notifications: "Notifications",
+  legal: "Legal",
+  "contract-acceptances": "Contract acceptances",
+  "static-pages": "Static Pages",
+  "dashboard-hero": "Dashboard hero",
+  suggestions: "Suggestions",
+  "permission-groups": "İzin grupları",
+};
+
+/** Admin API permission slug per tab (UI-only tabs use same keys as backend constants). */
+const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
+  users: "admin.users",
+  blacklist: ["admin.blacklist", "admin.users"],
+  coaches: "admin.coaches",
+  enums: "admin.enums",
+  events: "admin.events",
+  notifications: "admin.notifications",
+  legal: "admin.legal",
+  "contract-acceptances": "admin.contract_acceptances",
+  "static-pages": "admin.static_pages",
+  "dashboard-hero": "admin.dashboard_hero",
+  suggestions: "admin.suggestions",
+};
 
 export default function AdminPanelPage() {
   const router = useRouter();
   const { data: user, isLoading } = useMe();
-  const [adminData, setAdminData] = useState<any>(null);
+  const [adminData, setAdminData] = useState<{
+    permissions?: string[];
+    isFullAdmin?: boolean;
+    user?: unknown;
+  } | null>(null);
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("users");
+
+  const perms = adminData?.permissions ?? [];
+  const isFullAdmin = adminData?.isFullAdmin === true;
+
+  const canTab = useCallback(
+    (tab: TabType) => {
+      if (tab === "permission-groups") return isFullAdmin;
+      const key = TAB_PERM[tab];
+      if (!key) return false;
+      if (perms.includes("*")) return true;
+      const keys = Array.isArray(key) ? key : [key];
+      return keys.some((k) => perms.includes(k));
+    },
+    [perms, isFullAdmin]
+  );
+
+  const visibleTabs = useMemo(() => TAB_ORDER.filter((t) => canTab(t)), [canTab]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -40,6 +123,13 @@ export default function AdminPanelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isLoading, router]);
 
+  useEffect(() => {
+    if (!adminData?.permissions) return;
+    if (canTab(activeTab)) return;
+    const first = TAB_ORDER.find((t) => canTab(t));
+    if (first) setActiveTab(first);
+  }, [adminData, activeTab, canTab]);
+
   const fetchAdminData = async () => {
     try {
       setIsLoadingAdmin(true);
@@ -49,7 +139,7 @@ export default function AdminPanelPage() {
       } else {
         router.push("/");
       }
-    } catch (error) {
+    } catch {
       router.push("/");
     } finally {
       setIsLoadingAdmin(false);
@@ -88,89 +178,44 @@ export default function AdminPanelPage() {
             </button>
           </div>
 
-          <div className="border-b border-gray-200 dark:border-slate-700 mb-6">
-            <nav className="flex space-x-8">
-              <button
-                onClick={() => setActiveTab("users")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "users"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Users
-              </button>
-              <button
-                onClick={() => setActiveTab("coaches")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "coaches"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Coach Certificates
-              </button>
-              <button
-                onClick={() => setActiveTab("enums")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "enums"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Enum Management
-              </button>
-              <button
-                onClick={() => setActiveTab("events")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "events"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Events
-              </button>
-              <button
-                onClick={() => setActiveTab("notifications")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "notifications"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Notifications
-              </button>
-              <button
-                onClick={() => setActiveTab("legal")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "legal"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Legal (KVKK & Terms)
-              </button>
-              <button
-                onClick={() => setActiveTab("static-pages")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "static-pages"
-                    ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
-                }`}
-              >
-                Static Pages
-              </button>
+          {visibleTabs.length === 0 && (
+            <p className="text-amber-800 dark:text-amber-200 text-sm mb-4">
+              Hesabınıza atanmış bir admin izni yok. Tam yetkili yöneticiden izin grubu isteyin.
+            </p>
+          )}
+
+          <div className="border-b border-gray-200 dark:border-slate-700 mb-6 overflow-x-auto">
+            <nav className="flex flex-nowrap gap-6 sm:space-x-8 min-w-min pb-1">
+              {visibleTabs.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap shrink-0 ${
+                    activeTab === tab
+                      ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
+                  }`}
+                >
+                  {TAB_LABEL[tab]}
+                </button>
+              ))}
             </nav>
           </div>
 
           <div className="mt-6">
-            {activeTab === "users" && <UsersManagement />}
+            {activeTab === "users" && <UsersManagement isFullAdmin={isFullAdmin} />}
+            {activeTab === "blacklist" && <BlacklistManagement />}
             {activeTab === "coaches" && <CoachCertificateApproval />}
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
             {activeTab === "notifications" && <NotificationManagement />}
             {activeTab === "legal" && <LegalManagement />}
+            {activeTab === "contract-acceptances" && <ContractAcceptanceManagement />}
             {activeTab === "static-pages" && <StaticPagesManagement />}
+            {activeTab === "dashboard-hero" && <DashboardHeroManagement />}
+            {activeTab === "suggestions" && <SuggestionsManagement />}
+            {activeTab === "permission-groups" && <AdminPermissionGroupsManagement />}
           </div>
         </div>
       </div>

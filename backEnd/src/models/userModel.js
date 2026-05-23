@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { locationSubSchema } from './locationModel.js';
 
 const termsAcceptedSchema = new mongoose.Schema(
     {
@@ -46,6 +47,7 @@ const userSchema = new mongoose.Schema(
             type: Date,
             required: [true, 'Age is required'],
         },
+        location: locationSubSchema,
         isEmailVerified: {
             type: Boolean,
             default: false,
@@ -57,7 +59,7 @@ const userSchema = new mongoose.Schema(
         password: {
             type: String,
             required: [true, 'Password is required'],
-            minlength: 7,
+            minlength: 8,
             select: false,
         },
         participant: {
@@ -88,6 +90,18 @@ const userSchema = new mongoose.Schema(
             type: Number,
             default: 1,
         },
+        /** Hesap pasif: giriş ve korumalı API reddedilir. */
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+        /** Yalnızca role === 0 (admin) için; boş = tam yetki (geriye dönük). */
+        adminPermissionGroups: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'AdminPermissionGroup',
+            },
+        ],
         failedLoginAttempts: {
             type: Number,
             default: 0,
@@ -109,6 +123,10 @@ const userSchema = new mongoose.Schema(
         kvkkConsent: {
             type: kvkkConsentSchema,
             default: null,
+        },
+        marketingConsent: {
+            agreed: { type: Boolean, default: false },
+            consentedAt: { type: Date, default: null },
         },
     },
     { timestamps: true }

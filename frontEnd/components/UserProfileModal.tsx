@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   User,
@@ -19,6 +19,7 @@ import {
   DollarSign,
   Image as ImageIcon,
   ShieldCheck,
+  ChevronRight,
 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -33,6 +34,13 @@ import {
 } from "@/app/lib/types";
 import ClubViewModal from "@/components/ClubViewModal";
 import GroupViewModal from "@/components/GroupViewModal";
+import ViewEventModal from "@/components/event/ViewEventModal";
+
+type ViewEventModalEvent = NonNullable<
+  React.ComponentProps<typeof ViewEventModal>["event"]
+>;
+
+type CoachProfileEvent = CoachDetails["event"][number];
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -62,6 +70,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [selectedCoachEvent, setSelectedCoachEvent] =
+    useState<CoachProfileEvent | null>(null);
+  const [isEventViewOpen, setIsEventViewOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -73,8 +84,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setSportGoal(null);
       setCoachDetails(null);
       setIsFullyLoaded(false);
+      setSelectedCoachEvent(null);
+      setIsEventViewOpen(false);
     }
   }, [isOpen, userId]);
+
+  const coachCreatedEvents = useMemo(() => {
+    const events = coachDetails?.event ?? [];
+    return events
+      .filter((ev) => (ev as { status?: string }).status !== "cancelled")
+      .sort(
+        (a, b) =>
+          new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      );
+  }, [coachDetails?.event]);
 
   useEffect(() => {
     if (user) {
@@ -119,7 +142,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               setSportGoal(participantData.sportGoal);
             }
           } else {
-            throw new Error("User or participant data not found");
+            throw new Error("User or gamer data not found");
           }
         }
       } else {
@@ -240,13 +263,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     return new Date(dateString).toLocaleDateString("en-US");
   };
 
-  const getImageUrl = (path: string) => {
-    if (!path) return "";
-    // Use API_ASSETS_BASE with the path from database
-    // If path starts with /, use it directly, otherwise add /
-    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
-  };
+  const getImageUrl = (path: string) => EP.assetUrl(path);
 
   const isOwnerOrCreator = (resource: any, type: "club" | "group") => {
     if (!currentUser) return false;
@@ -275,6 +292,35 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const handleCloseGroupModal = () => {
     setIsGroupModalOpen(false);
     setSelectedGroup(null);
+  };
+
+  const formatEventDateTime = (iso: string) => {
+    if (!iso) return "—";
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  };
+
+  const toViewEventModalEvent = (ev: CoachProfileEvent): ViewEventModalEvent =>
+    ({
+      ...ev,
+      owner:
+        typeof ev.owner === "string"
+          ? { _id: ev.owner }
+          : (ev.owner as ViewEventModalEvent["owner"]),
+      eventStyle: ev.style
+        ? { name: ev.style.name, color: "#22c55e" }
+        : undefined,
+      createdAt: ev.createdAt || new Date().toISOString(),
+    }) as ViewEventModalEvent;
+
+  const openCoachEvent = (ev: CoachProfileEvent) => {
+    setSelectedCoachEvent(ev);
+    setIsEventViewOpen(true);
   };
 
   const getRoleName = (role: number) => {
@@ -329,7 +375,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <div className="w-20 h-20 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center">
                   {user.photo?.path ? (
                     <img
-                      src={`${EP.API_ASSETS_BASE}/${user.photo.path}`}
+                      src={EP.assetUrl(user.photo.path)}
                       alt={`${user.firstName} ${user.lastName}`}
                       className="w-20 h-20 rounded-full object-cover"
                     />
@@ -368,7 +414,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <div className="border-t dark:border-gray-700 pt-6">
                   <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                    Participant Information
+                    Gamer Information
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-3 p-3 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg">
@@ -644,51 +690,51 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       )}
 
                     {/* Events Created */}
-                    {coachDetails?.event && coachDetails.event.length > 0 && (
+                    {coachCreatedEvents.length > 0 && (
                       <div className="mb-6">
                         <h5 className="text-md font-medium text-gray-800 dark:text-white mb-3 flex items-center gap-2">
                           <CalendarIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          Created Events ({coachDetails.event.length})
+                          Created Events ({coachCreatedEvents.length})
                         </h5>
-                        <div className="space-y-2">
-                          {coachDetails.event.slice(0, 5).map((event) => (
-                            <div
-                              key={event._id}
-                              className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/30 rounded-lg"
-                            >
-                              <CalendarIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-                              <div className="flex-1">
-                                <p className="font-medium dark:text-white">
-                                  {event.name}
-                                </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  {new Date(
-                                    event.startTime
-                                  ).toLocaleDateString()}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 px-2 py-0.5 rounded-full">
-                                    {event.capacity} capacity
-                                  </span>
-                                  <span
-                                    className={`text-xs px-2 py-0.5 rounded-full ${
-                                      event.private
-                                        ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
-                                        : "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
-                                    }`}
-                                  >
-                                    {event.private ? "Private" : "Public"}
-                                  </span>
+                        <ul className="space-y-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600 divide-y divide-gray-100 dark:divide-gray-700">
+                          {coachCreatedEvents.map((event) => (
+                            <li key={event._id}>
+                              <button
+                                type="button"
+                                onClick={() => openCoachEvent(event)}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-left bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                              >
+                                <CalendarIcon className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white truncate">
+                                    {event.name}
+                                  </p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {formatEventDateTime(event.startTime)}
+                                    {event.sport?.name
+                                      ? ` · ${event.sport.name}`
+                                      : ""}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 px-2 py-0.5 rounded-full">
+                                      {event.capacity} capacity
+                                    </span>
+                                    <span
+                                      className={`text-xs px-2 py-0.5 rounded-full ${
+                                        event.private
+                                          ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
+                                          : "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
+                                      }`}
+                                    >
+                                      {event.private ? "Private" : "Public"}
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
+                                <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                              </button>
+                            </li>
                           ))}
-                          {coachDetails.event.length > 5 && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
-                              And {coachDetails.event.length - 5} more events...
-                            </p>
-                          )}
-                        </div>
+                        </ul>
                       </div>
                     )}
 
@@ -777,7 +823,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           >
                             {company.photo ? (
                               <img
-                                src={`${EP.API_ASSETS_BASE}${company.photo.path}`}
+                                src={EP.assetUrl(company.photo.path)}
                                 alt={company.name}
                                 className="w-16 h-16 object-cover rounded-lg border dark:border-gray-600"
                               />
@@ -832,6 +878,34 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           isOpen={isGroupModalOpen}
           onClose={handleCloseGroupModal}
           group={selectedGroup}
+        />
+      )}
+
+      {selectedCoachEvent && (
+        <ViewEventModal
+          isOpen={isEventViewOpen}
+          onClose={() => {
+            setIsEventViewOpen(false);
+            setSelectedCoachEvent(null);
+          }}
+          event={toViewEventModalEvent(selectedCoachEvent)}
+          onCoachClick={() => {}}
+          onClubClick={(club) => {
+            if (club?._id && club?.name) {
+              setSelectedClub({ _id: club._id, name: club.name });
+              setIsClubModalOpen(true);
+            }
+          }}
+          onGroupClick={(group) => {
+            if (group?._id && group?.name) {
+              setSelectedGroup({
+                _id: group._id,
+                name: group.name,
+                clubName: group.name,
+              });
+              setIsGroupModalOpen(true);
+            }
+          }}
         />
       )}
     </div>

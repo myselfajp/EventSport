@@ -41,6 +41,7 @@ export interface User {
     _id: string;
     name: string;
     address: string;
+    companyType?: CompanyType;
     phone?: string;
     email?: string;
     photo?: {
@@ -60,6 +61,10 @@ export interface User {
     originalName: string;
     mimeType: string;
     size: number;
+  };
+  marketingConsent?: {
+    agreed: boolean;
+    consentedAt: string | null;
   };
 }
 
@@ -316,10 +321,13 @@ export interface FacilitySearchResponse {
   message?: string;
 }
 
+export type CompanyType = "sponsor" | "sport";
+
 export interface Company {
   _id: string;
   name: string;
   address: string;
+  companyType: CompanyType;
   phone?: string;
   email?: string;
   photo: {

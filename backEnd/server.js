@@ -1,7 +1,10 @@
 import app from './src/app.js';
 import mongoose from 'mongoose';
 import { initAdmin } from './src/utils/initAdmin.js';
+import { initAdminPermissionGroups } from './src/utils/initAdminPermissionGroups.js';
 import { initLegal } from './src/utils/initLegal.js';
+import { initLocations } from './src/utils/initLocations.js';
+import { startCheckInReminderScheduler } from './src/utils/checkInReminderJob.js';
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -23,7 +26,10 @@ const connectDB = async () => {
         console.log('✅ MongoDB connected');
         
         await initAdmin();
+        await initAdminPermissionGroups();
         await initLegal();
+        await initLocations();
+        startCheckInReminderScheduler();
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1); // stop app if DB fails

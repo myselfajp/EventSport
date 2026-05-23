@@ -13,10 +13,13 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Environment variables
+# Environment variables and secrets
 .env
+.env.*
 .env.local
 .env.*.local
+*.pem
+*.key
 
 # Build output
 dist/
@@ -47,5 +50,8 @@ coverage/
 .prettierrc
 .eslintrc.json
 
-# media
+# User-uploaded media (multer)
 uploads/
+
+# Local DB dumps
+*.dump

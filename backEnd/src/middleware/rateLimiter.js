@@ -38,3 +38,21 @@ export const generalRateLimiter = rateLimit({
     skipSuccessfulRequests: false,
 });
 
+/** Dashboard hero tracked clicks — prevent inflated counts. */
+export const heroClickRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    message: 'Too many requests, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+/** Footer suggestion form — strict limit per IP. */
+export const publicSuggestionRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 25,
+    message: 'Çok fazla öneri gönderdiniz. Lütfen daha sonra tekrar deneyin.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+

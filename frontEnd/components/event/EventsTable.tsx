@@ -15,10 +15,13 @@ import {
   CheckCircle,
   Clock,
   CreditCard,
+  Plus,
 } from "lucide-react";
 import ViewEventModal from "./ViewEventModal";
 import CoachDetailModal from "../CoachDetailModal";
 import FacilityDetailsModal from "../profile/FacilityDetailsModal";
+import ClubViewModal, { type ClubViewModalClub } from "../ClubViewModal";
+import GroupViewModal, { type GroupViewModalGroup } from "../GroupViewModal";
 import { Facility } from "@/app/lib/types";
 import { EP } from "@/app/lib/endpoints";
 import { fetchJSON } from "@/app/lib/api";
@@ -30,6 +33,7 @@ import {
   defaultFavorites,
 } from "@/app/hooks/useFavorites";
 import { useMe } from "@/app/hooks/useAuth";
+import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
 
 interface Event {
   _id: string;
@@ -91,6 +95,8 @@ interface EventsTableProps {
   onSortChange: (sortBy: string, sortType: "asc" | "desc") => void;
   onPrivateToggle: (isPrivate: boolean) => void;
   isPrivateFilter: boolean;
+  onCreateEventClick?: () => void;
+  onEventsChanged?: () => void;
 }
 
 const EventsTable: React.FC<EventsTableProps> = ({
@@ -105,6 +111,8 @@ const EventsTable: React.FC<EventsTableProps> = ({
   onSortChange,
   onPrivateToggle,
   isPrivateFilter,
+  onCreateEventClick,
+  onEventsChanged,
 }) => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -123,6 +131,10 @@ const EventsTable: React.FC<EventsTableProps> = ({
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [isFacilityModalOpen, setIsFacilityModalOpen] = useState(false);
+  const [selectedClub, setSelectedClub] = useState<ClubViewModalClub | null>(null);
+  const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
   const { data: user } = useMe();
   const { data: favoritesData } = useFavorites();
@@ -132,6 +144,8 @@ const EventsTable: React.FC<EventsTableProps> = ({
   const { mutateAsync: removeFavoriteAsync, isPending: isRemovingFavorite } =
     useRemoveFavorite();
   const canFavorite = !!user?.participant;
+  const canSeeMyEvents = !!user?.coach || user?.role === 0;
+  const canCreateOrManageEvents = !!user?.coach || user?.role === 0;
   const [favoriteAnimatingId, setFavoriteAnimatingId] = useState<string | null>(
     null
   );
@@ -161,7 +175,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
     e.stopPropagation();
     if (!eventItem?._id) return;
     if (!canFavorite) {
-      alert("Create a participant profile to add favorites.");
+      alert("Create a gamer profile to add favorites.");
       return;
     }
     const animKey = `event-${eventItem._id}`;
@@ -238,6 +252,16 @@ const EventsTable: React.FC<EventsTableProps> = ({
     setSelectedFacility(null);
   };
 
+  const handleCloseClubModal = () => {
+    setIsClubModalOpen(false);
+    setSelectedClub(null);
+  };
+
+  const handleCloseGroupModal = () => {
+    setIsGroupModalOpen(false);
+    setSelectedGroup(null);
+  };
+
   const goToPage = (page: number) => {
     if (page >= 1 && page <= pagination.totalPages) {
       onPageChange(page);
@@ -309,7 +333,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
 
   const getImageUrl = (photo?: { path?: string }) => {
     if (photo?.path) {
-      return `${EP.API_ASSETS_BASE}/${photo.path}`.replace(/\\/g, "/");
+      return EP.assetUrl(photo.path);
     }
     return "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=400&fit=crop";
   };
@@ -361,10 +385,15 @@ const EventsTable: React.FC<EventsTableProps> = ({
   const startIndex = (pagination.currentPage - 1) * pagination.perPage;
   const endIndex = Math.min(startIndex + pagination.perPage, pagination.total);
 
+  const needsGamerProfile = !!user && !user.participant;
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md dark:shadow-lg border border-gray-100 dark:border-slate-700 p-6 transition-colors">
+      {needsGamerProfile && activeTab === "all" && (
+        <GamerProfileRequiredBanner className="mb-5" />
+      )}
       {/* Tab Header */}
-      <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-slate-700 pb-4">
+      <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-slate-700 pb-4 gap-3 flex-wrap">
         <div className="flex gap-4 flex-wrap">
           <button
             onClick={() => setActiveTab("all")}
@@ -377,31 +406,70 @@ const EventsTable: React.FC<EventsTableProps> = ({
             All Events {activeTab === "all" ? `(${pagination.total})` : ""}
           </button>
           <button
-            onClick={() => setActiveTab("my")}
+            onClick={() => canSeeMyEvents && setActiveTab("my")}
+            disabled={!canSeeMyEvents}
             className={`pb-2 font-semibold transition-colors ${
               activeTab === "my"
                 ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
                 : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-            }`}
+            } ${!canSeeMyEvents ? "opacity-40 cursor-not-allowed hover:text-gray-500" : ""}`}
+            title={
+              !canSeeMyEvents
+                ? "Coach profile or admin required — events you create appear here"
+                : undefined
+            }
           >
             My Events {activeTab === "my" ? `(${pagination.total})` : ""}
           </button>
-          {user?.coach && (
-            <button
-              onClick={() => setActiveTab("created")}
-              className={`pb-2 font-semibold transition-colors ${
-                activeTab === "created"
-                  ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
-                  : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-              }`}
-            >
-              Created Events {activeTab === "created" ? `(${pagination.total})` : ""}
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab("registered")}
+            disabled={!user?.participant}
+            className={`pb-2 font-semibold transition-colors ${
+              activeTab === "registered"
+                ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
+                : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+            } ${!user?.participant ? "opacity-40 cursor-not-allowed hover:text-gray-500" : ""}`}
+            title={
+              !user?.participant
+                ? "Create a gamer profile to use Registered Events"
+                : undefined
+            }
+          >
+            Registered Events{" "}
+            {activeTab === "registered" ? `(${pagination.total})` : ""}
+          </button>
+          <button
+            onClick={() => setActiveTab("participated")}
+            disabled={!user?.participant}
+            className={`pb-2 font-semibold transition-colors ${
+              activeTab === "participated"
+                ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
+                : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+            } ${!user?.participant ? "opacity-40 cursor-not-allowed hover:text-gray-500" : ""}`}
+            title={
+              !user?.participant
+                ? "Create a gamer profile to use Participated Events"
+                : undefined
+            }
+          >
+            Participated Events{" "}
+            {activeTab === "participated" ? `(${pagination.total})` : ""}
+          </button>
         </div>
+        {/* Create Event butonu sadece koçlar için anlamlı; uygunsa burada gösterilir. */}
+        {canCreateOrManageEvents && onCreateEventClick && (
+          <button
+            onClick={onCreateEventClick}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Create Event
+          </button>
+        )}
       </div>
 
-      {/* Filters and Search */}
+      {/* Filters and Search — only for browsing all events */}
+      {activeTab === "all" && (
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           {/* Search Input */}
@@ -443,6 +511,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Table Content */}
       {isLoading ? (
@@ -455,7 +524,14 @@ const EventsTable: React.FC<EventsTableProps> = ({
         </div>
       ) : events.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-slate-400">No events found</p>
+          <p className="text-gray-500 dark:text-slate-400">
+            {activeTab === "my" && !canSeeMyEvents
+              ? "Add a coach profile (or sign in as admin) to list events you create."
+              : (activeTab === "registered" || activeTab === "participated") &&
+                  !user?.participant
+                ? "Create a gamer profile to see registered and participated events."
+                : "No events found"}
+          </p>
         </div>
       ) : (
         <>
@@ -498,6 +574,11 @@ const EventsTable: React.FC<EventsTableProps> = ({
                   <tr
                     key={event._id}
                     onClick={() => handleEventClick(event)}
+                    title={
+                      needsGamerProfile
+                        ? "Create a Gamer profile in the left panel to join events"
+                        : undefined
+                    }
                     className={`border-b border-gray-100 dark:border-slate-700/50 
                                hover:bg-cyan-50/50 dark:hover:bg-cyan-900/10 
                                cursor-pointer transition-all duration-200 relative group ${
@@ -537,11 +618,11 @@ const EventsTable: React.FC<EventsTableProps> = ({
                     <td className="py-5 px-4">
                       <div className="flex items-center justify-end gap-2">
                         {/* Show participants button for created events tab */}
-                        {activeTab === "created" && (
+                        {activeTab === "my" && canCreateOrManageEvents && (
                           <button
                             onClick={(e) => handleShowParticipants(e, event)}
                             className="p-2 rounded-full border border-transparent hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors text-blue-500 dark:text-blue-400 flex items-center gap-1"
-                            title="View Participants"
+                            title="View Gamers"
                           >
                             <Users className="w-4 h-4" />
                             {(event as any).participantCount !== undefined && (
@@ -673,6 +754,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
         isOpen={isViewModalOpen}
         onClose={handleCloseViewModal}
         event={selectedEvent}
+        onEventUpdated={onEventsChanged}
         onCoachClick={(coachId) => {
           setSelectedCoachId(coachId);
           setIsCoachModalOpen(true);
@@ -681,6 +763,18 @@ const EventsTable: React.FC<EventsTableProps> = ({
           if (facility) {
             setSelectedFacility(facility as Facility);
             setIsFacilityModalOpen(true);
+          }
+        }}
+        onClubClick={(club) => {
+          if (club?._id && club?.name) {
+            setSelectedClub({ _id: club._id, name: club.name });
+            setIsClubModalOpen(true);
+          }
+        }}
+        onGroupClick={(group) => {
+          if (group?._id && group?.name) {
+            setSelectedGroup({ _id: group._id, name: group.name });
+            setIsGroupModalOpen(true);
           }
         }}
       />
@@ -697,6 +791,18 @@ const EventsTable: React.FC<EventsTableProps> = ({
         facility={selectedFacility}
       />
 
+      <ClubViewModal
+        isOpen={isClubModalOpen}
+        onClose={handleCloseClubModal}
+        club={selectedClub}
+      />
+
+      <GroupViewModal
+        isOpen={isGroupModalOpen}
+        onClose={handleCloseGroupModal}
+        group={selectedGroup}
+      />
+
       {/* Participants Modal */}
       {isParticipantsModalOpen && selectedEventForParticipants && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-50 p-4">
@@ -704,7 +810,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Event Participants
+                  Event Gamers
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                   {selectedEventForParticipants.name}
@@ -726,7 +832,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
               ) : participants.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-slate-400">
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No participants yet</p>
+                  <p>No gamers yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -744,7 +850,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
                             {p.user?.firstName} {p.user?.lastName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-slate-400">
-                            {p.participant?.name || "Participant"}
+                            {p.participant?.name || "Gamer"}
                           </div>
                         </div>
                       </div>
@@ -779,7 +885,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
             
             <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
               <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
-                <span>Total: {participants.length} participants</span>
+                <span>Total: {participants.length} gamers</span>
                 <span>
                   Checked In: {participants.filter((p: any) => p.isCheckedIn).length}
                 </span>

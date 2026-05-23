@@ -27,6 +27,10 @@ import {
   normalizePhoneForDisplay,
   isPhoneComplete,
 } from "@/app/lib/phone-utils";
+import LocationFields, {
+  emptyLocationValue,
+} from "@/components/location/LocationFields";
+import type { LocationValue } from "@/app/lib/location-api";
 
 interface FacilityModalProps {
   isOpen: boolean;
@@ -76,6 +80,9 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   initialData = null,
 }) => {
   // Facility State
+  const [locationValue, setLocationValue] = useState<LocationValue>(
+    emptyLocationValue()
+  );
   const [formData, setFormData] = useState<FacilityFormData>({
     name: "",
     address: "",
@@ -160,9 +167,9 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
         setSalonPhotosRemoved(new Set());
         getSalons(initialData._id).then((fetchedSalons) => {
           const formattedSalons = fetchedSalons.map((s: any) => {
-            const photoUrl =
-              s.photo?.path &&
-              `${EP.API_ASSETS_BASE}/${s.photo.path}`.replace(/\\/g, "/");
+            const photoUrl = s.photo?.path
+              ? EP.assetUrl(s.photo.path)
+              : undefined;
             return {
               id: s._id,
               _id: s._id,
@@ -359,7 +366,9 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     // Facility Validation
     if (!initialData) {
       if (!formData.name) newErrors.name = "Facility Name is required";
-      if (!formData.address) newErrors.address = "Address is required";
+      if (!locationValue.district && !formData.address?.trim()) {
+        newErrors.address = "Select an Istanbul district or enter address";
+      }
       if (!formData.phone || !isPhoneComplete(formData.phone))
         newErrors.phone = `Phone required (9 digits after ${PHONE_PREFIX})`;
       if (!formData.email) newErrors.email = "E-mail is required";
@@ -424,6 +433,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
           email: formData.email,
           mainSport: formData.mainSport,
           private: formData.isPrivate,
+          district: locationValue.district || undefined,
+          addressLine: locationValue.addressLine || undefined,
         };
 
         submitData.append("data", JSON.stringify(facilityData));
@@ -619,23 +630,14 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Address{" "}
+                            Istanbul district{" "}
                             {!initialData && (
                               <span className="text-red-500">*</span>
                             )}
                           </label>
-                          <textarea
-                            value={formData.address}
-                            onChange={(e) =>
-                              handleInputChange("address", e.target.value)
-                            }
-                            placeholder="Enter address"
-                            rows={3}
-                            className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 transition-colors resize-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
-                              errors.address
-                                ? "border-red-300 focus:ring-red-200 dark:border-red-500"
-                                : "border-gray-200 dark:border-gray-600 focus:ring-cyan-500"
-                            }`}
+                          <LocationFields
+                            value={locationValue}
+                            onChange={setLocationValue}
                             disabled={isLoading}
                           />
                           {errors.address && (

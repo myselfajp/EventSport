@@ -3,8 +3,14 @@
 import React from "react";
 import { LEVEL_DEFINITIONS } from "@/app/lib/level-definitions";
 
-export const LevelDefinitions: React.FC = () => (
-  <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-4">
+type LevelDefinitionsProps = {
+  className?: string;
+};
+
+export const LevelDefinitions: React.FC<LevelDefinitionsProps> = ({ className = "" }) => (
+  <div
+    className={`rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-4 ${className}`.trim()}
+  >
     <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
       Level Definitions
     </h4>

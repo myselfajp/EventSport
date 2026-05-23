@@ -1,17 +1,78 @@
-# Environment variables
+# =============================================================================
+# EventSport — root .gitignore (monorepo)
+# Alt klasörlerde ek kurallar: backEnd/.gitignore, frontEnd/.gitignore
+# =============================================================================
+
+# --- Ortam değişkenleri ve gizli dosyalar ---
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 .env.development
 .env.production
 .env.test
+.env.staging
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+secrets/
+credentials.json
+service-account*.json
 
-# Docker
-docker-compose.override.yml
-*.dockerignore
+# .env.example repoda kalır; gerçek .env ignore edilir
 
-# Logs
+# --- Bağımlılıklar ---
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+.pnpm-store/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+jspm_packages/
+
+# --- Next.js (frontEnd) ---
+.next/
+**/.next/
+out/
+**/out/
+next-env.d.ts
+.vercel/
+
+# --- Derleme ve önbellek ---
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+.cache/
+.parcel-cache/
+.eslintcache
+.npm/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.nyc_output/
+
+# --- Kullanıcı yüklemeleri (multer → backEnd/uploads) ---
+backEnd/uploads/
+uploads/
+
+# --- Test / coverage ---
+coverage/
+*.lcov
+
+# --- Loglar ---
 logs/
+**/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -19,7 +80,34 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# OS-specific files
+# --- Veritabanı (yerel dump / sqlite) ---
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+data/
+mongodb_data/
+mongodb_data_prod/
+
+# --- Docker (yerel override; prod compose dosyaları repoda) ---
+docker-compose.override.yml
+docker-compose.local.yml
+
+# --- IDE ve editör ---
+.vscode/
+.idea/
+.cursor/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.iml
+
+# --- İşletim sistemi ---
 .DS_Store
 .DS_Store?
 ._*
@@ -29,51 +117,25 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# IDE and Editor files
-.vscode/
-.idea/
-*.sublime-workspace
-*.sublime-project
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
-
-# Temporary files
+# --- Geçici / yedek ---
 *.tmp
 *.temp
 *.bak
 *.backup
 *.cache
+*.old
+*.pid
+*.seed
+*.pid.lock
+pids/
+tmp/
+temp/
 
-# Package manager files
+# --- Paket yöneticisi yedekleri ---
 package-lock.json.backup
 yarn.lock.backup
-.pnpm-store/
+*.tgz
+.yarn-integrity
 
-# Build artifacts (if any at root)
-dist/
-build/
-out/
-*.tsbuildinfo
-
-# Coverage reports
-coverage/
-.nyc_output/
-*.lcov
-
-# Database files (if any local databases)
-*.db
-*.sqlite
-*.sqlite3
-
-# Backup files
-*.backup
-*.old
-
-# Local configuration overrides
-docker-compose.local.yml
-docker-compose.override.yml
-
+# --- Eski / yerel proje kopyaları ---
+_oldProject_/

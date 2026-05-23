@@ -5,6 +5,7 @@ import Facility from '../models/facilityModel.js';
 import SalonCalendar from '../models/salonCalendarModel.js';
 import { Sport, SportGroup } from '../models/referenceDataModel.js';
 import * as zodValidation from '../utils/validation.js';
+import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 
 export const createFacility = async (req, res, next) => {
     try {
@@ -27,7 +28,8 @@ export const createFacility = async (req, res, next) => {
             };
         }
 
-        const newFacility = await Facility.create({ ...result });
+        const facilityPayload = await mergeLocationIntoPayload(result);
+        const newFacility = await Facility.create(facilityPayload);
 
         // Add facility to user's facility array
         await User.findByIdAndUpdate(user._id, {
@@ -80,9 +82,10 @@ export const editFacility = async (req, res, next) => {
             };
         }
 
+        const updatePayload = await mergeLocationIntoPayload(result);
         const updatedFacility = await Facility.findByIdAndUpdate(
             facilityId,
-            { $set: result },
+            { $set: updatePayload },
             { new: true }
         );
 

@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { X, Plus, Upload, Trash2, ChevronDown } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { useMe } from "@/app/hooks/useAuth";
+import LegalContentModal from "@/components/auth/LegalContentModal";
+
+type CertificateLevel = "A" | "B" | "C";
 
 interface CoachModalProps {
   isOpen: boolean;
@@ -31,6 +35,7 @@ interface Branch {
   sportGroup: string;
   branchOrder: number;
   level: number;
+  certificateLevel: CertificateLevel;
   certificate: File | null;
   certificatePreview: string | null;
   sportName?: string;
@@ -75,6 +80,41 @@ const CoachModal: React.FC<CoachModalProps> = ({
   const [initializing, setInitializing] = useState(false);
   const [error, setError] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [agreeCoachAgreement, setAgreeCoachAgreement] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [activeCommercialMessages, setActiveCommercialMessages] = useState<{
+    _id: string;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [commercialLegalModal, setCommercialLegalModal] = useState<{
+    title: string;
+    content: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchJSON(
+          EP.LEGAL.getActive("commercial_messages"),
+          { method: "GET" },
+          { skipAuth: true }
+        );
+        if (!cancelled && res?.success && res?.data) {
+          setActiveCommercialMessages(res.data);
+        } else if (!cancelled) {
+          setActiveCommercialMessages(null);
+        }
+      } catch {
+        if (!cancelled) setActiveCommercialMessages(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && (!userLoading || adminUserId)) {
@@ -145,6 +185,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
               sportGroup: sportGroupId,
               branchOrder: branch.branchOrder || index + 1,
               level: branch.level || 5,
+              certificateLevel: (branch.certificateLevel as CertificateLevel) || "A",
               certificate: null,
               certificatePreview: null,
               sportName: branch.sportName || "",
@@ -224,6 +265,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
               sportGroup: sportGroupId,
               branchOrder: branch.branchOrder || index + 1,
               level: branch.level || 5,
+              certificateLevel: (branch.certificateLevel as CertificateLevel) || "A",
               certificate: null,
               certificatePreview: null,
               sportName: branch.sportName || "",
@@ -319,6 +361,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
       sportGroup: "",
       branchOrder: formData.branches.length + 1,
       level: 5,
+      certificateLevel: "A",
       certificate: null,
       certificatePreview: null,
     };
@@ -386,6 +429,21 @@ const CoachModal: React.FC<CoachModalProps> = ({
       return;
     }
 
+    if (!adminUserId && !isEditMode && !agreeCoachAgreement) {
+      setError("You must read and accept the Coach Agreement.");
+      return;
+    }
+
+    if (
+      !adminUserId &&
+      !isEditMode &&
+      marketingConsent &&
+      !activeCommercialMessages?._id
+    ) {
+      setError("Commercial messages consent text is not available. Uncheck the opt-in or try again later.");
+      return;
+    }
+
     for (const branch of formData.branches) {
       if (!branch.sport || !branch.level) {
         setError("Please fill in all required fields for each branch");
@@ -410,6 +468,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
           sport: branch.sport,
           branchOrder: index + 1,
           level: branch.level,
+          certificateLevel: branch.certificateLevel || "A",
         };
 
         // Handle certificate data based on type
@@ -435,7 +494,15 @@ const CoachModal: React.FC<CoachModalProps> = ({
         return sportData;
       });
 
-      formDataToSend.append("data", JSON.stringify(sportsData));
+      const payload: Record<string, unknown> = { branches: sportsData };
+      if (!adminUserId && !isEditMode) {
+        payload.agreeCoachAgreement = agreeCoachAgreement;
+        payload.marketingConsent = marketingConsent;
+        if (marketingConsent && activeCommercialMessages?._id) {
+          payload.commercialMessagesVersionId = activeCommercialMessages._id;
+        }
+      }
+      formDataToSend.append("data", JSON.stringify(payload));
       console.log(
         "Final sportsData being sent:",
         JSON.stringify(sportsData, null, 2)
@@ -495,6 +562,8 @@ const CoachModal: React.FC<CoachModalProps> = ({
   const resetForm = () => {
     setFormData({ branches: [], about: "" });
     setIsEditMode(false);
+    setAgreeCoachAgreement(false);
+    setMarketingConsent(false);
   };
 
   const handleClose = () => {
@@ -833,6 +902,32 @@ const CoachModal: React.FC<CoachModalProps> = ({
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Certificate level (A / B / C){" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={branch.certificateLevel || "A"}
+                          onChange={(e) =>
+                            updateBranch(
+                              index,
+                              "certificateLevel",
+                              e.target.value as CertificateLevel
+                            )
+                          }
+                          className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-600 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          disabled={loading || initializing}
+                        >
+                          <option value="A">A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                        </select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Official certificate class for this branch
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Certificate{" "}
                           {!isEditMode && (
                             <span className="text-red-500">*</span>
@@ -890,6 +985,77 @@ const CoachModal: React.FC<CoachModalProps> = ({
               </div>
             )}
 
+            {!adminUserId && !isEditMode && (
+              <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-4">
+                <h3 className="text-base font-medium text-gray-800 dark:text-white">
+                  Approvals
+                </h3>
+                <label className="flex items-start gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={agreeCoachAgreement}
+                    onChange={(e) => setAgreeCoachAgreement(e.target.checked)}
+                    className="mt-1 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                    disabled={loading || initializing}
+                  />
+                  <span>
+                    I have read and agree to the{" "}
+                    <Link
+                      href="/sozlesmeler#antrenor-sozlesmesi"
+                      className="text-cyan-600 dark:text-cyan-400 underline font-medium"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Coach Agreement
+                    </Link>
+                    . (Appendices: Training Rules, Penalty Terms, Coach Documents — all on the{" "}
+                    <Link
+                      href="/sozlesmeler"
+                      className="text-cyan-600 dark:text-cyan-400 underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Agreements
+                    </Link>{" "}
+                    page.)
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={marketingConsent}
+                    onChange={(e) => setMarketingConsent(e.target.checked)}
+                    className="mt-1 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                    disabled={loading || initializing || !activeCommercialMessages}
+                  />
+                  <span>
+                    {activeCommercialMessages ? (
+                      <>
+                        I consent to receiving commercial electronic messages (SMS, email, phone).
+                        I have read the{" "}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCommercialLegalModal({
+                              title: activeCommercialMessages.title,
+                              content: activeCommercialMessages.content,
+                            });
+                          }}
+                          className="text-cyan-600 dark:text-cyan-400 underline font-medium"
+                        >
+                          Commercial Electronic Messages Consent (IYS)
+                        </button>
+                        . (Optional)
+                      </>
+                    ) : (
+                      <>Commercial messages opt-in is unavailable until an active consent text is published in Admin → Legal.</>
+                    )}
+                  </span>
+                </label>
+              </div>
+            )}
+
             {error && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded-lg">
                 {error}
@@ -916,6 +1082,13 @@ const CoachModal: React.FC<CoachModalProps> = ({
           </div>
         </form>
       </div>
+      {commercialLegalModal && (
+        <LegalContentModal
+          title={commercialLegalModal.title}
+          content={commercialLegalModal.content}
+          onClose={() => setCommercialLegalModal(null)}
+        />
+      )}
     </div>
   );
 };

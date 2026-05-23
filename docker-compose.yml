@@ -9,6 +9,8 @@ services:
     command: mongod --quiet --logpath /dev/null
     volumes:
       - mongodb_data_prod:/data/db
+    ports:
+      - "27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -39,6 +41,7 @@ services:
       - ADMIN_PHONE=${ADMIN_PHONE}
       - ADMIN_AGE=${ADMIN_AGE}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - LISTING_PRICE_PER_SLOT=${LISTING_PRICE_PER_SLOT:-50}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:

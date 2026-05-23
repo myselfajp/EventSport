@@ -143,13 +143,8 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
     }
   };
 
-  const getImageUrl = (path?: string) => {
-    if (!path) return null;
-    // Use API_ASSETS_BASE with the path from database
-    // If path starts with /, use it directly, otherwise add /
-    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    return `${EP.API_ASSETS_BASE}${normalizedPath}`.replace(/\\/g, "/");
-  };
+  const getImageUrl = (path?: string) =>
+    path ? EP.assetUrl(path) : null;
 
   const calculateAge = (dateString?: string) => {
     if (!dateString) return null;

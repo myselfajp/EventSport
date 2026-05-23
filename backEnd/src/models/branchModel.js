@@ -20,6 +20,12 @@ const branchSchema = new mongoose.Schema(
             type: Number,
             required: true,
         },
+        certificateLevel: {
+            type: String,
+            enum: ['A', 'B', 'C'],
+            default: 'A',
+            required: true,
+        },
         certificate: {
             path: { type: String, required: true },
             originalName: { type: String, required: true },

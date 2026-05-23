@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Download } from "lucide-react";
 import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import CoachModal from "../profile/CoachModal";
@@ -12,6 +13,7 @@ import {
   normalizePhoneForDisplay,
   isPhoneComplete,
 } from "../../app/lib/phone-utils";
+import { useMe } from "../../app/hooks/useAuth";
 
 interface User {
   _id: string;
@@ -20,6 +22,8 @@ interface User {
   email: string;
   phone: string;
   age: string;
+  isActive?: boolean;
+  adminPermissionGroups?: Array<{ _id: string; name: string; slug?: string }>;
   photo?: {
     path: string;
     originalName: string;
@@ -44,6 +48,8 @@ interface User {
     facility?: {
       facilityCount: number;
       salonsCount: number;
+      salonSportsSummary?: Array<{ name: string; count: number }>;
+      salonSportsLabel?: string;
     };
     club?: {
       clubCount: number;
@@ -64,7 +70,8 @@ interface User {
 
 type ProfileTab = 'participant' | 'coach' | 'facility';
 
-export default function UsersManagement() {
+export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: boolean }) {
+  const { data: me } = useMe();
   const [activeTab, setActiveTab] = useState<ProfileTab>('participant');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,6 +90,10 @@ export default function UsersManagement() {
   const [showFacilityModal, setShowFacilityModal] = useState(false);
   const [editingProfileUser, setEditingProfileUser] = useState<User | null>(null);
   const [editingFacility, setEditingFacility] = useState<any>(null);
+  const [exporting, setExporting] = useState(false);
+  const [loadedPermissionGroups, setLoadedPermissionGroups] = useState<
+    Array<{ _id: string; name: string; slug?: string }>
+  >([]);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -91,7 +102,26 @@ export default function UsersManagement() {
     age: "",
     password: "",
     role: 1,
+    adminPermissionGroupIds: [] as string[],
   });
+
+  useEffect(() => {
+    if (!showModal || !isFullAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchJSON(EP.ADMIN.permissionGroups.list, { method: "GET" });
+        if (!cancelled && res?.success) {
+          setLoadedPermissionGroups(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch {
+        if (!cancelled) setLoadedPermissionGroups([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showModal, isFullAdmin]);
 
   useEffect(() => {
     setPage(1);
@@ -144,12 +174,16 @@ export default function UsersManagement() {
       age: "",
       password: "",
       role: 1,
+      adminPermissionGroupIds: [],
     });
     setShowModal(true);
   };
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
+    const groupIds = (user.adminPermissionGroups || [])
+      .map((g: any) => (typeof g === "string" ? g : g?._id))
+      .filter(Boolean);
     setFormData({
       firstName: user.firstName,
       lastName: user.lastName,
@@ -158,6 +192,7 @@ export default function UsersManagement() {
       age: user.age ? new Date(user.age).toISOString().split("T")[0] : "",
       password: "",
       role: user.role,
+      adminPermissionGroupIds: groupIds,
     });
     setShowModal(true);
   };
@@ -201,7 +236,11 @@ export default function UsersManagement() {
         : EP.ADMIN.users.create;
 
       const body: any = { ...formData };
-      
+      delete body.adminPermissionGroupIds;
+      if (isFullAdmin && body.role === 0) {
+        body.adminPermissionGroups = formData.adminPermissionGroupIds;
+      }
+
       if (!editingUser) {
         if (!body.password) {
           setError("Password is required");
@@ -245,7 +284,255 @@ export default function UsersManagement() {
         fetchUsers();
       }
     } catch (err: any) {
-      setError(err.message || "Failed to delete user");
+      setError(err.message || err.response?.data?.message || "Failed to delete user");
+    }
+  };
+
+  const handleToggleActive = async (user: User) => {
+    if (!me?._id) return;
+    const currentlyActive = user.isActive !== false;
+    if (currentlyActive && user._id === me._id) {
+      setError("You cannot deactivate your own account.");
+      return;
+    }
+    const msg = currentlyActive
+      ? "Deactivate this user? They will not be able to sign in."
+      : "Reactivate this user?";
+    if (!confirm(msg)) return;
+    try {
+      setError("");
+      const response = await fetchJSON(EP.ADMIN.users.update(user._id), {
+        method: "PUT",
+        body: { isActive: !currentlyActive },
+      });
+      if (response?.success) {
+        fetchUsers();
+      } else {
+        setError(response?.message || response?.error || "Güncellenemedi");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to update user");
+    }
+  };
+
+  const handleBlacklistUser = async (user: User) => {
+    if (!me?._id) return;
+    if (user._id === me._id) {
+      setError("You cannot blacklist your own account.");
+      return;
+    }
+    const reason = window.prompt("Blacklist reason (optional):", "") ?? "";
+    if (reason === null) return;
+    const msg =
+      "Add this user to the blacklist (email, phone, user id) and deactivate their account? They will not be able to sign in.";
+    if (!confirm(msg)) return;
+    try {
+      setError("");
+      const response = await fetchJSON(EP.ADMIN.blacklist.fromUser(user._id), {
+        method: "POST",
+        body: { reason: reason.trim(), deactivate: true },
+      });
+      if (response?.success) {
+        fetchUsers();
+      } else {
+        setError(response?.message || response?.error || "Blacklist failed");
+      }
+    } catch (err: any) {
+      setError(err.message || "Blacklist failed");
+    }
+  };
+
+  /** Excel TR/EU locales use semicolon as list separator; comma leaves one column. */
+  const CSV_SEP = ";";
+
+  const csvCell = (v: unknown) => {
+    const s = v == null ? "" : String(v);
+    return `"${s.replace(/"/g, '""')}"`;
+  };
+
+  const csvRow = (cells: unknown[]) => cells.map(csvCell).join(CSV_SEP);
+
+  const exportUsersCsv = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      const rows: User[] = [];
+      let p = 1;
+      /** Backend SearchQuerySchema caps perPage at 100 — larger values fail validation and return no data. */
+      const perPage = 100;
+      const trimmedSearch = search.trim();
+      let exportAborted = false;
+      while (true) {
+        const response = await fetchJSON(EP.ADMIN.users.getAll, {
+          method: "POST",
+          body: {
+            perPage,
+            pageNumber: p,
+            profileType: activeTab,
+            ...(trimmedSearch ? { search: trimmedSearch } : {}),
+          },
+        });
+        if (!response?.success || !Array.isArray(response.data)) {
+          exportAborted = true;
+          setError(
+            typeof response?.message === "string"
+              ? response.message
+              : "Export failed: could not load user list."
+          );
+          break;
+        }
+        rows.push(...response.data);
+        const tp = response.totalPages ?? 1;
+        if (p >= tp || response.data.length === 0) break;
+        p += 1;
+      }
+
+      if (exportAborted && rows.length === 0) {
+        return;
+      }
+
+      const lines: string[] = [];
+      if (activeTab === "participant") {
+        lines.push(
+          csvRow([
+            "User ID",
+            "First Name",
+            "Last Name",
+            "Email",
+            "Phone",
+            "Terms Ver",
+            "KVKK",
+            "Active",
+            "Main Sport",
+            "Joined Events",
+          ])
+        );
+        for (const u of rows) {
+          const termsV =
+            u.termsAccepted?.versionId &&
+            typeof u.termsAccepted.versionId === "object" &&
+            (u.termsAccepted.versionId as { version?: number }).version != null
+              ? `v${(u.termsAccepted.versionId as { version?: number }).version}`
+              : "";
+          const mainSport =
+            u.participant?.mainSport &&
+            typeof u.participant.mainSport === "object" &&
+            u.participant.mainSport.name
+              ? u.participant.mainSport.name
+              : "";
+          lines.push(
+            csvRow([
+              u._id,
+              u.firstName,
+              u.lastName,
+              u.email,
+              u.phone,
+              termsV,
+              u.kvkkConsent?.agreed ? "Yes" : "No",
+              u.isActive === false ? "No" : "Yes",
+              mainSport,
+              u.summary?.participant?.joinedEventsCount ?? "",
+            ])
+          );
+        }
+      } else if (activeTab === "coach") {
+        lines.push(
+          csvRow([
+            "User ID",
+            "First Name",
+            "Last Name",
+            "Email",
+            "Phone",
+            "Terms Ver",
+            "KVKK",
+            "Active",
+            "Certificates",
+            "Sports",
+            "Events Created",
+          ])
+        );
+        for (const u of rows) {
+          const termsV =
+            u.termsAccepted?.versionId &&
+            typeof u.termsAccepted.versionId === "object" &&
+            (u.termsAccepted.versionId as { version?: number }).version != null
+              ? `v${(u.termsAccepted.versionId as { version?: number }).version}`
+              : "";
+          const sports =
+            u.summary?.coach?.sports
+              ?.map((x) => `${x.name}${x.groupName ? ` (${x.groupName})` : ""}`)
+              .join(" | ") ?? "";
+          lines.push(
+            csvRow([
+              u._id,
+              u.firstName,
+              u.lastName,
+              u.email,
+              u.phone,
+              termsV,
+              u.kvkkConsent?.agreed ? "Yes" : "No",
+              u.isActive === false ? "No" : "Yes",
+              u.summary?.coach?.certificateCount ?? "",
+              sports,
+              u.summary?.coach?.eventsCount ?? "",
+            ])
+          );
+        }
+      } else {
+        lines.push(
+          csvRow([
+            "User ID",
+            "First Name",
+            "Last Name",
+            "Email",
+            "Phone",
+            "Terms Ver",
+            "KVKK",
+            "Active",
+            "Facilities Count",
+            "Salons Count",
+            "Salon types (by sport)",
+          ])
+        );
+        for (const u of rows) {
+          const termsV =
+            u.termsAccepted?.versionId &&
+            typeof u.termsAccepted.versionId === "object" &&
+            (u.termsAccepted.versionId as { version?: number }).version != null
+              ? `v${(u.termsAccepted.versionId as { version?: number }).version}`
+              : "";
+          lines.push(
+            csvRow([
+              u._id,
+              u.firstName,
+              u.lastName,
+              u.email,
+              u.phone,
+              termsV,
+              u.kvkkConsent?.agreed ? "Yes" : "No",
+              u.isActive === false ? "No" : "Yes",
+              u.summary?.facility?.facilityCount ?? "",
+              u.summary?.facility?.salonsCount ?? "",
+              u.summary?.facility?.salonSportsLabel ?? "",
+            ])
+          );
+        }
+      }
+
+      const bom = "\ufeff";
+      const blob = new Blob([bom + `sep=${CSV_SEP}\r\n` + lines.join("\r\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `users-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -321,23 +608,34 @@ export default function UsersManagement() {
   const getProfileSummary = (user: User) => {
     const parts: string[] = [];
     if (user.coach) parts.push("Coach");
-    if (user.participant) parts.push("Participant");
+    if (user.participant) parts.push("Gamer");
     if (user.facility && user.facility.length > 0) parts.push(`Facility Owner (${user.facility.length})`);
     return parts.length > 0 ? parts.join(", ") : "Regular User";
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
           Users Management
         </h2>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
-        >
-          Create User
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void exportUsersCsv()}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-60"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? "Exporting…" : "Export CSV (Excel TR)"}
+          </button>
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+          >
+            Create User
+          </button>
+        </div>
       </div>
 
       <div className="border-b border-gray-200 dark:border-slate-700">
@@ -350,7 +648,7 @@ export default function UsersManagement() {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
             }`}
           >
-            Participants
+            Gamers
           </button>
           <button
             onClick={() => setActiveTab('coach')}
@@ -378,7 +676,7 @@ export default function UsersManagement() {
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder={`Search ${activeTab}s...`}
+          placeholder={`Search ${activeTab}s by name, email, phone, or paste a 24-char user / participant / coach / facility ID`}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -417,6 +715,9 @@ export default function UsersManagement() {
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     KVKK consent
                   </th>
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    Status
+                  </th>
                   {activeTab === 'participant' && (
                     <>
                       <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
@@ -448,6 +749,9 @@ export default function UsersManagement() {
                       <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                         Salons Count
                       </th>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Salon types (by sport)
+                      </th>
                     </>
                   )}
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
@@ -477,6 +781,13 @@ export default function UsersManagement() {
                         <span className="text-green-600 dark:text-green-400 font-medium">Yes</span>
                       ) : (
                         <span className="text-gray-500 dark:text-slate-400">No</span>
+                      )}
+                    </td>
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                      {user.isActive === false ? (
+                        <span className="text-amber-700 dark:text-amber-300 font-medium">Inactive</span>
+                      ) : (
+                        <span className="text-green-700 dark:text-green-300">Active</span>
                       )}
                     </td>
                     {activeTab === 'participant' && (
@@ -514,6 +825,9 @@ export default function UsersManagement() {
                         <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
                           {user.summary?.facility?.salonsCount || 0}
                         </td>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs max-w-xs break-words">
+                          {user.summary?.facility?.salonSportsLabel || "—"}
+                        </td>
                       </>
                     )}
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
@@ -538,6 +852,18 @@ export default function UsersManagement() {
                             Edit Profile
                           </button>
                         )}
+                        <button
+                          onClick={() => handleToggleActive(user)}
+                          className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
+                        >
+                          {user.isActive === false ? "Activate" : "Deactivate"}
+                        </button>
+                        <button
+                          onClick={() => handleBlacklistUser(user)}
+                          className="px-3 py-1 bg-slate-700 text-white rounded hover:bg-slate-800 text-sm"
+                        >
+                          Blacklist
+                        </button>
                         <button
                           onClick={() => handleDelete(user._id)}
                           className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -576,7 +902,7 @@ export default function UsersManagement() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-md">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-lg">
             <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-slate-100">
               {editingUser ? "Edit User" : "Create User"}
             </h3>
@@ -673,15 +999,50 @@ export default function UsersManagement() {
                 </label>
                 <select
                   value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: parseInt(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    const role = parseInt(e.target.value, 10);
+                    setFormData({
+                      ...formData,
+                      role,
+                      adminPermissionGroupIds: role === 0 ? formData.adminPermissionGroupIds : [],
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
                 >
                   <option value={1}>User</option>
                   <option value={0}>Admin</option>
                 </select>
               </div>
+              {isFullAdmin && formData.role === 0 && loadedPermissionGroups.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+                    Admin izin grupları
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">
+                    Boş bırakılırsa tam yetki (varsayılan). Grup seçilirse yalnızca seçilen izinler geçerli olur.
+                  </p>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded-lg p-2 space-y-1">
+                    {loadedPermissionGroups.map((g) => (
+                      <label key={g._id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.adminPermissionGroupIds.includes(g._id)}
+                          onChange={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              adminPermissionGroupIds: prev.adminPermissionGroupIds.includes(g._id)
+                                ? prev.adminPermissionGroupIds.filter((id) => id !== g._id)
+                                : [...prev.adminPermissionGroupIds, g._id],
+                            }));
+                          }}
+                        />
+                        <span>{g.name}</span>
+                        <span className="text-xs text-gray-400 font-mono">{g.slug}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -780,7 +1141,7 @@ export default function UsersManagement() {
                                       </div>
                                       {branch.certificate && (
                                         <a
-                                          href={`${EP.API_ASSETS_BASE}${branch.certificate.path.startsWith('/') ? branch.certificate.path : `/${branch.certificate.path}`}`}
+                                          href={EP.assetUrl(branch.certificate.path)}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="text-xs text-cyan-600 hover:underline mt-1 inline-block"
@@ -807,7 +1168,7 @@ export default function UsersManagement() {
 
                 {detailsData?.participant && (
                   <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Participant Profile</h4>
+                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Gamer Profile</h4>
                     <div className="space-y-2 text-sm">
                       {detailsData.participant.mainSport && (
                         <p>

@@ -22,6 +22,7 @@ router.post('/unfollow-club', participantController.unfollowClub);
 router.post('/join-to-group/:groupId', participantController.joinToClubGroup);
 router.post('/leave-group/:groupId', participantController.leaveClubGroup);
 router.post('/make-reservation', participantController.makeReservation);
+router.post('/enroll-series', participantController.enrollInSeries);
 router.post('/check-in', participantController.checkIn);
 router.post('/confirm-payment', participantController.confirmPayment);
 router.post('/follow-group', participantController.followGroup);
@@ -33,6 +34,7 @@ router.post(
     uploadFile({ fieldName: 'event-end-photo' }),
     participantController.endPhoto
 );
+router.post('/event-end-photos', participantController.getEventEndPhotos);
 router.get('/get-by-detail/:participantId', participantController.getParticipantDetails);
 router.get('/follows', participantController.getFollows);
 router.post('/my-reservations', participantController.getMyReservations);

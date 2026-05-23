@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { unlink } from 'fs/promises';
 import User from '../models/userModel.js';
+import AdminPermissionGroup from '../models/adminPermissionGroupModel.js';
 import Coach from '../models/coachModel.js';
 import Branch from '../models/branchModel.js';
 import Event from '../models/eventModel.js';
@@ -12,15 +13,29 @@ import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
 import { Sport } from '../models/referenceDataModel.js';
 import StaticPage from '../models/staticPageModel.js';
+import Suggestion from '../models/suggestionModel.js';
+import DashboardHeroSlide from '../models/dashboardHeroSlideModel.js';
+import DashboardHeroClick from '../models/dashboardHeroClickModel.js';
+import { parseHeroAnalyticsQuery, fillDailySeries } from '../utils/heroClickAnalytics.js';
 import { AppError } from '../utils/appError.js';
-import { SearchQuerySchema, mongoObjectId, signupSchema, adminCreateUserSchema, editUserSchema } from '../utils/validation.js';
+import {
+    SearchQuerySchema,
+    mongoObjectId,
+    adminCreateUserSchema,
+    adminEditUserSchema,
+} from '../utils/validation.js';
 import * as zodValidation from '../utils/validation.js';
 import argon2 from 'argon2';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { notifyCertificateApproved, notifyCertificateRejected } from '../utils/notificationHelper.js';
+import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
+import { isValidHeroCtaHref } from '../utils/heroCtaHref.js';
+import { ADMIN_PERMISSION_STAR } from '../constants/adminPermissions.js';
 
 export const getAdminPanel = async (req, res, next) => {
     try {
+        const permissions = req.adminPermissions ? Array.from(req.adminPermissions) : [];
+        const isFullAdmin = req.adminPermissions?.has(ADMIN_PERMISSION_STAR) ?? false;
         res.status(200).json({
             success: true,
             message: 'Admin panel access granted',
@@ -31,6 +46,8 @@ export const getAdminPanel = async (req, res, next) => {
                     firstName: req.user.firstName,
                     lastName: req.user.lastName,
                 },
+                permissions,
+                isFullAdmin,
             },
         });
     } catch (err) {
@@ -49,13 +66,34 @@ export const getAllUsers = async (req, res, next) => {
         });
 
         const query = {};
-        if (search) {
-            query.$or = [
-                { firstName: { $regex: search, $options: 'i' } },
-                { lastName: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
-                { phone: { $regex: search, $options: 'i' } },
-            ];
+        const trimmedSearch = search?.trim() || '';
+
+        const textOr = trimmedSearch
+            ? [
+                  { firstName: { $regex: trimmedSearch, $options: 'i' } },
+                  { lastName: { $regex: trimmedSearch, $options: 'i' } },
+                  { email: { $regex: trimmedSearch, $options: 'i' } },
+                  { phone: { $regex: trimmedSearch, $options: 'i' } },
+              ]
+            : [];
+
+        const idOr = [];
+        if (
+            trimmedSearch &&
+            /^[a-fA-F0-9]{24}$/.test(trimmedSearch) &&
+            mongoose.Types.ObjectId.isValid(trimmedSearch)
+        ) {
+            idOr.push(
+                { _id: trimmedSearch },
+                { participant: trimmedSearch },
+                { coach: trimmedSearch },
+                { facility: trimmedSearch },
+                { company: trimmedSearch }
+            );
+        }
+
+        if (textOr.length || idOr.length) {
+            query.$or = [...textOr, ...idOr];
         }
 
         if (profileType === 'participant') {
@@ -80,6 +118,7 @@ export const getAllUsers = async (req, res, next) => {
             .populate('facility', 'name mainSport')
             .populate('termsAccepted.versionId', 'docType version title isActive')
             .populate('kvkkConsent.versionId', 'docType version title isActive')
+            .populate({ path: 'adminPermissionGroups', select: 'name slug permissions' })
             .skip((pageNumber - 1) * perPage)
             .limit(perPage)
             .sort({ createdAt: -1 });
@@ -101,11 +140,9 @@ export const getAllUsers = async (req, res, next) => {
                         groupName: branch.sport?.groupName || '',
                     }));
                     
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
+                    /** All events this user created (any start date; includes cancelled). */
                     const eventsCount = await Event.countDocuments({
                         owner: user._id,
-                        startTime: { $lte: today },
                     });
                     summary.coach = {
                         certificateCount: approvedBranchesCount,
@@ -130,9 +167,30 @@ export const getAllUsers = async (req, res, next) => {
                     const salonsCount = await Salon.countDocuments({
                         facility: { $in: facilityIds },
                     });
+                    const salonsWithSport = await Salon.find({
+                        facility: { $in: facilityIds },
+                    })
+                        .select('sport')
+                        .populate('sport', 'name')
+                        .lean();
+                    const sportCounts = new Map();
+                    for (const s of salonsWithSport) {
+                        const name =
+                            s.sport && typeof s.sport === 'object' && s.sport.name
+                                ? s.sport.name
+                                : 'Unknown';
+                        sportCounts.set(name, (sportCounts.get(name) || 0) + 1);
+                    }
+                    const salonSportsSummary = [...sportCounts.entries()]
+                        .map(([name, count]) => ({ name, count }))
+                        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
                     summary.facility = {
                         facilityCount: user.facility.length,
                         salonsCount,
+                        salonSportsSummary,
+                        salonSportsLabel: salonSportsSummary
+                            .map(({ name, count }) => `${name}: ${count}`)
+                            .join(', '),
                     };
                 }
 
@@ -192,14 +250,29 @@ export const createUser = async (req, res, next) => {
         }
 
         const hashedPassword = await argon2.hash(result.password);
-        const { password, ...userData } = result;
+        const { password, adminPermissionGroups, ...userData } = result;
+
+        let groupIds = [];
+        if (userData.role === 0 && adminPermissionGroups?.length) {
+            if (!req.adminPermissions?.has(ADMIN_PERMISSION_STAR)) {
+                throw new AppError(403, 'Yalnızca tam yetkili yönetici izin grubu atayabilir.');
+            }
+            const n = await AdminPermissionGroup.countDocuments({ _id: { $in: adminPermissionGroups } });
+            if (n !== adminPermissionGroups.length) {
+                throw new AppError(400, 'Geçersiz izin grubu');
+            }
+            groupIds = adminPermissionGroups;
+        }
 
         const user = await User.create({
             ...userData,
             password: hashedPassword,
             termsAccepted: null,
             kvkkConsent: null,
+            adminPermissionGroups: groupIds,
         });
+
+        await user.populate({ path: 'adminPermissionGroups', select: 'name slug permissions' });
 
         const { password: pass, ...userWithoutPassword } = user.toObject();
 
@@ -243,14 +316,48 @@ export const updateUser = async (req, res, next) => {
             }
         }
 
-        const result = editUserSchema.parse(updateData);
+        const result = adminEditUserSchema.parse(updateData);
+
+        const targetBefore = await User.findById(userId).select('role');
+        if (!targetBefore) {
+            throw new AppError(404, 'User not found');
+        }
+        const finalRole = result.role !== undefined ? result.role : targetBefore.role;
+        if (finalRole !== 0) {
+            delete result.adminPermissionGroups;
+        }
+
+        const hasFull = req.adminPermissions?.has(ADMIN_PERMISSION_STAR);
+
+        if (result.isActive === false && userId.toString() === req.user._id.toString()) {
+            throw new AppError(400, 'Kendi hesabınızı pasifleştiremezsiniz.');
+        }
+
+        if (result.adminPermissionGroups !== undefined && !hasFull) {
+            throw new AppError(403, 'İzin grubu ataması için tam yetki gerekir.');
+        }
+
+        if (result.role === 1) {
+            result.adminPermissionGroups = [];
+        } else if (result.role === 0 && result.adminPermissionGroups !== undefined && hasFull) {
+            const ids = result.adminPermissionGroups;
+            if (ids.length) {
+                const n = await AdminPermissionGroup.countDocuments({ _id: { $in: ids } });
+                if (n !== ids.length) {
+                    throw new AppError(400, 'Geçersiz izin grubu');
+                }
+            }
+        }
 
         if (passwordHash) {
             result.password = passwordHash;
         }
 
-        const updatedUser = await User.findByIdAndUpdate(userId, result, { new: true })
-            .select('-password -failedLoginAttempts -accountLockedUntil');
+        const patch = Object.fromEntries(Object.entries(result).filter(([, v]) => v !== undefined));
+
+        const updatedUser = await User.findByIdAndUpdate(userId, { $set: patch }, { new: true })
+            .select('-password -failedLoginAttempts -accountLockedUntil')
+            .populate({ path: 'adminPermissionGroups', select: 'name slug permissions' });
 
         if (!updatedUser) {
             throw new AppError(404, 'User not found');
@@ -314,12 +421,28 @@ export const getPendingCoaches = async (req, res, next) => {
         let filteredBranches = branches;
 
         if (search) {
-            const searchLower = search.toLowerCase();
-            filteredBranches = branches.filter((branch) => {
-                const coachName = branch.coach?.name || '';
-                const sportName = branch.sport?.name || '';
-                return coachName.toLowerCase().includes(searchLower) || sportName.toLowerCase().includes(searchLower);
-            });
+            const trimmed = search.trim();
+            const oidMatch =
+                /^[a-fA-F0-9]{24}$/.test(trimmed) &&
+                mongoose.Types.ObjectId.isValid(trimmed);
+
+            if (oidMatch) {
+                filteredBranches = branches.filter(
+                    (branch) =>
+                        String(branch._id) === trimmed ||
+                        String(branch.coach?._id) === trimmed
+                );
+            } else {
+                const searchLower = trimmed.toLowerCase();
+                filteredBranches = branches.filter((branch) => {
+                    const coachName = branch.coach?.name || '';
+                    const sportName = branch.sport?.name || '';
+                    return (
+                        coachName.toLowerCase().includes(searchLower) ||
+                        sportName.toLowerCase().includes(searchLower)
+                    );
+                });
+            }
         }
 
         const total = filteredBranches.length;
@@ -513,7 +636,7 @@ export const getParticipantDetails = async (req, res, next) => {
         const user = await User.findById(userId).populate('participant');
 
         if (!user || !user.participant) {
-            throw new AppError(404, 'User or participant profile not found');
+            throw new AppError(404, 'User or gamer profile not found');
         }
 
         const participantId = user.participant._id;
@@ -726,8 +849,7 @@ export const updateCoachProfile = async (req, res, next) => {
             throw new AppError(404, 'User or coach profile not found');
         }
 
-        const data = JSON.parse(req.body.data);
-        const result = zodValidation.createCoachSchema.parse(data);
+        const { branches: result } = zodValidation.parseCoachProfileFormData(req.body.data);
 
         const branchesNeedingPhotos = result.filter((branch) => !branch.certificate);
 
@@ -850,7 +972,7 @@ export const getParticipantProfile = async (req, res, next) => {
         });
 
         if (!user || !user.participant) {
-            throw new AppError(404, 'User or participant profile not found');
+            throw new AppError(404, 'User or gamer profile not found');
         }
 
         const participant = user.participant;
@@ -883,7 +1005,7 @@ export const updateParticipantProfile = async (req, res, next) => {
         const user = await User.findById(userId).populate('participant');
 
         if (!user || !user.participant) {
-            throw new AppError(404, 'User or participant profile not found');
+            throw new AppError(404, 'User or gamer profile not found');
         }
 
         const result = zodValidation.editParticipantSchema.parse({
@@ -902,7 +1024,7 @@ export const updateParticipantProfile = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: 'Participant profile updated successfully',
+            message: 'Gamer profile updated successfully',
             data: editParticipant,
         });
     } catch (err) {
@@ -1093,3 +1215,333 @@ export const getActiveStaticPages = async (req, res, next) => {
         next(err);
     }
 };
+
+export const listSuggestions = async (req, res, next) => {
+    try {
+        const list = await Suggestion.find()
+            .sort({ createdAt: -1 })
+            .limit(400)
+            .select('message email contactName createdAt')
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: list,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+function parseDashboardHeroData(req) {
+    try {
+        if (typeof req.body?.data === 'string') {
+            return JSON.parse(req.body.data);
+        }
+    } catch {
+        throw new AppError(400, 'Invalid JSON in data field');
+    }
+    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+        return req.body;
+    }
+    return {};
+}
+
+async function safeUnlinkHeroImage(image) {
+    if (!image?.path) return;
+    try {
+        await unlink(image.path);
+    } catch {
+        /* ignore */
+    }
+}
+
+function sanitizeDashboardHeroPayload(body, { partial } = { partial: false }) {
+    const out = {};
+    if (!partial || body.badgeLabel !== undefined) {
+        out.badgeLabel =
+            typeof body.badgeLabel === 'string' ? body.badgeLabel.trim().slice(0, 80) : '';
+    }
+    if (!partial || body.title !== undefined) {
+        const t = typeof body.title === 'string' ? body.title.trim() : '';
+        out.title = t.slice(0, 220);
+    }
+    if (!partial || body.subtitle !== undefined) {
+        out.subtitle =
+            typeof body.subtitle === 'string' ? body.subtitle.trim().slice(0, 600) : '';
+    }
+    if (!partial || body.imageAlt !== undefined) {
+        out.imageAlt =
+            typeof body.imageAlt === 'string' ? body.imageAlt.trim().slice(0, 200) : '';
+    }
+    if (!partial || body.ctaLabel !== undefined) {
+        out.ctaLabel =
+            typeof body.ctaLabel === 'string' ? body.ctaLabel.trim().slice(0, 80) : '';
+    }
+    if (!partial || body.ctaHref !== undefined) {
+        const h = typeof body.ctaHref === 'string' ? body.ctaHref.trim() : '';
+        if (h && !isValidHeroCtaHref(h)) {
+            throw new AppError(
+                400,
+                'CTA link must be a site path (e.g. /events) or https:// URL'
+            );
+        }
+        out.ctaHref = h.slice(0, 500);
+    }
+    if (!partial || body.ctaRequiresAdminRole !== undefined) {
+        out.ctaRequiresAdminRole = !!body.ctaRequiresAdminRole;
+    }
+    if (!partial || body.isActive !== undefined) {
+        out.isActive = body.isActive !== false;
+    }
+    if (!partial || body.order !== undefined) {
+        const o = Number(body.order);
+        out.order = Number.isFinite(o) ? o : 0;
+    }
+    return out;
+}
+
+export const listDashboardHeroSlides = async (req, res, next) => {
+    try {
+        const rows = await DashboardHeroSlide.find()
+            .sort({ order: 1, createdAt: -1 })
+            .lean();
+
+        const data = rows.map((row) => ({
+            ...row,
+            image: row.image?.path
+                ? {
+                      ...row.image,
+                      path: uploadsRelativePath(row.image.path),
+                  }
+                : undefined,
+        }));
+
+        res.status(200).json({ success: true, data });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const createDashboardHeroSlide = async (req, res, next) => {
+    try {
+        const raw = parseDashboardHeroData(req);
+        const payload = sanitizeDashboardHeroPayload(raw, { partial: false });
+        if (req.fileMeta) {
+            payload.image = req.fileMeta;
+        }
+        if (
+            !heroSlideHasContent({
+                title: payload.title,
+                subtitle: payload.subtitle,
+                image: payload.image,
+            })
+        ) {
+            throw new AppError(
+                400,
+                'Add at least an image, a title, or a subtitle'
+            );
+        }
+        const slide = await DashboardHeroSlide.create(payload);
+        res.status(201).json({ success: true, data: slide });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateDashboardHeroSlide = async (req, res, next) => {
+    try {
+        const slideId = zodValidation.mongoObjectId.parse(req.params.slideId);
+        const slide = await DashboardHeroSlide.findById(slideId);
+        if (!slide) throw new AppError(404, 'Slide not found');
+
+        const raw = parseDashboardHeroData(req);
+        const payload = sanitizeDashboardHeroPayload(raw, { partial: true });
+        Object.assign(slide, payload);
+
+        if (raw.removeImage === true) {
+            await safeUnlinkHeroImage(slide.image);
+            slide.image = undefined;
+        }
+
+        if (req.fileMeta) {
+            await safeUnlinkHeroImage(slide.image);
+            slide.image = req.fileMeta;
+        }
+
+        if (
+            !heroSlideHasContent({
+                title: slide.title,
+                subtitle: slide.subtitle,
+                image: slide.image,
+            })
+        ) {
+            throw new AppError(
+                400,
+                'Slide must keep at least an image, a title, or a subtitle'
+            );
+        }
+
+        await slide.save();
+
+        res.status(200).json({ success: true, data: slide });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getDashboardHeroAnalytics = async (req, res, next) => {
+    try {
+        const { from, to, days, slideId } = parseHeroAnalyticsQuery(req.query);
+
+        const match = {
+            clickedAt: { $gte: from, $lte: to },
+            ...(slideId ? { slideId: new mongoose.Types.ObjectId(slideId) } : {}),
+        };
+
+        const [periodBySlide, dailyRows, dailyBySlideRows, loggedInCount, slides] =
+            await Promise.all([
+                DashboardHeroClick.aggregate([
+                    { $match: match },
+                    { $group: { _id: '$slideId', periodClicks: { $sum: 1 } } },
+                    { $sort: { periodClicks: -1 } },
+                ]),
+                DashboardHeroClick.aggregate([
+                    { $match: match },
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: '%Y-%m-%d',
+                                    date: '$clickedAt',
+                                    timezone: 'UTC',
+                                },
+                            },
+                            count: { $sum: 1 },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ]),
+                DashboardHeroClick.aggregate([
+                    { $match: match },
+                    {
+                        $group: {
+                            _id: {
+                                day: {
+                                    $dateToString: {
+                                        format: '%Y-%m-%d',
+                                        date: '$clickedAt',
+                                        timezone: 'UTC',
+                                    },
+                                },
+                                slideId: '$slideId',
+                            },
+                            count: { $sum: 1 },
+                        },
+                    },
+                    { $sort: { '_id.day': 1 } },
+                ]),
+                DashboardHeroClick.countDocuments({
+                    ...match,
+                    userId: { $ne: null },
+                }),
+                DashboardHeroSlide.find()
+                    .select('title badgeLabel ctaHref isActive order clickCount lastClickedAt')
+                    .sort({ order: 1, createdAt: -1 })
+                    .lean(),
+            ]);
+
+        const slideMap = new Map(slides.map((s) => [String(s._id), s]));
+        const periodMap = new Map(
+            periodBySlide.map((r) => [String(r._id), r.periodClicks])
+        );
+
+        const periodClicksTotal = periodBySlide.reduce((n, r) => n + r.periodClicks, 0);
+
+        const bySlide = slides.map((s) => {
+            const id = String(s._id);
+            return {
+                slideId: id,
+                title: s.title || s.badgeLabel || '(untitled)',
+                ctaHref: s.ctaHref || '',
+                isActive: s.isActive !== false,
+                allTimeClicks: s.clickCount ?? 0,
+                periodClicks: periodMap.get(id) ?? 0,
+                lastClickedAt: s.lastClickedAt ?? null,
+            };
+        });
+
+        for (const row of periodBySlide) {
+            const id = String(row._id);
+            if (!slideMap.has(id)) {
+                bySlide.push({
+                    slideId: id,
+                    title: '(deleted slide)',
+                    ctaHref: '',
+                    isActive: false,
+                    allTimeClicks: 0,
+                    periodClicks: row.periodClicks,
+                    lastClickedAt: null,
+                });
+            }
+        }
+
+        bySlide.sort((a, b) => b.periodClicks - a.periodClicks);
+
+        const daily = fillDailySeries(
+            from,
+            to,
+            dailyRows.map((r) => ({ date: r._id, count: r.count }))
+        );
+
+        const dailyBySlide = dailyBySlideRows.map((r) => {
+            const sid = String(r._id.slideId);
+            const slide = slideMap.get(sid);
+            return {
+                date: r._id.day,
+                slideId: sid,
+                slideTitle: slide?.title || slide?.badgeLabel || '(deleted slide)',
+                count: r.count,
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                range: {
+                    from: from.toISOString(),
+                    to: to.toISOString(),
+                    days,
+                    slideId,
+                },
+                summary: {
+                    periodClicks: periodClicksTotal,
+                    loggedInClicks: loggedInCount,
+                },
+                daily,
+                dailyBySlide,
+                bySlide,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const deleteDashboardHeroSlide = async (req, res, next) => {
+    try {
+        const slideId = zodValidation.mongoObjectId.parse(req.params.slideId);
+        const slide = await DashboardHeroSlide.findById(slideId);
+        if (!slide) throw new AppError(404, 'Slide not found');
+        await safeUnlinkHeroImage(slide.image);
+        await slide.deleteOne();
+
+        res.status(200).json({ success: true, message: 'Slide deleted' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+function heroSlideHasContent({ title, subtitle, image }) {
+    return !!(image?.path || String(title || '').trim() || String(subtitle || '').trim());
+}
