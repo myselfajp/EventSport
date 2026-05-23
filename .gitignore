@@ -139,3 +139,9 @@ yarn.lock.backup
 
 # --- Eski / yerel proje kopyaları ---
 _oldProject_/
+
+# --- DB seed toolkit (canlı veri; GitHub'a gitmez) ---
+scripts/db-seed-toolkit/
+scripts/db-seed-toolkit/**
+EventSport-db-seed-toolkit.zip
+*.seed-toolkit.zip
