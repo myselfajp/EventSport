@@ -85,7 +85,8 @@ lerna-debug.log*
 *.sqlite
 *.sqlite3
 *.dump
-data/
+# Yalnızca kökteki DB dump klasörü (backEnd/src/data gibi kaynak klasörleri etkilemesin)
+/data/
 mongodb_data/
 mongodb_data_prod/
 
