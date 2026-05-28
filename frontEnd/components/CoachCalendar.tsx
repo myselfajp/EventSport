@@ -15,6 +15,10 @@ import { Facility } from "@/app/lib/types";
 
 interface CoachCalendarProps {
   onBack: () => void;
+  /** View another user's schedule (e.g. gamer viewing a coach). */
+  viewUserId?: string;
+  coachDisplayName?: string;
+  readOnly?: boolean;
 }
 
 interface Event {
@@ -43,10 +47,31 @@ interface Event {
   [key: string]: any;
 }
 
-const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
+function eventBelongsToUser(event: Event, userId: string) {
+  const ownerId =
+    typeof event.owner === "object" && event.owner !== null
+      ? event.owner._id
+      : event.owner;
+  const backupCoachId =
+    typeof event.backupCoach === "object" && event.backupCoach !== null
+      ? event.backupCoach._id
+      : event.backupCoach;
+  return ownerId === userId || backupCoachId === userId;
+}
+
+const CoachCalendar: React.FC<CoachCalendarProps> = ({
+  onBack,
+  viewUserId,
+  coachDisplayName,
+  readOnly = false,
+}) => {
   const { data: user, isLoading: userLoading } = useMe();
-  const coachId = user?._id; // User ID is used as owner for events
-  const isAdmin = user?.role === 0;
+  const coachId = viewUserId ?? user?._id;
+  const isViewingOtherCoach = Boolean(viewUserId);
+  const isAdmin = !isViewingOtherCoach && user?.role === 0;
+  const calendarReady = isViewingOtherCoach
+    ? Boolean(coachId)
+    : Boolean(coachId && !userLoading);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -99,8 +124,18 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
   }, []);
 
   // Fetch events for the current month (for highlighting)
+  const eventMatchesCoachFilter = useCallback(
+    (event: Event) => {
+      if (!coachId) return false;
+      if (isViewingOtherCoach || readOnly) return eventBelongsToUser(event, coachId);
+      if (isAdmin) return true;
+      return eventBelongsToUser(event, coachId);
+    },
+    [coachId, isViewingOtherCoach, readOnly, isAdmin]
+  );
+
   const fetchMonthEvents = useCallback(async () => {
-    if (!coachId || userLoading) return;
+    if (!calendarReady) return;
     
     setIsLoadingMonthEvents(true);
     try {
@@ -121,14 +156,8 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         // Filter events that belong to this coach (owner or backupCoach) and fall within the month range
         let allFilteredEvents = response.data.filter((event: Event) => {
           if (!event || !event.startTime) return false;
-          
-          // Check if coach is owner or backupCoach
-          const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
-          const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
-          const isOwner = ownerId === coachId;
-          const isBackupCoach = backupCoachId === coachId;
-          if (!isAdmin && !isOwner && !isBackupCoach) return false;
-          
+          if (!eventMatchesCoachFilter(event)) return false;
+
           const eventStart = new Date(event.startTime);
           const eventDate = new Date(
             eventStart.getFullYear(),
@@ -165,14 +194,8 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
               if (nextResponse?.success && nextResponse?.data) {
                 const nextFiltered = nextResponse.data.filter((event: Event) => {
                   if (!event || !event.startTime) return false;
-                  
-                  // Check if coach is owner or backupCoach
-                  const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
-                  const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
-                  const isOwner = ownerId === coachId;
-                  const isBackupCoach = backupCoachId === coachId;
-                  if (!isAdmin && !isOwner && !isBackupCoach) return false;
-                  
+                  if (!eventMatchesCoachFilter(event)) return false;
+
                   const eventStart = new Date(event.startTime);
                   const eventDate = new Date(
                     eventStart.getFullYear(),
@@ -210,7 +233,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     } finally {
       setIsLoadingMonthEvents(false);
     }
-  }, [currentDate, coachId, userLoading, getMonthStartEnd, isAdmin]);
+  }, [currentDate, calendarReady, getMonthStartEnd, eventMatchesCoachFilter]);
 
   // Fetch events for a specific date
   const fetchDateEvents = useCallback(async (date: Date) => {
@@ -233,14 +256,8 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         // Filter events that belong to this coach (owner or backupCoach) and match the specific date
         const filteredEvents = response.data.filter((event: Event) => {
           if (!event || !event.startTime) return false;
-          
-          // Check if coach is owner or backupCoach
-          const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
-          const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
-          const isOwner = ownerId === coachId;
-          const isBackupCoach = backupCoachId === coachId;
-          if (!isAdmin && !isOwner && !isBackupCoach) return false;
-          
+          if (!eventMatchesCoachFilter(event)) return false;
+
           const eventStart = new Date(event.startTime);
           return (
             eventStart.getDate() === date.getDate() &&
@@ -266,14 +283,8 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
               if (nextResponse?.success && nextResponse?.data) {
                 const nextFiltered = nextResponse.data.filter((event: Event) => {
                   if (!event || !event.startTime) return false;
-                  
-                  // Check if coach is owner or backupCoach
-                  const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
-                  const backupCoachId = typeof event.backupCoach === 'object' && event.backupCoach !== null ? event.backupCoach._id : event.backupCoach;
-                  const isOwner = ownerId === coachId;
-                  const isBackupCoach = backupCoachId === coachId;
-                  if (!isAdmin && !isOwner && !isBackupCoach) return false;
-                  
+                  if (!eventMatchesCoachFilter(event)) return false;
+
                   const eventStart = new Date(event.startTime);
                   return (
                     eventStart.getDate() === date.getDate() &&
@@ -300,12 +311,12 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
     } finally {
       setIsLoadingDateEvents(false);
     }
-  }, [coachId, isAdmin]);
+  }, [coachId, eventMatchesCoachFilter]);
   useEffect(() => {
-    if (coachId && !userLoading) {
+    if (calendarReady) {
       fetchMonthEvents();
     }
-  }, [currentDate, coachId, userLoading, fetchMonthEvents]);
+  }, [currentDate, calendarReady, fetchMonthEvents]);
 
   // Get events for a specific day
   const getEventsForDay = useCallback((day: number) => {
@@ -505,7 +516,11 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         >
           <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-slate-300" />
         </button>
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">My Calendar</h2>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+          {isViewingOtherCoach && coachDisplayName
+            ? `${coachDisplayName}'s Calendar`
+            : "My Calendar"}
+        </h2>
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row gap-6">
@@ -696,9 +711,12 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
               ) : (
                 <div className="space-y-4">
                   {selectedDateEvents.map((event) => {
-                    const ownerId = typeof event.owner === 'object' && event.owner !== null ? event.owner._id : event.owner;
+                    const ownerId =
+                      typeof event.owner === "object" && event.owner !== null
+                        ? event.owner._id
+                        : event.owner;
                     const isOwner = ownerId === coachId;
-                    const canEditEvent = isOwner;
+                    const canEditEvent = !readOnly && isOwner;
                     
                     return (
                       <div
@@ -751,14 +769,16 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
                                     {event.eventStyle.name}
                                   </span>
                                 )}
-                                <button
-                                  onClick={(e) => handleShowParticipants(e, event)}
-                                  className="px-3 py-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                                  title="View Gamers"
-                                >
-                                  <Users className="w-3 h-3" />
-                                  Gamers
-                                </button>
+                                {!readOnly && (
+                                  <button
+                                    onClick={(e) => handleShowParticipants(e, event)}
+                                    className="px-3 py-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                                    title="View Gamers"
+                                  >
+                                    <Users className="w-3 h-3" />
+                                    Gamers
+                                  </button>
+                                )}
                                 {canEditEvent && (
                                   <button
                                     onClick={(e) => {
@@ -830,6 +850,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         />
       )}
 
+      {!readOnly && (
       <AddEventModal
         isOpen={showEditEventModal}
         onClose={() => {
@@ -846,6 +867,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({ onBack }) => {
         }}
         initialData={showEditEventModal ? selectedEvent : undefined}
       />
+      )}
 
       <CoachDetailModal
         isOpen={showCoachModal}

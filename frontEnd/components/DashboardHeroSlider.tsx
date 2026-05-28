@@ -81,9 +81,9 @@ function SlideContent({
 
   const imageBlock = imgUrl ? (
     <div
-      className={`overflow-hidden rounded-xl bg-slate-800/80 shrink-0 ${
-        imageOnly ? "w-full" : "w-full md:w-[46%] md:max-w-xl"
-      } ${imageOnly ? "max-h-[min(52vw,320px)] aspect-[21/9] md:aspect-[3/1]" : "h-48 md:h-56"} ${
+      className={`flex items-center justify-center overflow-hidden rounded-xl bg-slate-800/80 shrink-0 ${
+        imageOnly ? "w-full min-h-[120px]" : "w-full md:w-[46%] md:max-w-xl min-h-48 py-2"
+      } ${
         imageOnly && canUseLink
           ? "cursor-pointer ring-0 focus-within:ring-2 focus-within:ring-cyan-400/50"
           : ""
@@ -106,7 +106,9 @@ function SlideContent({
       <img
         src={imgUrl}
         alt={slide.imageAlt || slide.title || "Banner"}
-        className="w-full h-full object-cover object-center"
+        className={`w-full object-contain object-center ${
+          imageOnly ? "max-h-[min(52vw,420px)]" : "max-h-48 md:max-h-64"
+        }`}
       />
     </div>
   ) : null;

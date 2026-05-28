@@ -1,0 +1,18 @@
+{
+  "name": "eventsport",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EventSport monorepo — kök komutlar frontEnd / backEnd alt projelerine yönlendirir.",
+  "scripts": {
+    "build": "npm run build --prefix frontEnd",
+    "build:frontend": "npm run build --prefix frontEnd",
+    "dev": "npm run dev --prefix frontEnd",
+    "dev:frontend": "npm run dev --prefix frontEnd",
+    "dev:backend": "npm start --prefix backEnd",
+    "start": "npm run start --prefix frontEnd",
+    "start:frontend": "npm run start --prefix frontEnd",
+    "start:backend": "npm start --prefix backEnd",
+    "lint": "npm run lint --prefix frontEnd",
+    "install:all": "npm install --prefix backEnd && npm install --prefix frontEnd"
+  }
+}

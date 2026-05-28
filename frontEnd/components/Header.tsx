@@ -149,14 +149,9 @@ const Header: React.FC<HeaderProps> = ({
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div>
-            <h2 className="font-semibold text-gray-800 dark:text-slate-100 text-sm md:text-base">
-              Dashboard
-            </h2>
-            <p className="text-xs md:text-sm text-gray-500 dark:text-slate-400 hidden sm:block">
-              You've got 24 New Sales
-            </p>
-          </div>
+          <h2 className="font-semibold text-gray-800 dark:text-slate-100 text-sm md:text-base">
+            Dashboard
+          </h2>
         </div>
 
         {/* Calendar, Theme Toggle, and Notification buttons */}

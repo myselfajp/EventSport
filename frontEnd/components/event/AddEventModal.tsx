@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Upload, ImageIcon, ChevronDown, Search } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -23,6 +23,64 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
 
   return debouncedValue;
+}
+
+type RecurrenceFrequency = "weekly" | "daily" | "monthly";
+
+function getRecurrenceIntervalLabel(frequency: RecurrenceFrequency): string {
+  switch (frequency) {
+    case "weekly":
+      return "Repeat every (weeks)";
+    case "daily":
+      return "Repeat every (days)";
+    case "monthly":
+      return "Repeat every (months)";
+    default:
+      return "Repeat every";
+  }
+}
+
+function formatListingPurchaseLine(
+  sessionCount: string,
+  unitPrice: number,
+  totalAmount: number
+): string {
+  return `Listing purchase: ${totalAmount} TRY (${sessionCount} × ${unitPrice} TRY per session)`;
+}
+
+function extractRefId(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "_id" in (value as object)) {
+    const id = (value as { _id?: unknown })._id;
+    return id != null ? String(id) : "";
+  }
+  return "";
+}
+
+function localDateInputValue(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function localTimeInputValue(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function combineLocalDateTime(date: string, time: string): string {
+  if (!date || !time) return "";
+  const [y, m, d] = date.split("-").map(Number);
+  const [h, min] = time.split(":").map(Number);
+  if ([y, m, d, h, min].some((n) => Number.isNaN(n))) return "";
+  return new Date(y, m - 1, d, h, min, 0, 0).toISOString();
 }
 
 interface AddEventModalProps {
@@ -343,22 +401,26 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
   useEffect(() => {
     if (initialData && isOpen) {
-      const startDate = initialData.startTime ? new Date(initialData.startTime).toISOString().split('T')[0] : '';
-      const startTime = initialData.startTime ? new Date(initialData.startTime).toTimeString().slice(0, 5) : '';
-      const endDate = initialData.endTime ? new Date(initialData.endTime).toISOString().split('T')[0] : '';
-      const endTime = initialData.endTime ? new Date(initialData.endTime).toTimeString().slice(0, 5) : '';
+      const sportGroupId = extractRefId(initialData.sportGroup);
+      const sportId = extractRefId(initialData.sport);
+      prevSportGroupRef.current = sportGroupId;
+
+      const startDate = localDateInputValue(initialData.startTime);
+      const startTime = localTimeInputValue(initialData.startTime);
+      const endDate = localDateInputValue(initialData.endTime);
+      const endTime = localTimeInputValue(initialData.endTime);
 
       setFormData({
         name: initialData.name || "",
-        club: initialData.club?._id || initialData.club || "",
-        group: initialData.group?._id || initialData.group || "",
-        style: initialData.style?._id || initialData.style || "",
-        sportGroup: initialData.sportGroup?._id || initialData.sportGroup || "",
-        sport: initialData.sport?._id || initialData.sport || "",
-        facility: initialData.facility?._id || initialData.facility || "",
-        salon: initialData.salon?._id || initialData.salon || "",
+        club: extractRefId(initialData.club),
+        group: extractRefId(initialData.group),
+        style: extractRefId(initialData.style),
+        sportGroup: sportGroupId,
+        sport: sportId,
+        facility: extractRefId(initialData.facility),
+        salon: extractRefId(initialData.salon),
         location: initialData.location || "",
-        district: initialData.district?._id || initialData.district || "",
+        district: extractRefId(initialData.district),
         startDate: startDate,
         startTime: startTime,
         endDate: endDate,
@@ -390,10 +452,82 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       if (initialData.banner?.path) {
         setBannerPreview(EP.assetUrl(initialData.banner.path));
       }
+
+      void (async () => {
+        const sgName =
+          typeof initialData.sportGroup === "object" && initialData.sportGroup?.name
+            ? String(initialData.sportGroup.name)
+            : "";
+        const sportName =
+          typeof initialData.sport === "object" && initialData.sport?.name
+            ? String(initialData.sport.name)
+            : "";
+
+        if (sportGroupId) {
+          try {
+            const sgRes = await fetchJSON(EP.REFERENCE.sportGroup.get, {
+              method: "POST",
+              body: { perPage: 100, pageNumber: 1 },
+            });
+            let groups: SportGroup[] =
+              sgRes.success && Array.isArray(sgRes.data) ? sgRes.data : [];
+            if (!groups.some((g) => g._id === sportGroupId)) {
+              groups = [
+                { _id: sportGroupId, name: sgName || "Selected sport group" },
+                ...groups,
+              ];
+            }
+            setSportGroups(groups);
+          } catch {
+            if (sgName) {
+              setSportGroups([{ _id: sportGroupId, name: sgName }]);
+            }
+          }
+
+          if (sportId) {
+            try {
+              const spRes = await fetchJSON(EP.REFERENCE.sport.get, {
+                method: "POST",
+                body: { perPage: 100, pageNumber: 1, groupId: sportGroupId },
+              });
+              let list: Sport[] =
+                spRes.success && Array.isArray(spRes.data) ? spRes.data : [];
+              if (!list.some((s) => s._id === sportId)) {
+                list = [
+                  { _id: sportId, name: sportName || "Selected sport", group: sportGroupId },
+                  ...list,
+                ];
+              }
+              setSports(list);
+            } catch {
+              if (sportName) {
+                setSports([
+                  { _id: sportId, name: sportName, group: sportGroupId },
+                ]);
+              }
+            }
+          }
+        }
+      })();
     }
   }, [initialData, isOpen]);
 
   const isSeriesEdit = isEditMode && !!(initialData?.series?._id || initialData?.series);
+
+  const recurrenceIntervalLabel = useMemo(
+    () => getRecurrenceIntervalLabel(formData.recurrenceFrequency),
+    [formData.recurrenceFrequency]
+  );
+
+  const listingPurchaseLine = useMemo(() => {
+    const count = formData.recurrenceSessionCount.trim();
+    if (!listingQuote || !count) return null;
+    return formatListingPurchaseLine(
+      count,
+      listingQuote.unitPrice,
+      listingQuote.totalAmount
+    );
+  }, [formData.recurrenceSessionCount, listingQuote]);
 
   useEffect(() => {
     if (!isOpen || !formData.isRecurring || isEditMode) {
@@ -749,11 +883,20 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         formDataToSend.append("event-banner", bannerFile);
       }
 
-      const startDateTime = `${formData.startDate}T${formData.startTime}:00.000Z`;
+      const startDateTime = combineLocalDateTime(
+        formData.startDate,
+        formData.startTime
+      );
       const endDateTime =
         formData.endDate && formData.endTime
-          ? `${formData.endDate}T${formData.endTime}:00.000Z`
+          ? combineLocalDateTime(formData.endDate, formData.endTime)
           : startDateTime;
+
+      if (!startDateTime || !endDateTime) {
+        setError("Invalid start or end date/time");
+        setSubmitting(false);
+        return;
+      }
 
       const eventData = {
         name: formData.name,
@@ -867,8 +1010,12 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         setError(result.message || (isEditMode ? "There was a problem updating the event" : "There was a problem creating the event"));
       }
     } catch (err: any) {
-      setError("There was a problem creating the event");
-      console.error("Error creating event:", err);
+      setError(
+        isEditMode
+          ? "There was a problem updating the event"
+          : "There was a problem creating the event"
+      );
+      console.error(isEditMode ? "Error updating event:" : "Error creating event:", err);
     } finally {
       setSubmitting(false);
     }
@@ -925,6 +1072,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     setSportSearchQuery("");
     setFacilitySearchQuery("");
     setSalonSearchQuery("");
+    prevSportGroupRef.current = "";
   };
 
   const getSelectedName = (id: string, list: any[], key = "name") => {
@@ -1992,7 +2140,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                        Every (interval)
+                        {recurrenceIntervalLabel}
                       </label>
                       <input
                         type="number"
@@ -2027,18 +2175,12 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   <div className="text-sm text-gray-700 dark:text-gray-300">
                     {loadingListingQuote ? (
                       <span>Calculating listing cost…</span>
-                    ) : listingQuote ? (
-                      <span>
-                        Listing purchase:{" "}
-                        <strong>
-                          {listingQuote.totalAmount.toLocaleString("tr-TR")} TRY
-                        </strong>{" "}
-                        ({formData.recurrenceSessionCount} ×{" "}
-                        {listingQuote.unitPrice.toLocaleString("tr-TR")} TRY per
-                        session)
-                      </span>
+                    ) : listingPurchaseLine ? (
+                      <span>{listingPurchaseLine}</span>
                     ) : (
-                      <span>Enter session count to see listing cost.</span>
+                      <span>
+                        Enter a valid session count (2–52) to see listing cost.
+                      </span>
                     )}
                   </div>
                   <div className="flex items-start gap-2">
@@ -2059,7 +2201,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       className="text-sm text-gray-700 dark:text-gray-300"
                     >
                       I confirm the listing purchase for all sessions in this
-                      series (payment will be integrated later).
+                      series (payment will be made to the coach/organizer of
+                      the event at once at the beginning).
                     </label>
                   </div>
                 </div>

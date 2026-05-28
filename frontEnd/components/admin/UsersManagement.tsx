@@ -88,6 +88,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [showParticipantModal, setShowParticipantModal] = useState(false);
   const [showFacilityModal, setShowFacilityModal] = useState(false);
+  const [showCreateFacilityModal, setShowCreateFacilityModal] = useState(false);
   const [editingProfileUser, setEditingProfileUser] = useState<User | null>(null);
   const [editingFacility, setEditingFacility] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
@@ -177,6 +178,10 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       adminPermissionGroupIds: [],
     });
     setShowModal(true);
+  };
+
+  const handleCreateFacility = () => {
+    setShowCreateFacilityModal(true);
   };
 
   const handleEdit = (user: User) => {
@@ -629,6 +634,15 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
             <Download className="w-4 h-4" />
             {exporting ? "Exporting…" : "Export CSV (Excel TR)"}
           </button>
+          {activeTab === "facility" && (
+            <button
+              type="button"
+              onClick={handleCreateFacility}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+            >
+              Create Facility
+            </button>
+          )}
           <button
             onClick={handleCreate}
             className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
@@ -1326,6 +1340,15 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
           }}
         />
       )}
+
+      <AdminCreateFacilityModal
+        isOpen={showCreateFacilityModal}
+        onClose={() => setShowCreateFacilityModal(false)}
+        onSuccess={() => {
+          fetchUsers();
+          setShowCreateFacilityModal(false);
+        }}
+      />
     </div>
   );
 }
@@ -1367,18 +1390,16 @@ function AdminParticipantModal({ isOpen, onClose, userId, onSuccess }: { isOpen:
 // Admin Facility Modal Wrapper
 function AdminFacilityModal({ isOpen, onClose, userId, facilityId, initialData, onSuccess }: { isOpen: boolean; onClose: () => void; userId: string; facilityId: string; initialData: any; onSuccess: () => void }) {
   const handleSubmit = async (formData: FormData) => {
-    try {
-      const res = await apiFetch(EP.ADMIN.users.updateFacilityProfile(userId, facilityId), {
-        method: "PUT",
-        body: formData,
-      });
-      const json = await res.json();
-      if (json.success) {
-        onSuccess();
-      }
-    } catch (err: any) {
-      console.error("Error updating facility profile:", err);
+    const res = await apiFetch(EP.ADMIN.users.updateFacilityProfile(userId, facilityId), {
+      method: "PUT",
+      body: formData,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json?.success === false) {
+      throw new Error(json?.message || json?.error || "Failed to update facility");
     }
+    onSuccess();
+    return json.data;
   };
 
   return (
@@ -1388,6 +1409,147 @@ function AdminFacilityModal({ isOpen, onClose, userId, facilityId, initialData, 
       onSubmit={handleSubmit}
       initialData={initialData}
     />
+  );
+}
+
+type OwnerUser = { _id: string; firstName: string; lastName: string; email: string };
+
+function AdminCreateFacilityModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [ownerUser, setOwnerUser] = useState<OwnerUser | null>(null);
+  const [ownerLookupError, setOwnerLookupError] = useState("");
+  const [ownerLookupLoading, setOwnerLookupLoading] = useState(false);
+  const [showFacilityForm, setShowFacilityForm] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setOwnerSearch("");
+      setOwnerUser(null);
+      setOwnerLookupError("");
+      setShowFacilityForm(false);
+    }
+  }, [isOpen]);
+
+  const lookupOwner = async () => {
+    const q = ownerSearch.trim();
+    if (!q) {
+      setOwnerLookupError("Enter owner email or 24-character user ID.");
+      return;
+    }
+    setOwnerLookupLoading(true);
+    setOwnerLookupError("");
+    setOwnerUser(null);
+    setShowFacilityForm(false);
+    try {
+      const response = await fetchJSON(EP.ADMIN.users.getAll, {
+        method: "POST",
+        body: { perPage: 5, pageNumber: 1, search: q },
+      });
+      const list = response?.success && Array.isArray(response.data) ? response.data : [];
+      if (list.length === 0) {
+        setOwnerLookupError("No user found. Check email or user ID.");
+        return;
+      }
+      const u = list[0];
+      setOwnerUser({
+        _id: u._id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+      });
+      setShowFacilityForm(true);
+    } catch (err: any) {
+      setOwnerLookupError(err?.message || "Failed to look up user.");
+    } finally {
+      setOwnerLookupLoading(false);
+    }
+  };
+
+  const handleCreateSubmit = async (formData: FormData) => {
+    if (!ownerUser) {
+      throw new Error("Select a facility owner first.");
+    }
+    const res = await apiFetch(EP.ADMIN.users.createFacility(ownerUser._id), {
+      method: "POST",
+      body: formData,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json?.success === false) {
+      throw new Error(json?.message || json?.error || "Failed to create facility");
+    }
+    onSuccess();
+    return json.data;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {!showFacilityForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-md shadow-xl">
+            <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-slate-100">
+              Create Facility
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+              Find the user who will own this facility (by email or user ID), then fill in
+              facility details.
+            </p>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+              Owner email or user ID
+            </label>
+            <input
+              type="text"
+              value={ownerSearch}
+              onChange={(e) => {
+                setOwnerSearch(e.target.value);
+                setOwnerLookupError("");
+              }}
+              placeholder="owner@example.com or 24-char MongoDB id"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 mb-3"
+            />
+            {ownerLookupError && (
+              <p className="text-sm text-red-600 dark:text-red-400 mb-3">{ownerLookupError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void lookupOwner()}
+                disabled={ownerLookupLoading}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {ownerLookupLoading ? "Searching…" : "Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFacilityForm && ownerUser && (
+        <FacilityModal
+          isOpen={showFacilityForm}
+          onClose={onClose}
+          onSubmit={handleCreateSubmit}
+          initialData={null}
+          headerNote={`Owner: ${ownerUser.firstName} ${ownerUser.lastName} (${ownerUser.email})`}
+        />
+      )}
+    </>
   );
 }
 

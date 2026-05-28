@@ -1,9 +1,13 @@
 import Facility from '../models/facilityModel.js';
 import Salon from '../models/salonModel.js';
 import User from '../models/userModel.js';
+import Follow from '../models/followModel.js';
 import { District } from '../models/locationModel.js';
 import { AppError } from '../utils/appError.js';
-import { notifyNearbyEventCreated } from './notificationHelper.js';
+import {
+    notifyNearbyEventCreated,
+    notifyCoachFollowersOfEvent,
+} from './notificationHelper.js';
 
 /**
  * Resolve event district for non-online events from explicit district or facility/salon.
@@ -72,5 +76,41 @@ export async function notifyUsersInEventDistrict(event, ownerUserId, coachName) 
         }
     } catch (err) {
         console.error('Failed to send nearby event notifications:', err);
+    }
+}
+
+/**
+ * Notify every gamer who follows the coach (`user.coach`) of the just-created event.
+ * Skips private events and self-notification. Best-effort: errors are logged, not thrown.
+ */
+export async function notifyCoachFollowersOfNewEvent(event, ownerUser, coachName) {
+    if (!event || !ownerUser?.coach || event.private) return;
+
+    try {
+        const followRows = await Follow.find({ followingCoach: ownerUser.coach })
+            .select('follower')
+            .lean();
+
+        const followerIds = followRows
+            .map((row) => row.follower)
+            .filter((id) => id && id.toString() !== ownerUser._id.toString())
+            .map((id) => id.toString());
+
+        if (followerIds.length === 0) return;
+
+        const unique = [...new Set(followerIds)];
+
+        for (let i = 0; i < unique.length; i += NOTIFY_BATCH_SIZE) {
+            const batch = unique.slice(i, i + NOTIFY_BATCH_SIZE);
+            await notifyCoachFollowersOfEvent({
+                eventId: event._id.toString(),
+                eventName: event.name,
+                coachId: ownerUser.coach.toString(),
+                coachName,
+                userIds: batch,
+            });
+        }
+    } catch (err) {
+        console.error('Failed to send coach-follower notifications:', err);
     }
 }

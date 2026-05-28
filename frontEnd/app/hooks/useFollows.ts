@@ -156,12 +156,13 @@ export function useFollows(params?: FollowParams) {
     },
     enabled: !!user?._id,
     staleTime: 1000 * 60 * 5,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     select: normalizeFollows,
   });
 }
 
 export function useFollowMutation() {
-  const { data: user } = useMe();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -180,14 +181,21 @@ export function useFollowMutation() {
       }
       return { response, type, id };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["follows", user?._id] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["follows"] });
+      if (variables?.type === "coach") {
+        queryClient.invalidateQueries({
+          queryKey: ["coach-follow-stats", variables.id],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["coach-followers", variables.id],
+        });
+      }
     },
   });
 }
 
 export function useUnfollowMutation() {
-  const { data: user } = useMe();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -206,8 +214,95 @@ export function useUnfollowMutation() {
       }
       return { response, type, id };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["follows", user?._id] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["follows"] });
+      if (variables?.type === "coach") {
+        queryClient.invalidateQueries({
+          queryKey: ["coach-follow-stats", variables.id],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["coach-followers", variables.id],
+        });
+      }
     },
+  });
+}
+
+export interface CoachFollowStats {
+  coachId: string;
+  followerCount: number;
+  isFollowing: boolean;
+}
+
+export function useCoachFollowStats(coachId?: string | null) {
+  return useQuery({
+    queryKey: ["coach-follow-stats", coachId],
+    queryFn: async () => {
+      const res = await fetchJSON(EP.COACH.followStats(coachId as string), {
+        method: "GET",
+      });
+      if (res?.success === false) {
+        throw new Error(res?.message || "Failed to load follow stats");
+      }
+      const payload = (res?.data ?? {}) as Partial<CoachFollowStats>;
+      return {
+        coachId: payload.coachId || coachId || "",
+        followerCount: Number(payload.followerCount) || 0,
+        isFollowing: Boolean(payload.isFollowing),
+      } satisfies CoachFollowStats;
+    },
+    enabled: !!coachId,
+    staleTime: 1000 * 30,
+  });
+}
+
+export interface CoachFollowerEntry {
+  _id: string;
+  followedAt?: string;
+  user: {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    photo?: { path?: string } | null;
+    participantId?: string | null;
+    role?: number;
+  };
+}
+
+export interface CoachFollowersPage {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  followers: CoachFollowerEntry[];
+}
+
+export function useCoachFollowers(
+  coachId?: string | null,
+  page: number = 1,
+  limit: number = 20,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: ["coach-followers", coachId, page, limit],
+    queryFn: async () => {
+      const res = await fetchJSON(
+        EP.COACH.followers(coachId as string, page, limit),
+        { method: "GET" }
+      );
+      if (res?.success === false) {
+        throw new Error(res?.message || "Failed to load followers");
+      }
+      const payload = (res?.data ?? {}) as Partial<CoachFollowersPage>;
+      return {
+        total: Number(payload.total) || 0,
+        page: Number(payload.page) || page,
+        limit: Number(payload.limit) || limit,
+        totalPages: Number(payload.totalPages) || 1,
+        followers: Array.isArray(payload.followers) ? payload.followers : [],
+      } satisfies CoachFollowersPage;
+    },
+    enabled: !!coachId && (options?.enabled ?? true),
+    staleTime: 1000 * 30,
   });
 }

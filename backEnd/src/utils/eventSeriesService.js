@@ -12,7 +12,10 @@ import {
     frequencyLabel,
 } from './recurrenceHelper.js';
 import { resolveEventDistrict } from './eventDistrictHelper.js';
-import { notifyUsersInEventDistrict } from './eventDistrictHelper.js';
+import {
+    notifyUsersInEventDistrict,
+    notifyCoachFollowersOfNewEvent,
+} from './eventDistrictHelper.js';
 import {
     notifySeriesSessionsCancelled,
     notifySeriesSessionsRescheduled,
@@ -111,6 +114,11 @@ export async function createRecurringEventSeries({
 
     for (const ev of createdEvents) {
         void notifyUsersInEventDistrict(ev, user._id, coachName);
+    }
+
+    // Notify coach followers only once per series (first session) to avoid spam.
+    if (createdEvents[0]) {
+        void notifyCoachFollowersOfNewEvent(createdEvents[0], user, coachName);
     }
 
     return {

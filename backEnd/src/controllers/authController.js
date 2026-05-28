@@ -465,7 +465,8 @@ export const editUser = async (req, res, next) => {
         }
 
         const userUpdate = await mergeLocationIntoPayload(result);
-        const editUser = await User.findByIdAndUpdate(req.user._id, { $set: userUpdate }, { new: true });
+        const editUser = await User.findByIdAndUpdate(req.user._id, { $set: userUpdate }, { new: true })
+            .populate({ path: 'location.district', select: 'name' });
 
         if (!editUser) throw new AppError(404);
 

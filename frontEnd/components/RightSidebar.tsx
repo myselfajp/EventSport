@@ -278,7 +278,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-800 dark:text-slate-100 text-lg">
-            Dashboard
+            My Calendar
           </h3>
           {userLoading ? (
             <div className="w-28 h-10 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>

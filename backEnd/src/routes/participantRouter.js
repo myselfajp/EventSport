@@ -14,6 +14,24 @@ router.post('/unfollow-facility', participantController.unfollowFacility);
 router.post('/favorite-facility', participantController.favoriteFacility);
 router.post('/point-to-facility', participantController.pointToFacility);
 router.post('/favorite-event', participantController.favoriteEvent);
+
+// Unfavorite (frontend sends DELETE /favorite/:type with the entity id in the body).
+router.delete('/favorite/:type', (req, res, next) => {
+    switch ((req.params.type || '').toLowerCase()) {
+        case 'coach':
+            return participantController.unfavoriteCoach(req, res, next);
+        case 'facility':
+            return participantController.unfavoriteFacility(req, res, next);
+        case 'event':
+            return participantController.unfavoriteEvent(req, res, next);
+        default:
+            return res
+                .status(400)
+                .json({ success: false, message: 'Invalid favorite type.' });
+    }
+});
+
+router.get('/get-favorites', participantController.getFavorites);
 router.post('/point-to-event', participantController.pointToEvent);
 router.post('/follow-company', participantController.followCompany);
 router.post('/unfollow-company', participantController.unfollowCompany);
