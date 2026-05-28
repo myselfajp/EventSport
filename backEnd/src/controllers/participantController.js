@@ -103,18 +103,23 @@ export const followCoach = async (req, res, next) => {
         const coachExists = await Coach.findById(coachId);
         if (!coachExists) throw new AppError(404);
 
-        // check if already follows this coach
-        const alreadyFollowed = await Follow.findOne({
-            follower: user._id,
-            followingCoach: coachId,
-        });
-        if (alreadyFollowed) throw new AppError(409, 'You already follow this coach.');
+        // Self-follow guard: a coach should not follow their own coach profile.
+        if (user.coach && user.coach.toString() === coachId.toString()) {
+            throw new AppError(400, 'You cannot follow your own coach profile.');
+        }
 
-        const follow = await Follow.create({
-            follower: user._id,
-            followingCoach: coachId,
-        });
-        if (!follow) throw new AppError(404);
+        try {
+            await Follow.create({
+                follower: user._id,
+                followingCoach: coachId,
+            });
+        } catch (err) {
+            // Duplicate-key from the unique partial index: already following.
+            if (err?.code === 11000) {
+                throw new AppError(409, 'You already follow this coach.');
+            }
+            throw err;
+        }
 
         res.status(201).json({
             success: true,
@@ -169,23 +174,49 @@ export const favoriteCoach = async (req, res, next) => {
         const coachExists = await Coach.findById(coachId);
         if (!coachExists) throw new AppError(404);
 
-        // check if already favorited this coach
-        const alreadyFavorited = await FavoriteList.findOne({
-            user: user._id,
-            coach: coachId,
-        });
+        // Self-favorite guard: a coach cannot favorite their own coach profile.
+        if (user.coach && user.coach.toString() === coachId.toString()) {
+            throw new AppError(400, 'You cannot favorite your own coach profile.');
+        }
 
-        if (alreadyFavorited) throw new AppError(409, 'You already added this coach to favorites.');
-
-        const addToFavorites = await FavoriteList.create({
-            user: user._id,
-            coach: coachId,
-        });
-        if (!addToFavorites) throw new AppError(404);
+        try {
+            await FavoriteList.create({ user: user._id, coach: coachId });
+        } catch (err) {
+            if (err?.code === 11000) {
+                throw new AppError(409, 'You already added this coach to favorites.');
+            }
+            throw err;
+        }
 
         res.status(201).json({
             success: true,
             data: 'saved',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const unfavoriteCoach = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const coachId = zodValidation.coachId.parse(req.body?.coachId);
+
+        const removed = await FavoriteList.findOneAndDelete({
+            user: user._id,
+            coach: coachId,
+        });
+        if (!removed) {
+            throw new AppError(404, 'This coach is not in your favorites.');
+        }
+
+        res.status(200).json({
+            success: true,
+            data: 'unfavorited',
         });
     } catch (err) {
         next(err);
@@ -310,24 +341,44 @@ export const favoriteFacility = async (req, res, next) => {
         const facilityExists = await Facility.findById(facilityId);
         if (!facilityExists) throw new AppError(404);
 
-        // check if already favorited this facility
-        const alreadyFavorited = await FavoriteList.findOne({
-            user: user._id,
-            facility: facilityId,
-        });
-
-        if (alreadyFavorited)
-            throw new AppError(409, 'You already added this facility to favorites.');
-
-        const addToFavorites = await FavoriteList.create({
-            user: user._id,
-            facility: facilityId,
-        });
-        if (!addToFavorites) throw new AppError(404);
+        try {
+            await FavoriteList.create({ user: user._id, facility: facilityId });
+        } catch (err) {
+            if (err?.code === 11000) {
+                throw new AppError(409, 'You already added this facility to favorites.');
+            }
+            throw err;
+        }
 
         res.status(201).json({
             success: true,
             data: 'saved',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const unfavoriteFacility = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const facilityId = zodValidation.facilityId.parse(req.body?.facilityId);
+
+        const removed = await FavoriteList.findOneAndDelete({
+            user: user._id,
+            facility: facilityId,
+        });
+        if (!removed) {
+            throw new AppError(404, 'This facility is not in your favorites.');
+        }
+
+        res.status(200).json({
+            success: true,
+            data: 'unfavorited',
         });
     } catch (err) {
         next(err);
@@ -385,23 +436,149 @@ export const favoriteEvent = async (req, res, next) => {
         const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404);
 
-        // check if already favorited this event
-        const alreadyFavorited = await FavoriteList.findOne({
-            user: user._id,
-            event: eventId,
-        });
-
-        if (alreadyFavorited) throw new AppError(409, 'You already added this event to favorites.');
-
-        const addToFavorites = await FavoriteList.create({
-            user: user._id,
-            event: eventId,
-        });
-        if (!addToFavorites) throw new AppError(404);
+        try {
+            await FavoriteList.create({ user: user._id, event: eventId });
+        } catch (err) {
+            if (err?.code === 11000) {
+                throw new AppError(409, 'You already added this event to favorites.');
+            }
+            throw err;
+        }
 
         res.status(201).json({
             success: true,
             data: 'saved',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const unfavoriteEvent = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const eventId = zodValidation.eventId.parse(req.body?.eventId);
+
+        const removed = await FavoriteList.findOneAndDelete({
+            user: user._id,
+            event: eventId,
+        });
+        if (!removed) {
+            throw new AppError(404, 'This event is not in your favorites.');
+        }
+
+        res.status(200).json({
+            success: true,
+            data: 'unfavorited',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * GET /api/v1/participant/get-favorites
+ * Returns the current participant's favorites grouped + flattened. Front-end
+ * normalizes `data.favorites` (rows with populated coach/facility/event refs).
+ */
+export const getFavorites = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const typeRaw = (req.query.type || 'all').toString().toLowerCase();
+        const allowedTypes = new Set(['all', 'coach', 'facility', 'event']);
+        const type = allowedTypes.has(typeRaw) ? typeRaw : 'all';
+
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(
+            200,
+            Math.max(1, parseInt(req.query.limit, 10) || 100)
+        );
+        const skip = (page - 1) * limit;
+
+        const sortRaw = (req.query.sort || '-createdAt').toString();
+        const sort = {};
+        const sortKey = sortRaw.startsWith('-') ? sortRaw.slice(1) : sortRaw;
+        sort[sortKey || 'createdAt'] = sortRaw.startsWith('-') ? -1 : 1;
+
+        const filter = { user: user._id };
+        if (type === 'coach') {
+            filter.coach = { $type: 'objectId' };
+        } else if (type === 'facility') {
+            filter.facility = { $type: 'objectId' };
+        } else if (type === 'event') {
+            filter.event = { $type: 'objectId' };
+        }
+
+        const [total, rows] = await Promise.all([
+            FavoriteList.countDocuments(filter),
+            FavoriteList.find(filter)
+                .populate({
+                    path: 'coach',
+                    select: 'name about isVerified membershipLevel point',
+                })
+                .populate({
+                    path: 'facility',
+                    select: 'name photo location address',
+                })
+                .populate({
+                    path: 'event',
+                    select: 'name photo banner startTime endTime sport facility',
+                })
+                .sort(sort)
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+        ]);
+
+        // Hydrate coach favorites with the linked User's profile (firstName / lastName / photo)
+        // because Coach itself does not store those fields.
+        const coachIds = rows
+            .filter((row) => row.coach)
+            .map((row) => row.coach._id)
+            .filter(Boolean);
+
+        if (coachIds.length > 0) {
+            const users = await User.find({ coach: { $in: coachIds } })
+                .select('firstName lastName photo coach participant')
+                .lean();
+
+            const userByCoachId = new Map();
+            for (const u of users) {
+                if (u?.coach) userByCoachId.set(u.coach.toString(), u);
+            }
+
+            rows.forEach((row) => {
+                if (!row.coach) return;
+                const linkedUser = userByCoachId.get(row.coach._id.toString());
+                if (!linkedUser) return;
+                row.coach.firstName = linkedUser.firstName;
+                row.coach.lastName = linkedUser.lastName;
+                row.coach.photo = linkedUser.photo || row.coach.photo;
+                row.coach.userId = linkedUser._id;
+                row.coach.participantId = linkedUser.participant || null;
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                favorites: rows,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.max(1, Math.ceil(total / limit)),
+                },
+                filters: { type, sort: sortRaw },
+            },
         });
     } catch (err) {
         next(err);
@@ -1161,8 +1338,10 @@ export const getEventEndPhotos = async (req, res, next) => {
 
 export const getFollows = async (req, res, next) => {
     try {
-        if (!req.user || !req.user.participant) {
-            throw new AppError(!req.user ? 401 : 403);
+        // Read-only listing: any authenticated user can read their own follow list.
+        // (Some accounts may have legacy follows even when participant field is missing.)
+        if (!req.user) {
+            throw new AppError(401);
         }
 
         const user = req.user;
@@ -1190,11 +1369,7 @@ export const getFollows = async (req, res, next) => {
         const follows = await Follow.find(query)
             .populate({
                 path: 'followingCoach',
-                populate: {
-                    path: 'coach',
-                    select: 'name membershipLevel point isVerified'
-                },
-                select: 'firstName lastName photo coach'
+                select: 'name membershipLevel point isVerified about'
             })
             .populate({
                 path: 'followingFacility',

@@ -91,4 +91,9 @@ router.post('/my-events', coachController.getMyCreatedEvents);
 router.post('/approve-reservation/:requestId', coachController.approveReservation);
 
 router.get('/get-by-detail/:coachId', coachController.getCoachDetails);
+
+// Public follow stats / followers list for a coach profile.
+router.get('/:coachId/follow-stats', coachController.getCoachFollowStats);
+router.get('/:coachId/followers', coachController.getCoachFollowers);
+
 export default router;

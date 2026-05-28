@@ -13,6 +13,7 @@ import Reservation from '../models/reservationModel.js';
 import { Sport, EventStyle, SportGroup } from '../models/referenceDataModel.js';
 import { JoinPrivateEvent, JoinClub, JoinGroup } from '../models/joinRequestModel.js';
 import EventEndPhoto from '../models/eventEndPhotoModel.js';
+import Follow from '../models/followModel.js';
 import { genSecret } from '../utils/secretIdGen.js';
 import * as zodValidation from '../utils/validation.js';
 import { unlink } from 'fs/promises';
@@ -23,7 +24,11 @@ import {
     recordStaticAcceptancesBySlugs,
 } from '../utils/contractAcceptanceHelper.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
-import { resolveEventDistrict, notifyUsersInEventDistrict } from '../utils/eventDistrictHelper.js';
+import {
+    resolveEventDistrict,
+    notifyUsersInEventDistrict,
+    notifyCoachFollowersOfNewEvent,
+} from '../utils/eventDistrictHelper.js';
 import { createRecurringEventSeries, cancelEventsWithScope, applyEventEditWithScope } from '../utils/eventSeriesService.js';
 import { getListingPricePerSlot } from '../utils/recurrenceHelper.js';
 import EventSeries from '../models/eventSeriesModel.js';
@@ -379,6 +384,7 @@ export const createEvent = async (req, res, next) => {
                 ? `${user.firstName} ${user.lastName}`
                 : 'A coach';
         void notifyUsersInEventDistrict(createEvent, user._id, coachName);
+        void notifyCoachFollowersOfNewEvent(createEvent, user, coachName);
 
         res.status(201).json({
             success: true,
@@ -411,18 +417,24 @@ export const editEvent = async (req, res, next) => {
         }
 
         const data = req.body.data ? JSON.parse(req.body.data) : req.body;
-        const updateData = {};
 
-        // Parse dates if provided
         if (data.startTime) {
-            updateData.startTime = new Date(data.startTime);
+            data.startTime = new Date(data.startTime);
         }
         if (data.endTime) {
-            updateData.endTime = new Date(data.endTime);
+            data.endTime = new Date(data.endTime);
         }
 
-        // Validate and parse other fields
         const result = zodValidation.editEventSchema.parse(data ?? {});
+
+        // Empty strings from the form must not be written to ObjectId fields (CastError → "Not found")
+        for (const key of ['club', 'group', 'facility', 'salon', 'district']) {
+            if (result[key] === '') {
+                result[key] = null;
+            }
+        }
+
+        const updateData = {};
 
         // Check if referenced data exists
         if (result.sportGroup || result.sport || result.club || result.group || result.style) {
@@ -1411,6 +1423,103 @@ export const getListingQuote = async (req, res, next) => {
                 unitPrice,
                 totalAmount,
                 currency: 'TRY',
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * Public coach follow stats: follower count + (when logged-in gamer) isFollowing flag.
+ */
+export const getCoachFollowStats = async (req, res, next) => {
+    try {
+        const coachId = zodValidation.coachId.parse(req.params.coachId);
+
+        const coachExists = await Coach.exists({ _id: coachId });
+        if (!coachExists) throw new AppError(404, 'Coach not found');
+
+        const followerCount = await Follow.countDocuments({ followingCoach: coachId });
+
+        let isFollowing = false;
+        if (req.user?.participant) {
+            const existing = await Follow.exists({
+                follower: req.user._id,
+                followingCoach: coachId,
+            });
+            isFollowing = Boolean(existing);
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                coachId,
+                followerCount,
+                isFollowing,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * Public, paginated list of users following a coach. Returns minimal public profile
+ * info only (no email/phone).
+ */
+export const getCoachFollowers = async (req, res, next) => {
+    try {
+        const coachId = zodValidation.coachId.parse(req.params.coachId);
+
+        const coachExists = await Coach.exists({ _id: coachId });
+        if (!coachExists) throw new AppError(404, 'Coach not found');
+
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(
+            100,
+            Math.max(1, parseInt(req.query.limit, 10) || 20)
+        );
+        const skip = (page - 1) * limit;
+
+        const filter = { followingCoach: coachId };
+
+        const [total, rows] = await Promise.all([
+            Follow.countDocuments(filter),
+            Follow.find(filter)
+                .populate({
+                    path: 'follower',
+                    select: 'firstName lastName photo participant role isActive',
+                })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+        ]);
+
+        const followers = rows
+            .filter((row) => row.follower && row.follower.isActive !== false)
+            .map((row) => ({
+                _id: row._id,
+                followedAt: row.createdAt,
+                user: {
+                    _id: row.follower._id,
+                    firstName: row.follower.firstName,
+                    lastName: row.follower.lastName,
+                    photo: row.follower.photo,
+                    participantId: row.follower.participant || null,
+                    role: row.follower.role,
+                },
+            }));
+
+        res.status(200).json({
+            success: true,
+            data: {
+                total,
+                page,
+                limit,
+                totalPages: Math.max(1, Math.ceil(total / limit)),
+                followers,
             },
         });
     } catch (err) {

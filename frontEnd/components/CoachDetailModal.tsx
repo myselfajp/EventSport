@@ -4,20 +4,29 @@ import {
   Mail,
   Phone,
   Award,
-  CheckCircle,
   Calendar,
-  MapPin,
   ShieldCheck,
   User,
+  Users,
+  UserPlus,
+  UserCheck,
+  Loader2,
 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
+import {
+  useCoachFollowStats,
+  useFollowMutation,
+  useUnfollowMutation,
+} from "@/app/hooks/useFollows";
 import { getCreatedClubs, getCreatedGroups } from "@/app/lib/club-api";
 import ClubModal from "@/components/profile/ClubModal";
 import GroupModal from "@/components/profile/GroupModal";
 import ClubViewModal from "@/components/ClubViewModal";
 import GroupViewModal from "@/components/GroupViewModal";
+import CoachCalendar from "@/components/CoachCalendar";
+import CoachFollowersModal from "@/components/follow/CoachFollowersModal";
 
 interface CoachDetailModalProps {
   isOpen: boolean;
@@ -99,6 +108,16 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState<any>(null);
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [showCoachCalendar, setShowCoachCalendar] = useState(false);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+
+  const { data: followStats } = useCoachFollowStats(
+    isOpen ? coachId : null
+  );
+  const followMutation = useFollowMutation();
+  const unfollowMutation = useUnfollowMutation();
+  const isFollowMutating =
+    followMutation.isPending || unfollowMutation.isPending;
 
   useEffect(() => {
     if (isOpen && coachId) {
@@ -106,6 +125,8 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
     } else {
       setData(null);
       setError(null);
+      setShowCoachCalendar(false);
+      setShowFollowersModal(false);
     }
   }, [isOpen, coachId]);
 
@@ -196,9 +217,31 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
     setSelectedGroup(null);
   };
 
+  const handleToggleFollow = () => {
+    if (!coachId || isFollowMutating) return;
+    if (followStats?.isFollowing) {
+      unfollowMutation.mutate({ type: "coach", id: coachId });
+    } else {
+      followMutation.mutate({ type: "coach", id: coachId });
+    }
+  };
+
   if (!isOpen) return null;
 
+  const isGamerViewer =
+    !!currentUser?.participant &&
+    !!data?.user?._id &&
+    currentUser._id !== data.user._id;
+
+  const followerCount = followStats?.followerCount ?? 0;
+  const followerLabel = followerCount === 1 ? "follower" : "followers";
+  const coachDisplayName = data
+    ? `${data.user.firstName} ${data.user.lastName}`.trim()
+    : undefined;
+
   return (
+    <>
+    {!showCoachCalendar && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
         {/* Header */}
@@ -252,7 +295,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center flex-wrap gap-2 sm:gap-3 mb-2">
                       <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate">
                         {data.user.firstName} {data.user.lastName}
                       </h3>
@@ -262,6 +305,17 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                           Verified
                         </span>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => setShowFollowersModal(true)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-cyan-50 dark:hover:bg-cyan-900/40 hover:text-cyan-700 dark:hover:text-cyan-300 border border-gray-200 dark:border-gray-600 transition-colors"
+                        aria-label="View followers"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>
+                          {followerCount} {followerLabel}
+                        </span>
+                      </button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-8 text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -300,6 +354,68 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {(isGamerViewer || !!currentUser) && (
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {isGamerViewer && (
+                          <button
+                            type="button"
+                            onClick={() => setShowCoachCalendar(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <Calendar className="w-4 h-4" />
+                            Show Calendar
+                          </button>
+                        )}
+
+                        {isGamerViewer &&
+                          (followStats?.isFollowing ? (
+                            <button
+                              type="button"
+                              onClick={handleToggleFollow}
+                              disabled={isFollowMutating}
+                              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-900/30 border border-gray-200 dark:border-gray-600 hover:border-red-300 dark:hover:border-red-700 text-gray-700 dark:text-gray-200 hover:text-red-600 dark:hover:text-red-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed group"
+                            >
+                              {isFollowMutating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <UserCheck className="w-4 h-4 group-hover:hidden" />
+                                  <span className="hidden group-hover:inline">
+                                    Unfollow
+                                  </span>
+                                  <span className="group-hover:hidden">
+                                    Following
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleToggleFollow}
+                              disabled={isFollowMutating}
+                              className="inline-flex items-center gap-2 px-4 py-2.5 bg-cyan-50 dark:bg-cyan-900/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-sm font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {isFollowMutating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <UserPlus className="w-4 h-4" />
+                              )}
+                              Follow
+                            </button>
+                          ))}
+
+                        <button
+                          type="button"
+                          onClick={() => setShowFollowersModal(true)}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <Users className="w-4 h-4" />
+                          View followers
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -595,6 +711,28 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
         />
       )}
     </div>
+    )}
+
+    {showCoachCalendar && data?.user?._id && (
+      <div className="fixed inset-0 z-[60] bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 overflow-auto">
+        <div className="max-w-6xl mx-auto h-full min-h-0">
+          <CoachCalendar
+            viewUserId={data.user._id}
+            coachDisplayName={`${data.user.firstName} ${data.user.lastName}`}
+            readOnly
+            onBack={() => setShowCoachCalendar(false)}
+          />
+        </div>
+      </div>
+    )}
+
+    <CoachFollowersModal
+      isOpen={showFollowersModal}
+      onClose={() => setShowFollowersModal(false)}
+      coachId={coachId}
+      coachName={coachDisplayName}
+    />
+    </>
   );
 };
 

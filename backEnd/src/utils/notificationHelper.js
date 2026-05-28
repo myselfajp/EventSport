@@ -305,6 +305,35 @@ export const notifyReservationReminder = async (userId, eventId, eventName, star
 };
 
 /**
+ * Notify followers of a coach about a new event the coach just created.
+ */
+export const notifyCoachFollowersOfEvent = async ({
+    eventId,
+    eventName,
+    coachId,
+    coachName,
+    userIds,
+}) => {
+    if (!userIds?.length) return null;
+
+    return await createNotification({
+        scope: 'group',
+        type: 'follow_new_event',
+        title: 'New event from a coach you follow',
+        message: `${coachName} just created "${eventName}".`,
+        data: {
+            eventId,
+            eventName,
+            coachId,
+            coachName,
+        },
+        targetUsers: userIds,
+        priority: 'normal',
+        icon: 'calendar',
+    });
+};
+
+/**
  * Create system announcement (global)
  */
 export const notifySystemAnnouncement = async (title, message, priority = 'normal', expiresAt = null) => {

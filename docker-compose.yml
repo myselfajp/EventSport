@@ -8,7 +8,8 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DB}
     command: mongod --quiet --logpath /dev/null
     volumes:
-      - mongodb_data:/data/db
+      # Yerel veriler (users/events) — eventsport_mongodb_data_prod volume'unda
+      - eventsport_mongodb_data_prod:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -53,6 +54,8 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
     volumes:
       - ./backEnd/uploads:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -72,6 +75,8 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - PORT=${FRONTEND_PORT}
+    ports:
+      - "${FRONTEND_PORT:-3001}:3001"
     depends_on:
       - backend
     networks:
@@ -93,7 +98,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  mongodb_data:
+  eventsport_mongodb_data_prod:
+    external: true
 
 networks:
   eventsport_network:

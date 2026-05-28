@@ -30,6 +30,7 @@ import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { notifyCertificateApproved, notifyCertificateRejected } from '../utils/notificationHelper.js';
 import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
 import { isValidHeroCtaHref } from '../utils/heroCtaHref.js';
+import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { ADMIN_PERMISSION_STAR } from '../constants/adminPermissions.js';
 
 export const getAdminPanel = async (req, res, next) => {
@@ -1032,6 +1033,45 @@ export const updateParticipantProfile = async (req, res, next) => {
     }
 };
 
+export const createFacilityForUser = async (req, res, next) => {
+    try {
+        const userId = mongoObjectId.parse(req.params.userId);
+        const user = await User.findById(userId);
+        if (!user) throw new AppError(404, 'User not found');
+
+        const data =
+            typeof req.body?.data === 'string' ? JSON.parse(req.body.data) : req.body;
+        const result = zodValidation.createFacilitySchema.parse(data);
+
+        const sportExists = await Sport.exists({ _id: result.mainSport });
+        if (!sportExists) throw new AppError(404, 'MainSport not found');
+
+        if (req.fileMeta) {
+            result.photo = {
+                path: req.fileMeta.path,
+                originalName: req.fileMeta.originalName,
+                mimeType: req.fileMeta.mimeType,
+                size: req.fileMeta.size,
+            };
+        }
+
+        const facilityPayload = await mergeLocationIntoPayload(result);
+        const newFacility = await Facility.create(facilityPayload);
+
+        await User.findByIdAndUpdate(userId, {
+            $push: { facility: newFacility._id },
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Facility created successfully',
+            data: newFacility,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const updateFacilityProfile = async (req, res, next) => {
     try {
         const userId = mongoObjectId.parse(req.params.userId);
@@ -1042,7 +1082,9 @@ export const updateFacilityProfile = async (req, res, next) => {
             throw new AppError(404, 'User or facility not found');
         }
 
-        const result = zodValidation.editFacilitySchema.parse(req.body);
+        const raw =
+            typeof req.body?.data === 'string' ? JSON.parse(req.body.data) : req.body;
+        const result = zodValidation.editFacilitySchema.parse(raw);
         if (Object.keys(result).length === 0 && !req.fileMeta) {
             throw new AppError(400, 'At least one field must be provided.');
         }
@@ -1064,9 +1106,10 @@ export const updateFacilityProfile = async (req, res, next) => {
             };
         }
 
+        const updatePayload = await mergeLocationIntoPayload(result);
         const updatedFacility = await Facility.findByIdAndUpdate(
             facilityId,
-            { $set: result },
+            { $set: updatePayload },
             { new: true }
         );
 

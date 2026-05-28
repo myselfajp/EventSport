@@ -107,6 +107,12 @@ router.post(
     requireAdminPermission('admin.users'),
     adminController.updateParticipantProfile
 );
+router.post(
+    '/users/:userId/facility',
+    requireAdminPermission('admin.users'),
+    uploadFile({ fieldName: 'facility-photo', optional: true }),
+    adminController.createFacilityForUser
+);
 router.put(
     '/users/:userId/facility/:facilityId',
     requireAdminPermission('admin.users'),

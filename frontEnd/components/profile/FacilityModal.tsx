@@ -37,6 +37,8 @@ interface FacilityModalProps {
   onClose: () => void;
   onSubmit: (formData: FormData) => Promise<any> | any;
   initialData?: FacilityFormData | null;
+  /** Shown under the modal title (e.g. admin create: facility owner). */
+  headerNote?: string;
 }
 
 interface FacilityFormData {
@@ -78,6 +80,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   onClose,
   onSubmit,
   initialData = null,
+  headerNote,
 }) => {
   // Facility State
   const [locationValue, setLocationValue] = useState<LocationValue>(
@@ -547,9 +550,14 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-auto max-h-[90vh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            {initialData ? "Edit Facility" : "Add Facility"}
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+              {initialData ? "Edit Facility" : "Add Facility"}
+            </h2>
+            {headerNote && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{headerNote}</p>
+            )}
+          </div>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"

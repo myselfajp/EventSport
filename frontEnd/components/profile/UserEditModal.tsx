@@ -12,6 +12,8 @@ import {
   normalizePhoneForDisplay,
   isPhoneComplete,
 } from "@/app/lib/phone-utils";
+import LocationFields, { emptyLocationValue } from "@/components/location/LocationFields";
+import type { LocationValue } from "@/app/lib/location-api";
 
 interface UserEditModalProps {
   isOpen: boolean;
@@ -28,6 +30,22 @@ interface UserFormData {
   confirmPassword: string;
 }
 
+function locationFromUser(user: {
+  location?: { district?: string | { _id?: string }; addressLine?: string };
+}): LocationValue {
+  const district = user.location?.district;
+  const districtId =
+    typeof district === "object" && district?._id
+      ? String(district._id)
+      : typeof district === "string"
+        ? district
+        : "";
+  return {
+    district: districtId,
+    addressLine: user.location?.addressLine?.trim() || "",
+  };
+}
+
 const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
   const { data: user } = useMe();
   const queryClient = useQueryClient();
@@ -40,6 +58,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
     newPassword: "",
     confirmPassword: "",
   });
+  const [locationValue, setLocationValue] = useState<LocationValue>(emptyLocationValue());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [changePassword, setChangePassword] = useState(false);
@@ -57,6 +76,7 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
         newPassword: "",
         confirmPassword: "",
       });
+      setLocationValue(locationFromUser(user));
       setChangePassword(false);
       setError("");
     }
@@ -93,6 +113,11 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
+    if (!locationValue.district) {
+      setError("Please select your Istanbul district.");
+      return;
+    }
+
     if (changePassword) {
       if (!formData.oldPassword) {
         setError("Old password is required");
@@ -114,12 +139,15 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
 
     setLoading(true);
     try {
-      const payload: any = {
-        firstName: formData.firstName || undefined,
-        lastName: formData.lastName || undefined,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
+      const payload: Record<string, string> = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        district: locationValue.district,
       };
+      const addressLine = locationValue.addressLine.trim();
+      if (addressLine) payload.addressLine = addressLine;
 
       if (changePassword) {
         payload.oldPassword = formData.oldPassword;
@@ -236,6 +264,21 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
               placeholder={`${PHONE_PREFIX}XX XXX XX XX`}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required
+            />
+          </div>
+
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Location
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              If you move within Istanbul, update your district so nearby events and
+              recommendations stay accurate.
+            </p>
+            <LocationFields
+              value={locationValue}
+              onChange={setLocationValue}
+              disabled={loading}
             />
           </div>
 

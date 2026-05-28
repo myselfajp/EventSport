@@ -26,4 +26,31 @@ const favoriteListSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Prevent duplicate rows per (user, target) while allowing the polymorphic
+// schema where only one of `coach` / `facility` / `event` is populated per doc.
+favoriteListSchema.index(
+    { user: 1, coach: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { coach: { $type: 'objectId' } },
+    }
+);
+favoriteListSchema.index(
+    { user: 1, facility: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { facility: { $type: 'objectId' } },
+    }
+);
+favoriteListSchema.index(
+    { user: 1, event: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { event: { $type: 'objectId' } },
+    }
+);
+
+// Sorted lookup of a user's favorites.
+favoriteListSchema.index({ user: 1, createdAt: -1 });
+
 export default mongoose.model('FavoriteList', favoriteListSchema);

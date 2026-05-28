@@ -137,6 +137,7 @@ export const EP = {
       getParticipantProfile: (userId: string) => `${ADMIN_API}/users/${userId}/participant-profile`,
       updateCoachProfile: (userId: string) => `${ADMIN_API}/users/${userId}/coach-profile`,
       updateParticipantProfile: (userId: string) => `${ADMIN_API}/users/${userId}/participant-profile`,
+      createFacility: (userId: string) => `${ADMIN_API}/users/${userId}/facility`,
       updateFacilityProfile: (userId: string, facilityId: string) => `${ADMIN_API}/users/${userId}/facility/${facilityId}`,
     },
     coaches: {
@@ -287,6 +288,10 @@ export const EP = {
     addEndPhoto: `${COACH_DATA_API}/add-end-photo/`,
     getEventParticipants: (eventId: string) =>
       `${COACH_DATA_API}/event/participants/${eventId}`,
+    followStats: (coachId: string) =>
+      `${COACH_DATA_API}/${coachId}/follow-stats`,
+    followers: (coachId: string, page = 1, limit = 20) =>
+      `${COACH_DATA_API}/${coachId}/followers?page=${page}&limit=${limit}`,
   },
   PARTICIPANT_LIST: {
     getParticipantList: `${API_V1_BASE}/get-participant-list`,

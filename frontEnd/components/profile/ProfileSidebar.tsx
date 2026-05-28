@@ -148,8 +148,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     (favorites.facility?.length || 0) +
     (favorites.event?.length || 0);
 
-  const { data: followsData } = useFollows();
-  const totalFollows = followsData?.counts?.total || 0;
+  const {
+    data: followsData,
+    isFetching: isFollowsFetching,
+  } = useFollows();
+  const totalFollows = followsData?.counts?.total ?? followsData?.follows?.length ?? 0;
 
   const facilities = React.useMemo(() => {
     if (!user?.facility || !Array.isArray(user.facility)) return [];
@@ -902,7 +905,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         >
           <div className="font-bold text-gray-800 dark:text-white text-sm sm:text-base flex items-center gap-1">
             <Users className="w-4 h-4 text-cyan-500" />
-            {totalFollows}
+            {isFollowsFetching && !followsData ? "..." : totalFollows}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             Following
@@ -1105,7 +1108,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     Edit Account Info
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Update name, email, phone, password
+                    Update name, email, phone, district, password
                   </div>
                 </div>
               </div>
