@@ -888,6 +888,7 @@ export const makeReservation = async (req, res, next) => {
                     isCheckedIn: true,
                     isPaid: true,
                     isJoined: true,
+                    isApproved: true,
                     ...baseExtra,
                 });
 
@@ -909,6 +910,7 @@ export const makeReservation = async (req, res, next) => {
                 isCheckedIn: false,
                 isPaid: false,
                 isJoined: true,
+                isApproved: true,
                 ...baseExtra,
             });
 
@@ -950,6 +952,7 @@ export const makeReservation = async (req, res, next) => {
             checkInDeadline,
             isJoined: true,
             isPaid: isFreeEvent,
+            isApproved: true,
             ...baseExtra,
         });
 
@@ -1502,6 +1505,7 @@ export const getMyReservations = async (req, res, next) => {
                     isPaid: r.isPaid,
                     isCheckedIn: r.isCheckedIn,
                     isWaitListed: r.isWaitListed,
+                    isJoined: r.isJoined,
                     checkInDeadline: r.checkInDeadline,
                 },
             }));

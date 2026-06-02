@@ -21,6 +21,7 @@ import DashboardHeroSlider, {
 import NearbyEventsSection from "./NearbyEventsSection";
 import YourNextEventSection from "./YourNextEventSection";
 import HotUpcomingSection from "./HotUpcomingSection";
+import CheckInTimesSection from "./dashboard/CheckInTimesSection";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -321,30 +322,25 @@ const EventsDashboard = () => {
               !showFollowings &&
               !showFavorites &&
               !selectedStaticPageId && (
-                <div className="space-y-6">
-                  <YourNextEventSection />
-                  <HotUpcomingSection />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                    <YourNextEventSection />
+                    <HotUpcomingSection />
+                    <CheckInTimesSection />
+                  </div>
+                  <NearbyEventsSection
+                    districtId={userDistrictId}
+                    districtName={userDistrictName}
+                  />
                 </div>
               )}
 
-            {/* Sports Banner - Below banner - Only show on events page */}
             {!showCoachCalendar && !showFollowings && !showFavorites && (
               <SportsBanner
                 selectedSportId={filters.sport}
                 onSportClick={handleSportFilter}
               />
             )}
-
-            {!showCoachCalendar &&
-              !showFollowings &&
-              !showFavorites &&
-              !selectedStaticPageId &&
-              userDistrictId && (
-                <NearbyEventsSection
-                  districtId={userDistrictId}
-                  districtName={userDistrictName}
-                />
-              )}
 
             {/* Events Section */}
             <div>
