@@ -231,6 +231,136 @@ export const getAllUsers = async (req, res, next) => {
     }
 };
 
+/**
+ * Leaderboard for most active participant and coach by joined participation count.
+ */
+export const getUserActivityLeaderboard = async (req, res, next) => {
+    try {
+        const rawLimit = Number(req.query?.limit ?? req.body?.limit ?? 10);
+        const limit = Number.isFinite(rawLimit)
+            ? Math.max(1, Math.min(100, Math.trunc(rawLimit)))
+            : 10;
+
+        const participantLeaderboard = await Reservation.aggregate([
+            { $match: { isJoined: true, participant: { $exists: true, $ne: null } } },
+            {
+                $group: {
+                    _id: '$participant',
+                    totalParticipations: { $sum: 1 },
+                    lastParticipationAt: { $max: '$updatedAt' },
+                },
+            },
+            { $sort: { totalParticipations: -1, lastParticipationAt: -1 } },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: 'participants',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'participant',
+                },
+            },
+            { $unwind: '$participant' },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'participant._id',
+                    foreignField: 'participant',
+                    as: 'user',
+                },
+            },
+            { $unwind: '$user' },
+            {
+                $project: {
+                    _id: 0,
+                    participantId: '$participant._id',
+                    userId: '$user._id',
+                    firstName: '$user.firstName',
+                    lastName: '$user.lastName',
+                    email: '$user.email',
+                    totalParticipations: 1,
+                    lastParticipationAt: 1,
+                },
+            },
+        ]);
+
+        const coachLeaderboard = await Reservation.aggregate([
+            { $match: { isJoined: true, event: { $exists: true, $ne: null } } },
+            {
+                $lookup: {
+                    from: 'events',
+                    localField: 'event',
+                    foreignField: '_id',
+                    as: 'event',
+                },
+            },
+            { $unwind: '$event' },
+            { $match: { 'event.owner': { $exists: true, $ne: null } } },
+            {
+                $group: {
+                    _id: '$event.owner',
+                    totalParticipations: { $sum: 1 },
+                    eventIds: { $addToSet: '$event._id' },
+                    lastParticipationAt: { $max: '$updatedAt' },
+                },
+            },
+            {
+                $addFields: {
+                    eventCount: { $size: '$eventIds' },
+                },
+            },
+            { $sort: { totalParticipations: -1, eventCount: -1, lastParticipationAt: -1 } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'user',
+                },
+            },
+            { $unwind: '$user' },
+            { $match: { 'user.coach': { $exists: true, $ne: null } } },
+            {
+                $lookup: {
+                    from: 'coaches',
+                    localField: 'user.coach',
+                    foreignField: '_id',
+                    as: 'coach',
+                },
+            },
+            { $unwind: { path: '$coach', preserveNullAndEmptyArrays: true } },
+            { $limit: limit },
+            {
+                $project: {
+                    _id: 0,
+                    coachUserId: '$user._id',
+                    coachId: '$user.coach',
+                    coachName: '$coach.name',
+                    firstName: '$user.firstName',
+                    lastName: '$user.lastName',
+                    email: '$user.email',
+                    totalParticipations: 1,
+                    eventCount: 1,
+                    lastParticipationAt: 1,
+                },
+            },
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                topParticipant: participantLeaderboard[0] || null,
+                topCoach: coachLeaderboard[0] || null,
+                participantLeaderboard,
+                coachLeaderboard,
+                limit,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const createUser = async (req, res, next) => {
     try {
         const body = req.body || {};
@@ -410,7 +540,11 @@ export const getPendingCoaches = async (req, res, next) => {
             search: req.body?.search || req.query?.search,
         });
 
-        const branches = await Branch.find({ status: 'Pending' })
+        const statusParam = String(req.body?.status || req.query?.status || 'Pending').trim();
+        const allowedStatuses = ['Pending', 'Approved', 'Rejected'];
+        const status = allowedStatuses.includes(statusParam) ? statusParam : 'Pending';
+
+        const branches = await Branch.find({ status })
             .populate({
                 path: 'coach',
                 select: 'name isVerified',
@@ -463,6 +597,7 @@ export const getPendingCoaches = async (req, res, next) => {
             success: true,
             data: branchesWithUser,
             total,
+            status,
             perPage,
             pageNumber,
             totalPages: Math.ceil(total / perPage),
@@ -471,6 +606,44 @@ export const getPendingCoaches = async (req, res, next) => {
         next(err);
     }
 };
+
+async function deleteBranchCertificateFile(branch) {
+    if (!branch?.certificate?.path) return;
+    try {
+        await unlink(branch.certificate.path);
+    } catch (err) {
+        console.warn(`Failed to delete certificate file: ${branch.certificate.path}`, err);
+    }
+}
+
+/**
+ * If the coach has no approved branches, remove coach profile so the user stays a gamer only.
+ */
+async function revertCoachApplicationIfNotApproved(coachId) {
+    const coachObjectId = coachId?._id ?? coachId;
+    const approvedCount = await Branch.countDocuments({
+        coach: coachObjectId,
+        status: 'Approved',
+    });
+
+    if (approvedCount > 0) {
+        const allBranches = await Branch.find({ coach: coachObjectId });
+        const allApproved =
+            allBranches.length > 0 &&
+            allBranches.every((b) => b.status === 'Approved');
+        await Coach.findByIdAndUpdate(coachObjectId, { isVerified: !!allApproved });
+        return { reverted: false };
+    }
+
+    const branches = await Branch.find({ coach: coachObjectId });
+    for (const b of branches) {
+        await deleteBranchCertificateFile(b);
+    }
+    await Branch.deleteMany({ coach: coachObjectId });
+    await User.updateMany({ coach: coachObjectId }, { $set: { coach: null } });
+    await Coach.findByIdAndDelete(coachObjectId);
+    return { reverted: true };
+}
 
 export const approveCertificate = async (req, res, next) => {
     try {
@@ -541,8 +714,9 @@ export const rejectCertificate = async (req, res, next) => {
             throw new AppError(404, 'Branch not found');
         }
 
-        // Find user who owns this coach
-        const user = await User.findOne({ coach: branch.coach._id });
+        const coachId = branch.coach._id ?? branch.coach;
+
+        const user = await User.findOne({ coach: coachId });
         if (user) {
             try {
                 await notifyCertificateRejected(
@@ -553,14 +727,18 @@ export const rejectCertificate = async (req, res, next) => {
                 );
             } catch (notifErr) {
                 console.error('Failed to create notification:', notifErr);
-                // Don't fail the request if notification fails
             }
         }
 
+        const { reverted } = await revertCoachApplicationIfNotApproved(coachId);
+
         res.status(200).json({
             success: true,
-            message: 'Certificate rejected successfully',
+            message: reverted
+                ? 'Certificate rejected. User remains a gamer; coach application was removed.'
+                : 'Certificate rejected successfully',
             data: branch,
+            revertedToGamer: reverted,
         });
     } catch (err) {
         next(err);

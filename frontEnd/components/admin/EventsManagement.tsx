@@ -473,6 +473,9 @@ const EventsManagement: React.FC = () => {
                       Owner
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                      Owner ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -482,10 +485,10 @@ const EventsManagement: React.FC = () => {
                     <tr key={event._id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className="font-mono text-xs text-gray-500 dark:text-slate-400 select-all"
+                          className="font-mono text-xs text-gray-500 dark:text-slate-400 select-all break-all"
                           title={event._id}
                         >
-                          {event._id.slice(-8)}
+                          {event._id}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -545,6 +548,11 @@ const EventsManagement: React.FC = () => {
                             ? `${event.owner.firstName} ${event.owner.lastName}`
                             : "-"}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <code className="font-mono text-xs text-gray-500 dark:text-slate-400 select-all break-all">
+                          {event.owner?._id || "-"}
+                        </code>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {isEventOwner(event) && event.status !== "cancelled" ? (

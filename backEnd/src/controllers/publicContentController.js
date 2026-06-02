@@ -7,6 +7,8 @@ import * as zodValidation from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
 import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
 import { resolveHeroCtaRedirect } from '../utils/heroCtaHref.js';
+import { LEGACY_STATIC_CONTRACT_REDIRECTS } from '../constants/contractDocuments.js';
+import { getActiveCatalog } from './legalController.js';
 
 /** Slug: lowercase letters, digits, hyphens only (matches StaticPage.name usage). */
 const PUBLIC_PAGE_NAME_RE = /^[a-z0-9-]{1,80}$/;
@@ -16,6 +18,14 @@ export const getPublicStaticPageByName = async (req, res, next) => {
         const raw = String(req.params.name ?? '').trim().toLowerCase();
         if (!PUBLIC_PAGE_NAME_RE.test(raw)) {
             throw new AppError(400, 'Invalid page name');
+        }
+
+        const legacyRedirect = LEGACY_STATIC_CONTRACT_REDIRECTS[raw];
+        if (legacyRedirect) {
+            return res.status(200).json({
+                success: true,
+                redirect: legacyRedirect,
+            });
         }
 
         const page = await StaticPage.findOne({ name: raw, isActive: true })
@@ -153,3 +163,5 @@ export const submitSuggestion = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getPublicContractsCatalog = getActiveCatalog;

@@ -3,8 +3,9 @@ import StaticPage from '../models/staticPageModel.js';
 import ContractAcceptance from '../models/contractAcceptanceModel.js';
 import { AppError } from './appError.js';
 import { Types } from 'mongoose';
+import { COACH_PROFILE_REQUIRED_DOC_TYPES } from '../constants/contractDocuments.js';
 
-/** Antrenör ilk profil onayında loglanan statik sözleşme slug'ları. */
+/** @deprecated Use COACH_PROFILE_REQUIRED_DOC_TYPES — kept for redirects/migration references. */
 export const COACH_PROFILE_STATIC_SLUGS = [
     'sozlesmeler-antrenor',
     'sozlesmeler-ek-1',
@@ -82,6 +83,37 @@ export async function recordStaticAcceptancesBySlugs(req, userId, slugs, context
             title: page.title,
             staticPageId: page._id,
             staticPageUpdatedAt: page.updatedAt,
+            context,
+            acceptedAt,
+            ...meta,
+        });
+    }
+
+    if (entries.length === 0) return [];
+    return ContractAcceptance.insertMany(entries);
+}
+
+/** Records acceptance of all active coach legal documents (first coach profile). */
+export async function recordCoachProfileLegalAcceptances(req, userId, context = 'coach_profile') {
+    const meta = clientMetaFromRequest(req);
+    const acceptedAt = new Date();
+    const entries = [];
+
+    for (const docType of COACH_PROFILE_REQUIRED_DOC_TYPES) {
+        const doc = await LegalDocument.findOne({ docType, isActive: true }).lean();
+        if (!doc) {
+            throw new AppError(
+                400,
+                `Required coach contract "${docType}" has no active version. Contact administrator.`
+            );
+        }
+        entries.push({
+            user: userId,
+            contractKey: doc.docType,
+            source: 'legal',
+            title: doc.title,
+            legalDocumentId: doc._id,
+            version: doc.version,
             context,
             acceptedAt,
             ...meta,

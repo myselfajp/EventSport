@@ -11,11 +11,10 @@ import CoachCertificateApproval from "../../components/admin/CoachCertificateApp
 import EnumManagement from "../../components/admin/EnumManagement";
 import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
-import LegalManagement from "../../components/admin/LegalManagement";
+import ContractsManagement from "../../components/admin/ContractsManagement";
 import StaticPagesManagement from "../../components/admin/StaticPagesManagement";
 import SuggestionsManagement from "../../components/admin/SuggestionsManagement";
 import DashboardHeroManagement from "../../components/admin/DashboardHeroManagement";
-import ContractAcceptanceManagement from "../../components/admin/ContractAcceptanceManagement";
 import AdminPermissionGroupsManagement from "../../components/admin/AdminPermissionGroupsManagement";
 import BlacklistManagement from "../../components/admin/BlacklistManagement";
 
@@ -26,9 +25,8 @@ type TabType =
   | "enums"
   | "events"
   | "notifications"
-  | "legal"
-  | "contract-acceptances"
-  | "static-pages"
+  | "contracts"
+  | "site-pages"
   | "suggestions"
   | "dashboard-hero"
   | "permission-groups";
@@ -40,9 +38,8 @@ const TAB_ORDER: TabType[] = [
   "enums",
   "events",
   "notifications",
-  "legal",
-  "contract-acceptances",
-  "static-pages",
+  "contracts",
+  "site-pages",
   "dashboard-hero",
   "suggestions",
   "permission-groups",
@@ -55,9 +52,8 @@ const TAB_LABEL: Record<TabType, string> = {
   enums: "Enum Management",
   events: "Events",
   notifications: "Notifications",
-  legal: "Legal",
-  "contract-acceptances": "Contract acceptances",
-  "static-pages": "Static Pages",
+  contracts: "Contracts",
+  "site-pages": "Site pages",
   "dashboard-hero": "Dashboard hero",
   suggestions: "Suggestions",
   "permission-groups": "İzin grupları",
@@ -71,9 +67,8 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   enums: "admin.enums",
   events: "admin.events",
   notifications: "admin.notifications",
-  legal: "admin.legal",
-  "contract-acceptances": "admin.contract_acceptances",
-  "static-pages": "admin.static_pages",
+  contracts: ["admin.legal", "admin.contract_acceptances"],
+  "site-pages": "admin.static_pages",
   "dashboard-hero": "admin.dashboard_hero",
   suggestions: "admin.suggestions",
 };
@@ -210,9 +205,17 @@ export default function AdminPanelPage() {
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
             {activeTab === "notifications" && <NotificationManagement />}
-            {activeTab === "legal" && <LegalManagement />}
-            {activeTab === "contract-acceptances" && <ContractAcceptanceManagement />}
-            {activeTab === "static-pages" && <StaticPagesManagement />}
+            {activeTab === "contracts" && (
+              <ContractsManagement
+                canEditLegal={perms.includes("*") || perms.includes("admin.legal")}
+                canViewAcceptances={
+                  perms.includes("*") ||
+                  perms.includes("admin.contract_acceptances") ||
+                  perms.includes("admin.legal")
+                }
+              />
+            )}
+            {activeTab === "site-pages" && <StaticPagesManagement />}
             {activeTab === "dashboard-hero" && <DashboardHeroManagement />}
             {activeTab === "suggestions" && <SuggestionsManagement />}
             {activeTab === "permission-groups" && <AdminPermissionGroupsManagement />}

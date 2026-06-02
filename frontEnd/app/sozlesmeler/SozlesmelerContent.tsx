@@ -4,78 +4,30 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
-import { SOZLESMELER_STATIC_SLUGS } from "@/app/lib/sozlesmeler-static-slugs";
+import {
+  CATEGORY_LABELS_TR,
+  DEFAULT_TITLES_TR,
+  SOZLESMELER_SECTION_ANCHORS,
+  type ContractCategory,
+  type LegalDocType,
+} from "@/app/lib/contract-documents";
 import SiteFooter from "@/components/SiteFooter";
 
-type LegalDocType = "kvkk" | "terms" | "distance_selling" | "event_contract";
-
-const STATIC_SECTIONS = [
-  {
-    id: "antrenor-sozlesmesi",
-    slug: SOZLESMELER_STATIC_SLUGS[0],
-    defaultTitle: "Antrenör Sözleşmesi",
-  },
-  {
-    id: "ek-1",
-    slug: SOZLESMELER_STATIC_SLUGS[1],
-    defaultTitle: "Ek — 1 Antrenman Kuralları",
-  },
-  {
-    id: "ek-2",
-    slug: SOZLESMELER_STATIC_SLUGS[2],
-    defaultTitle: "Ek — 2 Cezai Şartlar",
-  },
-  {
-    id: "ek-3",
-    slug: SOZLESMELER_STATIC_SLUGS[3],
-    defaultTitle: "Ek — 3 Antrenör Belgeleri",
-  },
-  {
-    id: "mesafeli-satis-statik",
-    slug: SOZLESMELER_STATIC_SLUGS[4],
-    defaultTitle: "Mesafeli Satış Sözleşmesi",
-  },
-  {
-    id: "etkinlik-satin-alma-statik",
-    slug: SOZLESMELER_STATIC_SLUGS[5],
-    defaultTitle: "Etkinlik ve Satın Alma Koşulları",
-  },
-] as const;
-
-/** Admin → Legal: aktif sürüm (aynı kaynak `/legal/...` sayfaları). */
-const LEGAL_SECTIONS: {
-  id: string;
+type CatalogDoc = {
   docType: LegalDocType;
-  defaultTitle: string;
-}[] = [
-  { id: "kvkk", docType: "kvkk", defaultTitle: "KVKK Aydınlatma Metni" },
-  { id: "terms", docType: "terms", defaultTitle: "Şartlar ve Koşullar" },
-  {
-    id: "mesafeli-satis",
-    docType: "distance_selling",
-    defaultTitle: "Mesafeli Satış Sözleşmesi",
-  },
-  {
-    id: "etkinlik-satin-alma",
-    docType: "event_contract",
-    defaultTitle: "Etkinlik Sözleşmesi",
-  },
-];
-
-type SectionState = {
+  category: ContractCategory;
   title: string;
-  html: string;
-  missing: boolean;
+  content: string;
   version?: number;
 };
 
-function staticKey(slug: string) {
-  return `static:${slug}`;
-}
+type CatalogData = {
+  legal: CatalogDoc[];
+  gamer: CatalogDoc[];
+  coach: CatalogDoc[];
+};
 
-function legalKey(docType: LegalDocType) {
-  return `legal:${docType}`;
-}
+const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach"];
 
 const PROSE_CLASS =
   "text-sm text-gray-700 dark:text-slate-300 sozlesmeler-prose max-w-none [&_a]:text-cyan-600 dark:[&_a]:text-cyan-400 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6";
@@ -85,7 +37,7 @@ function SectionBody({ html }: { html: string }) {
 }
 
 export default function SozlesmelerContent() {
-  const [sections, setSections] = useState<Record<string, SectionState>>({});
+  const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
 
@@ -96,78 +48,18 @@ export default function SozlesmelerContent() {
       setLoading(true);
       setFatalError("");
       try {
-        const [staticResults, legalResults] = await Promise.all([
-          Promise.all(
-            STATIC_SECTIONS.map(async ({ slug, defaultTitle }) => {
-              const res = await fetchJSON(EP.PUBLIC.staticPageByName(slug), {
-                method: "GET",
-              });
-              if (cancelled) return { key: staticKey(slug), state: null as SectionState | null };
-              if (res?.success && res?.data?.content != null) {
-                return {
-                  key: staticKey(slug),
-                  state: {
-                    title: res.data.title || defaultTitle,
-                    html: String(res.data.content),
-                    missing: false,
-                  },
-                };
-              }
-              return {
-                key: staticKey(slug),
-                state: {
-                  title: defaultTitle,
-                  html: "",
-                  missing: true,
-                },
-              };
-            })
-          ),
-          Promise.all(
-            LEGAL_SECTIONS.map(async ({ docType, defaultTitle }) => {
-              const res = await fetchJSON(
-                EP.LEGAL.getActive(docType),
-                { method: "GET" },
-                { skipAuth: true }
-              );
-              if (cancelled) return { key: legalKey(docType), state: null as SectionState | null };
-              if (res?.success && res?.data) {
-                return {
-                  key: legalKey(docType),
-                  state: {
-                    title: String(res.data.title || defaultTitle),
-                    html: String(res.data.content ?? ""),
-                    missing: false,
-                    version:
-                      typeof res.data.version === "number"
-                        ? res.data.version
-                        : undefined,
-                  },
-                };
-              }
-              return {
-                key: legalKey(docType),
-                state: {
-                  title: defaultTitle,
-                  html: "",
-                  missing: true,
-                },
-              };
-            })
-          ),
-        ]);
-
+        const res = await fetchJSON(EP.PUBLIC.contractsCatalog, { method: "GET" }, {
+          skipAuth: true,
+        });
         if (cancelled) return;
-        const next: Record<string, SectionState> = {};
-        for (const { key, state } of [...staticResults, ...legalResults]) {
-          if (state) next[key] = state;
+        if (res?.success && res?.data) {
+          setCatalog(res.data as CatalogData);
+        } else {
+          setFatalError(res?.message || res?.error || "İçerik yüklenemedi.");
         }
-        setSections(next);
       } catch (e: unknown) {
         if (!cancelled) {
-          setFatalError(
-            e instanceof Error ? e.message : "İçerik yüklenemedi."
-          );
+          setFatalError(e instanceof Error ? e.message : "İçerik yüklenemedi.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -180,15 +72,17 @@ export default function SozlesmelerContent() {
     };
   }, []);
 
-  const tocLegal = LEGAL_SECTIONS.map((s) => ({
-    id: s.id,
-    label: sections[legalKey(s.docType)]?.title ?? s.defaultTitle,
-  }));
-
-  const tocStatic = STATIC_SECTIONS.map((s) => ({
-    id: s.id,
-    label: sections[staticKey(s.slug)]?.title ?? s.defaultTitle,
-  }));
+  const tocEntries: { anchor: string; label: string }[] = [];
+  if (catalog) {
+    for (const cat of CATEGORY_ORDER) {
+      for (const doc of catalog[cat] ?? []) {
+        tocEntries.push({
+          anchor: SOZLESMELER_SECTION_ANCHORS[doc.docType],
+          label: doc.title || DEFAULT_TITLES_TR[doc.docType],
+        });
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
@@ -209,38 +103,33 @@ export default function SozlesmelerContent() {
           <p className="font-medium text-gray-700 dark:text-slate-300 mb-2">
             İçindekiler
           </p>
-          <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mt-3 mb-1">
-            Legal (Admin → Legal)
-          </p>
-          <ul className="list-disc list-inside space-y-1 text-cyan-600 dark:text-cyan-400">
-            {tocLegal.map((s) => (
-              <li key={s.id}>
-                <a href={`#${s.id}`} className="hover:underline">
-                  {s.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mt-3 mb-1">
-            Statik sözleşmeler (Admin → Statik Sayfalar)
-          </p>
-          <ul className="list-disc list-inside space-y-1 text-cyan-600 dark:text-cyan-400">
-            {tocStatic.map((s) => (
-              <li key={s.id}>
-                <a href={`#${s.id}`} className="hover:underline">
-                  {s.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+          {CATEGORY_ORDER.map((cat) => {
+            const docs = catalog?.[cat] ?? [];
+            if (docs.length === 0) return null;
+            return (
+              <div key={cat} className="mt-3">
+                <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">
+                  {CATEGORY_LABELS_TR[cat]}
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-cyan-600 dark:text-cyan-400">
+                  {docs.map((doc) => {
+                    const anchor = SOZLESMELER_SECTION_ANCHORS[doc.docType];
+                    const label = doc.title || DEFAULT_TITLES_TR[doc.docType];
+                    return (
+                      <li key={doc.docType}>
+                        <a href={`#${anchor}`} className="hover:underline">
+                          {label}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
           <p className="mt-3 text-xs text-gray-500 dark:text-slate-400">
-            KVKK, şartlar, mesafeli satış ve etkinlik metinleri{" "}
-            <strong>Legal</strong> bölümünden; antrenör ve ek metinler{" "}
-            <strong>Statik Sayfalar</strong> (
-            <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded text-[11px]">
-              {SOZLESMELER_STATIC_SLUGS.join(", ")}
-            </code>
-            ) üzerinden düzenlenir.
+            Tüm metinler Admin → Contracts üzerinden yönetilir. Eski statik adresler bu sayfaya
+            yönlendirilir.
           </p>
         </nav>
 
@@ -261,73 +150,53 @@ export default function SozlesmelerContent() {
           </div>
         )}
 
-        {!loading && (
+        {!loading && catalog && (
           <>
-            <section className="space-y-8">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                Legal belgeleri
-              </h2>
-              {LEGAL_SECTIONS.map((s) => {
-                const data = sections[legalKey(s.docType)];
-                return (
-                  <article
-                    key={s.id}
-                    id={s.id}
-                    className="scroll-mt-24 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 shadow-sm"
-                  >
-                    <h3 className="text-xl font-semibold mb-1">
-                      {data?.title ?? s.defaultTitle}
-                    </h3>
-                    {data?.version != null && !data.missing && (
-                      <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
-                        Yayında sürüm: v{data.version}
-                      </p>
-                    )}
-                    {data?.missing ? (
-                      <p className="text-sm text-gray-600 dark:text-slate-400">
-                        Bu belge için aktif sürüm yok. Yönetici panelinde{" "}
-                        <strong>Legal</strong> bölümünden ilgili tipe bir sürüm
-                        oluşturup <strong>Set Active</strong> yapın.
-                      </p>
-                    ) : (
-                      <SectionBody html={data?.html ?? ""} />
-                    )}
-                  </article>
-                );
-              })}
-            </section>
+            {CATEGORY_ORDER.map((cat) => {
+              const docs = catalog[cat] ?? [];
+              if (docs.length === 0) return null;
+              return (
+                <section key={cat} className="space-y-8">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                    {CATEGORY_LABELS_TR[cat]}
+                  </h2>
+                  {docs.map((doc) => {
+                    const anchor = SOZLESMELER_SECTION_ANCHORS[doc.docType];
+                    const title = doc.title || DEFAULT_TITLES_TR[doc.docType];
+                    return (
+                      <article
+                        key={doc.docType}
+                        id={anchor}
+                        className="scroll-mt-24 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 shadow-sm"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+                          <h3 className="text-xl font-semibold">{title}</h3>
+                          <Link
+                            href={`/legal/${doc.docType}`}
+                            className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline"
+                          >
+                            Tam sayfa
+                          </Link>
+                        </div>
+                        {doc.version != null && (
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+                            Yayında sürüm: v{doc.version}
+                          </p>
+                        )}
+                        <SectionBody html={doc.content ?? ""} />
+                      </article>
+                    );
+                  })}
+                </section>
+              );
+            })}
 
-            <section className="space-y-8">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                Statik sözleşmeler
-              </h2>
-              {STATIC_SECTIONS.map((s) => {
-                const data = sections[staticKey(s.slug)];
-                return (
-                  <article
-                    key={s.id}
-                    id={s.id}
-                    className="scroll-mt-24 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 shadow-sm"
-                  >
-                    <h3 className="text-xl font-semibold mb-4">
-                      {data?.title ?? s.defaultTitle}
-                    </h3>
-                    {data?.missing ? (
-                      <p className="text-sm text-gray-600 dark:text-slate-400">
-                        Bu bölüm için henüz yayımlanmış statik sayfa yok.{" "}
-                        <strong>Statik Sayfalar</strong> bölümünden{" "}
-                        <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">
-                          {s.slug}
-                        </code>{" "}
-                        adında aktif sayfa oluşturun.
-                      </p>
-                    ) : (
-                      <SectionBody html={data?.html ?? ""} />
-                    )}
-                  </article>
-                );
-              })}
-            </section>
+            {tocEntries.length === 0 && !fatalError && (
+              <p className="text-sm text-gray-600 dark:text-slate-400">
+                Henüz yayımlanmış sözleşme yok. Yönetici panelinden Contracts bölümünde ilgili
+                belgeleri oluşturup aktif yapın.
+              </p>
+            )}
           </>
         )}
       </main>

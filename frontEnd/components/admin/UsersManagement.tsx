@@ -70,10 +70,41 @@ interface User {
 
 type ProfileTab = 'participant' | 'coach' | 'facility';
 
+type ActivityParticipantRow = {
+  participantId: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  totalParticipations: number;
+  lastParticipationAt?: string;
+};
+
+type ActivityCoachRow = {
+  coachUserId: string;
+  coachId: string;
+  coachName?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  totalParticipations: number;
+  eventCount: number;
+  lastParticipationAt?: string;
+};
+
+type ActivityLeaderboard = {
+  topParticipant: ActivityParticipantRow | null;
+  topCoach: ActivityCoachRow | null;
+  participantLeaderboard: ActivityParticipantRow[];
+  coachLeaderboard: ActivityCoachRow[];
+};
+
 export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: boolean }) {
   const { data: me } = useMe();
   const [activeTab, setActiveTab] = useState<ProfileTab>('participant');
   const [users, setUsers] = useState<User[]>([]);
+  const [activity, setActivity] = useState<ActivityLeaderboard | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -133,6 +164,10 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
     fetchUsers();
   }, [page]);
 
+  useEffect(() => {
+    fetchActivityLeaderboard();
+  }, []);
+
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -160,6 +195,22 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       setError(err.message || err.response?.data?.message || "Failed to fetch users");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActivityLeaderboard = async () => {
+    try {
+      setActivityLoading(true);
+      const response = await fetchJSON(EP.ADMIN.users.activityLeaderboard(10), {
+        method: "GET",
+      });
+      if (response?.success && response?.data) {
+        setActivity(response.data as ActivityLeaderboard);
+      }
+    } catch (err) {
+      console.error("Failed to fetch activity leaderboard:", err);
+    } finally {
+      setActivityLoading(false);
     }
   };
 
@@ -610,6 +661,15 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
     }
   };
 
+  const formatDateTime = (iso?: string) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("tr-TR");
+    } catch {
+      return iso;
+    }
+  };
+
   const getProfileSummary = (user: User) => {
     const parts: string[] = [];
     if (user.coach) parts.push("Coach");
@@ -700,6 +760,104 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
         />
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+              Most Active Gamers
+            </h3>
+            {activityLoading ? (
+              <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
+            ) : (
+              <span className="text-xs text-gray-500 dark:text-slate-400">
+                Top {activity?.participantLeaderboard?.length ?? 0}
+              </span>
+            )}
+          </div>
+          {activity?.topParticipant && (
+            <div className="mb-3 rounded border border-emerald-300/70 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 p-2 text-sm">
+              <span className="font-medium">Top participant:</span>{" "}
+              {activity.topParticipant.firstName} {activity.topParticipant.lastName} (
+              {activity.topParticipant.totalParticipations} participations)
+            </div>
+          )}
+          <div className="max-h-56 overflow-auto text-sm">
+            {(activity?.participantLeaderboard || []).map((row, idx) => (
+              <div
+                key={`${row.userId}-${row.participantId}`}
+                className="py-2 border-b border-gray-200 dark:border-slate-700"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium text-gray-900 dark:text-slate-100">
+                    #{idx + 1} {row.firstName} {row.lastName}
+                  </div>
+                  <div className="text-emerald-700 dark:text-emerald-300 font-semibold">
+                    {row.totalParticipations}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400">
+                  User ID: <code className="select-all">{row.userId}</code>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400">
+                  Last join: {formatDateTime(row.lastParticipationAt)}
+                </div>
+              </div>
+            ))}
+            {!activityLoading && !activity?.participantLeaderboard?.length && (
+              <div className="text-gray-500 dark:text-slate-400">No participation data yet.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+              Most Active Coaches
+            </h3>
+            {activityLoading ? (
+              <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
+            ) : (
+              <span className="text-xs text-gray-500 dark:text-slate-400">
+                Top {activity?.coachLeaderboard?.length ?? 0}
+              </span>
+            )}
+          </div>
+          {activity?.topCoach && (
+            <div className="mb-3 rounded border border-cyan-300/70 bg-cyan-50 dark:bg-cyan-900/20 dark:border-cyan-800 p-2 text-sm">
+              <span className="font-medium">Top coach:</span>{" "}
+              {activity.topCoach.firstName} {activity.topCoach.lastName} (
+              {activity.topCoach.totalParticipations} participations)
+            </div>
+          )}
+          <div className="max-h-56 overflow-auto text-sm">
+            {(activity?.coachLeaderboard || []).map((row, idx) => (
+              <div
+                key={`${row.coachUserId}-${row.coachId}`}
+                className="py-2 border-b border-gray-200 dark:border-slate-700"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium text-gray-900 dark:text-slate-100">
+                    #{idx + 1} {row.firstName} {row.lastName}
+                  </div>
+                  <div className="text-cyan-700 dark:text-cyan-300 font-semibold">
+                    {row.totalParticipations}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400">
+                  Coach ID: <code className="select-all">{row.coachId}</code>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400">
+                  Events: {row.eventCount} • Last join: {formatDateTime(row.lastParticipationAt)}
+                </div>
+              </div>
+            ))}
+            {!activityLoading && !activity?.coachLeaderboard?.length && (
+              <div className="text-gray-500 dark:text-slate-400">No coach participation data yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg">
           {error}
@@ -714,6 +872,9 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
             <table className="w-full border-collapse border border-gray-300 dark:border-slate-600">
               <thead>
                 <tr className="bg-gray-100 dark:bg-slate-700">
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    User ID
+                  </th>
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Name
                   </th>
@@ -745,6 +906,9 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                   {activeTab === 'coach' && (
                     <>
                       <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Coach ID
+                      </th>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                         Certificates
                       </th>
                       <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
@@ -757,6 +921,9 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                   )}
                   {activeTab === 'facility' && (
                     <>
+                      <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                        Facility IDs
+                      </th>
                       <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                         Facilities Count
                       </th>
@@ -776,6 +943,9 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
               <tbody>
                 {users.map((user) => (
                   <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                      <code className="font-mono select-all break-all">{user._id}</code>
+                    </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       {user.firstName} {user.lastName}
                     </td>
@@ -819,6 +989,11 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                     {activeTab === 'coach' && (
                       <>
                         <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                          <code className="font-mono select-all break-all">
+                            {user.coach?._id || "—"}
+                          </code>
+                        </td>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
                           {user.summary?.coach?.certificateCount || 0}
                         </td>
                         <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
@@ -833,6 +1008,19 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                     )}
                     {activeTab === 'facility' && (
                       <>
+                        <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs max-w-[280px]">
+                          {Array.isArray(user.facility) && user.facility.length > 0 ? (
+                            <div className="space-y-1">
+                              {user.facility.map((f: any, idx: number) => (
+                                <code key={f?._id || idx} className="block font-mono select-all break-all">
+                                  {typeof f === "string" ? f : f?._id || "—"}
+                                </code>
+                              ))}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
                           {user.summary?.facility?.facilityCount || 0}
                         </td>

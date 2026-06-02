@@ -18,10 +18,9 @@ import { genSecret } from '../utils/secretIdGen.js';
 import * as zodValidation from '../utils/validation.js';
 import { unlink } from 'fs/promises';
 import {
-    COACH_PROFILE_STATIC_SLUGS,
     recordLegalAcceptance,
     recordMarketingConsent,
-    recordStaticAcceptancesBySlugs,
+    recordCoachProfileLegalAcceptances,
 } from '../utils/contractAcceptanceHelper.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import {
@@ -187,12 +186,7 @@ export const createBranch = async (req, res, next) => {
         }
 
         if (isFirstCoachProfile && agreeCoachAgreement === true) {
-            await recordStaticAcceptancesBySlugs(
-                req,
-                user._id,
-                COACH_PROFILE_STATIC_SLUGS,
-                'coach_profile'
-            );
+            await recordCoachProfileLegalAcceptances(req, user._id, 'coach_profile');
             if (typeof marketingConsent === 'boolean') {
                 if (marketingConsent && commercialMessagesVersionId) {
                     await recordLegalAcceptance(req, user._id, {
@@ -1297,32 +1291,34 @@ export const getCoachDetails = async (req, res, next) => {
             coach: coachId,
         }).select('-email -phone -isEmailVerified -isPhoneVerified');
 
-        const club = await Club.find({ creator: user._id });
+        const club = user ? await Club.find({ creator: user._id }) : [];
         const clubGroup = await ClubGroup.find({ owner: coachId });
         const branch = await Branch.find({ coach: coachId }).populate({
             path: 'sport',
             select: 'name groupName icon',
         });
-        const event = await Event.find({
-            $and: [
-                { $or: [{ owner: user._id }, { backupCoach: user._id }] },
-                { $or: [{ status: 'active' }, { status: { $exists: false } }] },
-            ],
-        })
+        const event = user
+            ? await Event.find({
+                  $and: [
+                      { $or: [{ owner: user._id }, { backupCoach: user._id }] },
+                      { $or: [{ status: 'active' }, { status: { $exists: false } }] },
+                  ],
+              })
             .sort({ startTime: -1 })
-            .populate([
-            { path: 'club', select: 'name' },
-            { path: 'group', select: 'name' },
-            { path: 'sport', select: 'name' },
-            { path: 'sportGroup', select: 'name' },
-            { path: 'style', select: 'name' },
-            { path: 'salon', select: 'name' },
-            { path: 'facility', select: 'name' },
-        ]);
+                  .populate([
+                      { path: 'club', select: 'name' },
+                      { path: 'group', select: 'name' },
+                      { path: 'sport', select: 'name' },
+                      { path: 'sportGroup', select: 'name' },
+                      { path: 'style', select: 'name' },
+                      { path: 'salon', select: 'name' },
+                      { path: 'facility', select: 'name' },
+                  ])
+            : [];
 
         const allData = {
             coach,
-            user,
+            user: user ?? null,
             club,
             clubGroup,
             branch,

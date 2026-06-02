@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import SitePageShell from "@/components/SitePageShell";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { LEGACY_STATIC_CONTRACT_REDIRECTS } from "@/app/lib/contract-documents";
 
 const SLUG_RE = /^[a-z0-9-]{1,80}$/;
 
 export default function PublicStaticPage() {
+  const router = useRouter();
   const params = useParams();
   const slug = typeof params?.slug === "string" ? params.slug : "";
   const [page, setPage] = useState<{ title: string; content: string } | null>(
@@ -25,6 +27,12 @@ export default function PublicStaticPage() {
       return;
     }
 
+    const clientRedirect = LEGACY_STATIC_CONTRACT_REDIRECTS[slug];
+    if (clientRedirect) {
+      router.replace(clientRedirect);
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
@@ -35,6 +43,10 @@ export default function PublicStaticPage() {
           method: "GET",
         });
         if (cancelled) return;
+        if (res?.success && typeof res.redirect === "string") {
+          router.replace(res.redirect);
+          return;
+        }
         if (res?.success && res?.data?.content != null) {
           setPage({
             title: String(res.data.title ?? ""),
@@ -62,7 +74,7 @@ export default function PublicStaticPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, router]);
 
   return (
     <SitePageShell>
