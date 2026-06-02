@@ -1,8 +1,34 @@
 import LegalDocument from '../models/legalDocumentModel.js';
 import { AppError } from '../utils/appError.js';
 import { mongoObjectId } from '../utils/validation.js';
+import {
+    ALL_CONTRACT_DOC_TYPES,
+    CONTRACT_CATEGORIES,
+    DOC_TYPE_TO_CATEGORY,
+    LEGAL_DOC_TYPES,
+    GAMER_DOC_TYPES,
+    COACH_DOC_TYPES,
+} from '../constants/contractDocuments.js';
 
-const DOC_TYPES = ['kvkk', 'terms', 'distance_selling', 'event_contract', 'commercial_messages'];
+const DOC_TYPES = ALL_CONTRACT_DOC_TYPES;
+
+const DOC_TYPES_BY_CATEGORY = {
+    legal: LEGAL_DOC_TYPES,
+    gamer: GAMER_DOC_TYPES,
+    coach: COACH_DOC_TYPES,
+};
+
+function buildListFilter(query) {
+    const type = query?.type;
+    const category = query?.category;
+    if (type && DOC_TYPES.includes(type)) {
+        return { docType: type };
+    }
+    if (category && CONTRACT_CATEGORIES.includes(category)) {
+        return { docType: { $in: DOC_TYPES_BY_CATEGORY[category] } };
+    }
+    return {};
+}
 
 export const getActive = async (req, res, next) => {
     try {
@@ -34,8 +60,7 @@ export const list = async (req, res, next) => {
             throw new AppError(!req.user ? 401 : 403);
         }
 
-        const type = req.query?.type;
-        const filter = type && DOC_TYPES.includes(type) ? { docType: type } : {};
+        const filter = buildListFilter(req.query);
 
         const docs = await LegalDocument.find(filter)
             .sort({ docType: 1, version: -1 })
@@ -171,6 +196,44 @@ export const getById = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: doc,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/** Public catalog: active document per docType, grouped by category (legal / gamer / coach). */
+export const getActiveCatalog = async (req, res, next) => {
+    try {
+        const activeDocs = await LegalDocument.find({ isActive: true })
+            .select('docType title content version updatedAt')
+            .lean();
+
+        const byType = Object.fromEntries(activeDocs.map((d) => [d.docType, d]));
+
+        const group = (types) =>
+            types
+                .map((docType) => {
+                    const doc = byType[docType];
+                    if (!doc) return null;
+                    return {
+                        docType,
+                        category: DOC_TYPE_TO_CATEGORY[docType],
+                        title: doc.title,
+                        content: doc.content,
+                        version: doc.version,
+                        updatedAt: doc.updatedAt,
+                    };
+                })
+                .filter(Boolean);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                legal: group(LEGAL_DOC_TYPES),
+                gamer: group(GAMER_DOC_TYPES),
+                coach: group(COACH_DOC_TYPES),
+            },
         });
     } catch (err) {
         next(err);

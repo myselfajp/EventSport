@@ -66,6 +66,7 @@ export const EP = {
   PUBLIC: {
     staticPageByName: (name: string) =>
       `${API_V1_BASE}/public/static-page/${encodeURIComponent(name)}`,
+    contractsCatalog: `${API_V1_BASE}/public/contracts`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
     dashboardHeroSlides: `${API_V1_BASE}/public/dashboard-hero-slides`,
     heroClick: (slideId: string) =>
@@ -85,14 +86,8 @@ export const EP = {
     getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,
   },
   LEGAL: {
-    getActive: (
-      type:
-        | "kvkk"
-        | "terms"
-        | "distance_selling"
-        | "event_contract"
-        | "commercial_messages"
-    ) => `${LEGAL_API}/active?type=${type}`,
+    getActive: (type: string) => `${LEGAL_API}/active?type=${encodeURIComponent(type)}`,
+    catalog: `${LEGAL_API}/catalog`,
   },
   ADMIN: {
     panel: `${ADMIN_API}/panel`,
@@ -104,14 +99,13 @@ export const EP = {
       delete: (groupId: string) => `${ADMIN_API}/permission-groups/${groupId}`,
     },
     legal: {
-      list: (
-        type?:
-          | "kvkk"
-          | "terms"
-          | "distance_selling"
-          | "event_contract"
-          | "commercial_messages"
-      ) => (type ? `${ADMIN_API}/legal?type=${type}` : `${ADMIN_API}/legal`),
+      list: (type?: string, category?: string) => {
+        const params = new URLSearchParams();
+        if (type) params.set("type", type);
+        if (category) params.set("category", category);
+        const q = params.toString();
+        return q ? `${ADMIN_API}/legal?${q}` : `${ADMIN_API}/legal`;
+      },
       create: `${ADMIN_API}/legal`,
       getById: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
       update: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
@@ -126,6 +120,8 @@ export const EP = {
     },
     users: {
       getAll: `${ADMIN_API}/users`,
+      activityLeaderboard: (limit = 10) =>
+        `${ADMIN_API}/users/activity-leaderboard?limit=${limit}`,
       create: `${ADMIN_API}/users/create`,
       update: (userId: string) => `${ADMIN_API}/users/${userId}`,
       delete: (userId: string) => `${ADMIN_API}/users/${userId}`,

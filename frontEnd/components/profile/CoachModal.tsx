@@ -1001,14 +1001,14 @@ const CoachModal: React.FC<CoachModalProps> = ({
                   <span>
                     I have read and agree to the{" "}
                     <Link
-                      href="/sozlesmeler#antrenor-sozlesmesi"
+                      href="/sozlesmeler#coach-agreement"
                       className="text-cyan-600 dark:text-cyan-400 underline font-medium"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Coach Agreement
+                      Antrenör Sözleşmesi
                     </Link>
-                    . (Appendices: Training Rules, Penalty Terms, Coach Documents — all on the{" "}
+                    . (Cezai Şartlar, Antrenör Donanımları, Gizlilik — tümü{" "}
                     <Link
                       href="/sozlesmeler"
                       className="text-cyan-600 dark:text-cyan-400 underline"

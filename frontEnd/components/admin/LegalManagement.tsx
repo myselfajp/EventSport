@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import LegalContentModal from "../auth/LegalContentModal";
+import {
+  CATEGORY_LABELS,
+  DEFAULT_TITLES_TR,
+  DOC_TYPE_LABELS,
+  type ContractCategory,
+  type LegalDocType,
+} from "@/app/lib/contract-documents";
 
-type LegalDocType =
-  | "kvkk"
-  | "terms"
-  | "distance_selling"
-  | "event_contract"
-  | "commercial_messages";
 type DocTypeFilter = LegalDocType | "all";
 
 interface LegalDocument {
@@ -24,28 +25,23 @@ interface LegalDocument {
   updatedAt: string;
 }
 
-const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
-  kvkk: "KVKK",
-  terms: "Terms & Conditions",
-  distance_selling: "Distance selling agreement",
-  event_contract: "Event contract",
-  commercial_messages: "Commercial messages (IYS)",
+type LegalManagementProps = {
+  category: ContractCategory;
+  allowedDocTypes: readonly LegalDocType[];
 };
 
-const DEFAULT_TITLE: Record<LegalDocType, string> = {
-  kvkk: "KVKK",
-  terms: "Terms & Conditions",
-  distance_selling: "Distance Selling Agreement",
-  event_contract: "Event Contract",
-  commercial_messages: "Commercial Electronic Messages Consent (IYS)",
-};
-
-function docTypeFromFilter(f: DocTypeFilter): LegalDocType {
-  if (f === "all") return "kvkk";
+function docTypeFromFilter(
+  f: DocTypeFilter,
+  allowed: readonly LegalDocType[]
+): LegalDocType {
+  if (f === "all") return allowed[0];
   return f;
 }
 
-export default function LegalManagement() {
+export default function LegalManagement({
+  category,
+  allowedDocTypes,
+}: LegalManagementProps) {
   const [filter, setFilter] = useState<DocTypeFilter>("all");
   const [docs, setDocs] = useState<LegalDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,7 +63,10 @@ export default function LegalManagement() {
     try {
       setLoading(true);
       setError("");
-      const url = filter === "all" ? EP.ADMIN.legal.list() : EP.ADMIN.legal.list(filter);
+      const url =
+        filter === "all"
+          ? EP.ADMIN.legal.list(undefined, category)
+          : EP.ADMIN.legal.list(filter);
       const res = await fetchJSON(url, { method: "GET" });
       if (res?.success && Array.isArray(res?.data)) {
         setDocs(res.data);
@@ -83,10 +82,10 @@ export default function LegalManagement() {
 
   const handleCreate = () => {
     setEditingDoc(null);
-    const docType = docTypeFromFilter(filter);
+    const docType = docTypeFromFilter(filter, allowedDocTypes);
     setFormData({
       docType,
-      title: DEFAULT_TITLE[docType],
+      title: DEFAULT_TITLES_TR[docType],
       content: "",
     });
     setShowModal(true);
@@ -154,36 +153,31 @@ export default function LegalManagement() {
     }
   };
 
-  const filtered = docs.filter((d) => filter === "all" || d.docType === filter);
+  const filtered = docs
+    .filter((d) => allowedDocTypes.includes(d.docType))
+    .filter((d) => filter === "all" || d.docType === filter);
 
   const filterButtons: { key: DocTypeFilter; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "kvkk", label: DOC_TYPE_LABELS.kvkk },
-    { key: "terms", label: DOC_TYPE_LABELS.terms },
-    { key: "distance_selling", label: DOC_TYPE_LABELS.distance_selling },
-    { key: "event_contract", label: DOC_TYPE_LABELS.event_contract },
-    { key: "commercial_messages", label: DOC_TYPE_LABELS.commercial_messages },
+    ...allowedDocTypes.map((dt) => ({
+      key: dt as DocTypeFilter,
+      label: DOC_TYPE_LABELS[dt],
+    })),
   ];
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-500 dark:text-slate-400 max-w-3xl leading-relaxed">
-        Site footer ve doğrudan adresler:{" "}
-        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">/legal/kvkk</code>,{" "}
-        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">/legal/terms</code>,{" "}
-        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">
-          /legal/distance_selling
-        </code>
-        ,{" "}
-        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">
-          /legal/event_contract
-        </code>
-        ,{" "}
-        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px]">
-          /legal/commercial_messages
-        </code>
-        . Only the <strong>active</strong> version is shown on the site and at registration. These
-        texts are not edited under Static Pages.
+      <p className="text-xs text-gray-500 dark:text-slate-400">
+        {CATEGORY_LABELS[category]} — yalnızca <strong>aktif</strong> sürüm sitede ve kayıtta
+        gösterilir. Tekil URL:{" "}
+        {allowedDocTypes.map((dt) => (
+          <code
+            key={dt}
+            className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px] mr-1"
+          >
+            /legal/{dt}
+          </code>
+        ))}
       </p>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex gap-2 flex-wrap">
@@ -319,13 +313,13 @@ export default function LegalManagement() {
                         const docType = e.target.value as LegalDocType;
                         setFormData({
                           docType,
-                          title: DEFAULT_TITLE[docType],
+                          title: DEFAULT_TITLES_TR[docType],
                           content: formData.content,
                         });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
                     >
-                      {(Object.keys(DOC_TYPE_LABELS) as LegalDocType[]).map((dt) => (
+                      {allowedDocTypes.map((dt) => (
                         <option key={dt} value={dt}>
                           {DOC_TYPE_LABELS[dt]}
                         </option>

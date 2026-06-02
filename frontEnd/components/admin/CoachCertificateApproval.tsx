@@ -49,13 +49,14 @@ export default function CoachCertificateApproval() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved" | "Rejected">("Pending");
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
-  const [totalPending, setTotalPending] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchPendingBranches();
-  }, [page, search]);
+  }, [page, search, statusFilter]);
 
   const fetchPendingBranches = async () => {
     try {
@@ -64,6 +65,7 @@ export default function CoachCertificateApproval() {
       const body: any = {
         perPage: 10,
         pageNumber: page,
+        status: statusFilter,
       };
       if (search) {
         body.search = search;
@@ -76,10 +78,10 @@ export default function CoachCertificateApproval() {
       if (response?.success) {
         setBranches(response.data);
         setTotalPages(response.totalPages || 1);
-        setTotalPending(typeof response.total === "number" ? response.total : response.data?.length ?? 0);
+        setTotalCount(typeof response.total === "number" ? response.total : response.data?.length ?? 0);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to fetch pending certificates");
+      setError(err.message || "Failed to fetch certificates");
     } finally {
       setLoading(false);
     }
@@ -112,6 +114,11 @@ export default function CoachCertificateApproval() {
       });
 
       if (response?.success) {
+        if (response.revertedToGamer) {
+          alert(
+            "Certificate rejected. The user remains a gamer; coach application was removed."
+          );
+        }
         fetchPendingBranches();
       }
     } catch (err: any) {
@@ -130,14 +137,34 @@ export default function CoachCertificateApproval() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
           Coach Certificate Approval
         </h2>
-        {!loading && totalPending > 0 && (
+        {!loading && totalCount > 0 && (
           <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-            {totalPending} pending approval{totalPending !== 1 ? "s" : ""}
+            {totalCount} {statusFilter.toLowerCase()} certificate
+            {totalCount !== 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-3">
+        <div className="inline-flex rounded-lg border border-gray-300 dark:border-slate-600 overflow-hidden">
+          {(["Pending", "Approved", "Rejected"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => {
+                setStatusFilter(status);
+                setPage(1);
+              }}
+              className={`px-3 py-2 text-sm ${
+                statusFilter === status
+                  ? "bg-cyan-600 text-white"
+                  : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300"
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
         <input
           type="text"
           placeholder="Coach name, sport, branch ID, or coach profile ID..."
@@ -165,7 +192,13 @@ export default function CoachCertificateApproval() {
               <thead>
                 <tr className="bg-gray-100 dark:bg-slate-700">
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    Branch ID
+                  </th>
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Coach
+                  </th>
+                  <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
+                    Coach ID
                   </th>
                   <th className="border border-gray-300 dark:border-slate-600 p-2 text-left">
                     Sport
@@ -188,8 +221,17 @@ export default function CoachCertificateApproval() {
                 {branches.map((branch) => (
                   <tr
                     key={branch._id}
-                    className="border-l-4 border-l-amber-400 bg-amber-50/60 dark:border-l-amber-500 dark:bg-amber-950/25"
+                    className={
+                      branch.status === "Approved"
+                        ? "border-l-4 border-l-green-400 bg-green-50/60 dark:border-l-green-500 dark:bg-green-950/25"
+                        : branch.status === "Rejected"
+                        ? "border-l-4 border-l-red-400 bg-red-50/60 dark:border-l-red-500 dark:bg-red-950/25"
+                        : "border-l-4 border-l-amber-400 bg-amber-50/60 dark:border-l-amber-500 dark:bg-amber-950/25"
+                    }
                   >
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                      <code className="font-mono select-all break-all">{branch._id}</code>
+                    </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       <div>
                         <div className="font-medium">
@@ -203,6 +245,9 @@ export default function CoachCertificateApproval() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 text-xs">
+                      <code className="font-mono select-all break-all">{branch.coach?._id || "—"}</code>
                     </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
                       {branch.sport.name} ({branch.sport.groupName})
@@ -222,6 +267,19 @@ export default function CoachCertificateApproval() {
                       </button>
                     </td>
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
+                      <div className="mb-2">
+                        <span
+                          className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            branch.status === "Approved"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                              : branch.status === "Rejected"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                          }`}
+                        >
+                          {branch.status}
+                        </span>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {branch.user?._id ? (
                           <button
@@ -232,18 +290,22 @@ export default function CoachCertificateApproval() {
                             View profile
                           </button>
                         ) : null}
-                        <button
-                          onClick={() => handleApprove(branch._id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleReject(branch._id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                        >
-                          Reject
-                        </button>
+                        {branch.status === "Pending" ? (
+                          <>
+                            <button
+                              onClick={() => handleApprove(branch._id)}
+                              className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(branch._id)}
+                              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -340,24 +402,28 @@ export default function CoachCertificateApproval() {
                     View profile
                   </button>
                 ) : null}
-                <button
-                  onClick={() => {
-                    handleApprove(selectedBranch._id);
-                    setSelectedBranch(null);
-                  }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => {
-                    handleReject(selectedBranch._id);
-                    setSelectedBranch(null);
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  Reject
-                </button>
+                {selectedBranch.status === "Pending" ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleApprove(selectedBranch._id);
+                        setSelectedBranch(null);
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleReject(selectedBranch._id);
+                        setSelectedBranch(null);
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    >
+                      Reject
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>

@@ -76,14 +76,16 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   useEffect(() => {
     if (isOpen && userId) {
+      setIsFullyLoaded(false);
+      setError(null);
       fetchUserDetails(userId);
     } else if (!isOpen) {
-      // Reset state when modal closes
       setUser(null);
       setMainSport("");
       setSportGoal(null);
       setCoachDetails(null);
       setIsFullyLoaded(false);
+      setError(null);
       setSelectedCoachEvent(null);
       setIsEventViewOpen(false);
     }
@@ -146,39 +148,57 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           }
         }
       } else {
-        // For coaches, use the coach details endpoint (includes user data)
-        response = await fetchJSON(EP.COACH.getCoachById(id));
-        if (response?.success && response?.data) {
-          // The coach details endpoint returns comprehensive data
-          const coachData = response.data.coach;
-          const userData = response.data.user;
+        // Coach profile: admin often passes userId; API expects coachId
+        let coachId: string | null = null;
+        let userFromAuth: UserType | null = null;
 
-          if (userData && coachData) {
-            // Merge user and coach data for display
-            const mergedUser = {
-              ...userData,
-              coach: coachData,
-            };
-            setUser(mergedUser);
-
-            // Set coach details for additional display
-            setCoachDetails({
-              coach: coachData,
-              user: [userData], // Array format as expected by interface
-              club: response.data.club || [],
-              clubGroup: response.data.clubGroup || [],
-              branch: response.data.branch || [],
-              event: response.data.event || [],
-            });
-          } else {
-            throw new Error("Coach or user data not found");
+        try {
+          const userRes = await fetchJSON(EP.AUTH.getUserById(id));
+          if (userRes?.success && userRes?.data) {
+            userFromAuth = userRes.data as UserType;
+            const c = userRes.data.coach;
+            if (c && typeof c === "object" && c._id) {
+              coachId = String(c._id);
+            } else if (c) {
+              coachId = String(c);
+            }
           }
+        } catch {
+          // id may already be a coach id
+        }
+
+        if (!coachId) {
+          coachId = id;
+        }
+
+        response = await fetchJSON(EP.COACH.getCoachById(coachId));
+        if (response?.success && response?.data?.coach) {
+          const coachData = response.data.coach;
+          const userData = userFromAuth ?? response.data.user;
+
+          const mergedUser = {
+            ...(userData && typeof userData === "object" ? userData : {}),
+            coach: coachData,
+          } as UserType;
+          setUser(mergedUser);
+
+          setCoachDetails({
+            coach: coachData,
+            user: userData ? [userData] : [],
+            club: response.data.club || [],
+            clubGroup: response.data.clubGroup || [],
+            branch: response.data.branch || [],
+            event: response.data.event || [],
+          });
+          setIsFullyLoaded(true);
         } else {
           setError(response?.message || "Failed to load coach details");
+          setIsFullyLoaded(true);
         }
       }
     } catch (err) {
       setError("An error occurred while loading user details");
+      setIsFullyLoaded(true);
       console.error("Error loading user details:", err);
     } finally {
       setIsLoading(false);

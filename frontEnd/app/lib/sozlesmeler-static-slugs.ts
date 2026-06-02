@@ -1,6 +1,6 @@
 /**
- * Admin → Statik Sayfalar: her kaydın `name` alanı bu değerlerden biri olmalı (küçük harf, tire).
- * `/sozlesmeler` bu isimlerle public API üzerinden içeriği çeker.
+ * @deprecated Contract content moved to Legal API. Use contract-documents.ts.
+ * Legacy slugs kept for redirects only.
  */
 export const SOZLESMELER_STATIC_SLUGS = [
   "sozlesmeler-antrenor",

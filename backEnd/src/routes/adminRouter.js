@@ -39,6 +39,11 @@ router.delete(
 
 // User Management
 router.post('/users', requireAdminPermission('admin.users'), adminController.getAllUsers);
+router.get(
+    '/users/activity-leaderboard',
+    requireAdminPermission('admin.users'),
+    adminController.getUserActivityLeaderboard
+);
 router.post('/users/create', requireAdminPermission('admin.users'), adminController.createUser);
 router.put('/users/:userId', requireAdminPermission('admin.users'), adminController.updateUser);
 router.delete('/users/:userId', requireAdminPermission('admin.users'), adminController.deleteUser);

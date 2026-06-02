@@ -1,4 +1,5 @@
 import LegalDocument from '../models/legalDocumentModel.js';
+import { migrateStaticContractsToLegal } from './migrateStaticContractsToLegal.js';
 
 const DEFAULT_KVKK = {
     docType: 'kvkk',
@@ -101,6 +102,8 @@ export const initLegal = async () => {
                 '✅ Default Commercial messages / IYS consent (v' + version + ') created and set active.'
             );
         }
+
+        await migrateStaticContractsToLegal();
     } catch (err) {
         console.error('❌ Error initializing legal documents:', err.message);
     }

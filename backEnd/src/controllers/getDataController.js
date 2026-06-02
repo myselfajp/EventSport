@@ -92,7 +92,29 @@ export const createSearchController = (model, config = {}) => {
 
             // Extra filter from route params
             if (extraFilter) {
-                Object.assign(filter, extraFilter(req));
+                const routeExtraFilter = extraFilter(req) || {};
+
+                // If both filters have top-level $or, combine safely via $and.
+                // Otherwise one $or overwrites the other and search/status filtering breaks.
+                if (filter.$or && routeExtraFilter.$or) {
+                    const existingOr = filter.$or;
+                    const extraOr = routeExtraFilter.$or;
+                    delete filter.$or;
+                    delete routeExtraFilter.$or;
+
+                    const andParts = [{ $or: existingOr }, { $or: extraOr }];
+                    if (Object.keys(routeExtraFilter).length > 0) {
+                        andParts.push(routeExtraFilter);
+                    }
+
+                    if (Array.isArray(filter.$and)) {
+                        filter.$and = [...filter.$and, ...andParts];
+                    } else {
+                        filter.$and = andParts;
+                    }
+                } else {
+                    Object.assign(filter, routeExtraFilter);
+                }
             }
 
             // Build sort

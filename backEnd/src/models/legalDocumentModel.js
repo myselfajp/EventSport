@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
+import { ALL_CONTRACT_DOC_TYPES } from '../constants/contractDocuments.js';
 
 const legalDocumentSchema = new mongoose.Schema(
     {
         docType: {
             type: String,
-            enum: ['kvkk', 'terms', 'distance_selling', 'event_contract', 'commercial_messages'],
+            enum: ALL_CONTRACT_DOC_TYPES,
             required: true,
         },
         version: {

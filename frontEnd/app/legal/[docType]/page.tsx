@@ -5,24 +5,12 @@ import { useParams } from "next/navigation";
 import SitePageShell from "@/components/SitePageShell";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
-
-const DOC_TYPES = [
-  "kvkk",
-  "terms",
-  "distance_selling",
-  "event_contract",
-  "commercial_messages",
-] as const;
-type DocType = (typeof DOC_TYPES)[number];
-
-function isDocType(v: string): v is DocType {
-  return DOC_TYPES.includes(v as DocType);
-}
+import { DEFAULT_TITLES_TR, isLegalDocType } from "@/app/lib/contract-documents";
 
 export default function LegalPublicPage() {
   const params = useParams();
   const raw = typeof params?.docType === "string" ? params.docType : "";
-  const docType = isDocType(raw) ? raw : null;
+  const docType = isLegalDocType(raw) ? raw : null;
 
   const [doc, setDoc] = useState<{ title: string; content: string } | null>(
     null
@@ -42,34 +30,30 @@ export default function LegalPublicPage() {
 
     async function load() {
       if (!docType) return;
-      const legalType = docType;
 
       setLoading(true);
       setError("");
       try {
-        const res = await fetchJSON(EP.LEGAL.getActive(legalType), {
+        const res = await fetchJSON(EP.LEGAL.getActive(docType), {
           method: "GET",
-        });
+        }, { skipAuth: true });
         if (cancelled) return;
         if (res?.success && res?.data) {
           setDoc({
-            title: String(res.data.title ?? ""),
+            title: String(res.data.title ?? DEFAULT_TITLES_TR[docType]),
             content: String(res.data.content ?? ""),
           });
         } else {
           setError(
             res?.error ||
               res?.message ||
-              "Belge bulunamadı veya yayında değil. Admin panelinde Legal bölümünden aktif bir sürüm oluşturun."
+              "Belge bulunamadı veya yayında değil."
           );
           setDoc(null);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(
-            e?.message ||
-              "Yüklenemedi. Legal bölümünde bu tip için aktif belge olduğundan emin olun."
-          );
+          setError(e instanceof Error ? e.message : "Belge yüklenemedi.");
           setDoc(null);
         }
       } finally {
