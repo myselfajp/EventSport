@@ -22,6 +22,7 @@ import NearbyEventsSection from "./NearbyEventsSection";
 import YourNextEventSection from "./YourNextEventSection";
 import HotUpcomingSection from "./HotUpcomingSection";
 import CheckInTimesSection from "./dashboard/CheckInTimesSection";
+import NotificationEventLinkHandler from "./notification/NotificationEventLinkHandler";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -37,7 +38,7 @@ const EventsDashboard = () => {
   const [showCoachCalendar, setShowCoachCalendar] = useState(false);
   const [showFollowings, setShowFollowings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
-  const [selectedStaticPageId, setSelectedStaticPageId] = useState<string | null>(null);
+  const [selectedStaticPageName, setSelectedStaticPageName] = useState<string | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const [heroSlides, setHeroSlides] = useState<DashboardHeroSlideDTO[]>([]);
   const [gamerProfileOpenSignal, setGamerProfileOpenSignal] = useState(0);
@@ -281,11 +282,11 @@ const EventsDashboard = () => {
           setShowFavorites(true);
           setLeftSidebarOpen(false);
         }}
-        onShowStaticPage={(pageId: string) => {
+        onShowStaticPage={(pageName: string) => {
           setShowCoachCalendar(false);
           setShowFollowings(false);
           setShowFavorites(false);
-          setSelectedStaticPageId(pageId);
+          setSelectedStaticPageName(pageName);
           setLeftSidebarOpen(false);
         }}
       />
@@ -321,7 +322,7 @@ const EventsDashboard = () => {
             {!showCoachCalendar &&
               !showFollowings &&
               !showFavorites &&
-              !selectedStaticPageId && (
+              !selectedStaticPageName && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
                     <YourNextEventSection />
@@ -350,10 +351,10 @@ const EventsDashboard = () => {
                 <FollowingsView onBack={() => setShowFollowings(false)} />
               ) : showFavorites ? (
                 <FavoritesView onBack={() => setShowFavorites(false)} />
-              ) : selectedStaticPageId ? (
+              ) : selectedStaticPageName ? (
                 <StaticPageView
-                  pageId={selectedStaticPageId}
-                  onBack={() => setSelectedStaticPageId(null)}
+                  pageName={selectedStaticPageName}
+                  onBack={() => setSelectedStaticPageName(null)}
                 />
               ) : (
                 <EventsTable
@@ -425,6 +426,7 @@ const EventsDashboard = () => {
           <Calendar className="w-6 h-6" />
         )}
       </button>
+      <NotificationEventLinkHandler />
     </div>
     </GamerProfilePromptProvider>
   );

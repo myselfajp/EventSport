@@ -27,10 +27,74 @@ import {
     resolveEventDistrict,
     notifyUsersInEventDistrict,
     notifyCoachFollowersOfNewEvent,
+    notifyAffinityFollowersOfNewEvent,
+    notifyFacilityOwnerOfNewEvent,
 } from '../utils/eventDistrictHelper.js';
 import { createRecurringEventSeries, cancelEventsWithScope, applyEventEditWithScope } from '../utils/eventSeriesService.js';
 import { getListingPricePerSlot } from '../utils/recurrenceHelper.js';
 import EventSeries from '../models/eventSeriesModel.js';
+import {
+    notifyReservedUsersEventCancelled,
+    notifyReservedUsersEventUpdated,
+} from '../utils/eventReservationNotifier.js';
+import {
+    notifyEventInvite,
+    notifyGroupInvite,
+    notifyJoinRequestApproved,
+} from '../utils/notificationHelper.js';
+
+/** Build a short human-readable summary of which event fields changed. */
+function summarizeEventChanges(prev, next) {
+    const parts = [];
+    if (next?.startTime !== undefined && prev?.startTime) {
+        const a = new Date(prev.startTime).getTime();
+        const b = new Date(next.startTime).getTime();
+        if (a !== b) parts.push('time');
+    }
+    if (next?.endTime !== undefined && prev?.endTime) {
+        const a = new Date(prev.endTime).getTime();
+        const b = new Date(next.endTime).getTime();
+        if (a !== b && !parts.includes('time')) parts.push('time');
+    }
+    const refKeys = ['facility', 'salon', 'district'];
+    for (const key of refKeys) {
+        if (next?.[key] !== undefined) {
+            const prevVal = prev?.[key]?.toString?.() ?? prev?.[key] ?? null;
+            const nextVal = next?.[key]?.toString?.() ?? next?.[key] ?? null;
+            if (String(prevVal) !== String(nextVal)) {
+                parts.push('location');
+                break;
+            }
+        }
+    }
+    if (next?.type !== undefined && next.type !== prev?.type) {
+        if (!parts.includes('location')) parts.push('location');
+    }
+    if (next?.name !== undefined && next.name !== prev?.name) {
+        parts.push('title');
+    }
+    if (next?.capacity !== undefined && next.capacity !== prev?.capacity) {
+        parts.push('capacity');
+    }
+    if (
+        next?.participationFee !== undefined &&
+        next.participationFee !== prev?.participationFee
+    ) {
+        parts.push('fee');
+    }
+    if (next?.eventDetails !== undefined && next.eventDetails !== prev?.eventDetails) {
+        parts.push('details');
+    }
+    if (parts.length === 0) return undefined;
+    return `Updated: ${parts.join(', ')}.`;
+}
+
+function buildEditNotificationSummary(prev, updateData) {
+    return (
+        summarizeEventChanges(prev, updateData) ||
+        'The organizer updated this event. Please review the latest details.'
+    );
+}
 
 export const createBranch = async (req, res, next) => {
     try {
@@ -379,6 +443,8 @@ export const createEvent = async (req, res, next) => {
                 : 'A coach';
         void notifyUsersInEventDistrict(createEvent, user._id, coachName);
         void notifyCoachFollowersOfNewEvent(createEvent, user, coachName);
+        void notifyAffinityFollowersOfNewEvent(createEvent, user._id);
+        void notifyFacilityOwnerOfNewEvent(createEvent, user._id, coachName);
 
         res.status(201).json({
             success: true,
@@ -529,8 +595,42 @@ export const editEvent = async (req, res, next) => {
         const scope = zodValidation.eventEditScopeSchema.parse(data.scope ?? 'single');
 
         if (eventExists.series && scope === 'following') {
-            await applyEventEditWithScope(eventExists, updateData, scope);
+            const seriesOutcome = await applyEventEditWithScope(
+                eventExists,
+                updateData,
+                scope
+            );
             const updatedEvent = await Event.findById(eventId).select('-secretId');
+            const timeChanged =
+                updateData.startTime !== undefined ||
+                updateData.endTime !== undefined;
+            const hasNonTimeUpdate = Object.keys(updateData).some(
+                (k) => !['startTime', 'endTime', 'scope'].includes(k)
+            );
+            // Time-only series edits already trigger series_sessions_rescheduled inside applyEventEditWithScope.
+            if (hasNonTimeUpdate) {
+                const summary = buildEditNotificationSummary(
+                    eventExists.toObject(),
+                    updateData
+                );
+                for (const affectedId of seriesOutcome?.eventIds ?? [eventId]) {
+                    const ev = await Event.findById(affectedId).select('name').lean();
+                    void notifyReservedUsersEventUpdated({
+                        eventId: affectedId,
+                        eventName: ev?.name ?? updatedEvent?.name,
+                        changeSummary: summary,
+                    });
+                }
+            } else if (!timeChanged) {
+                void notifyReservedUsersEventUpdated({
+                    eventId: updatedEvent._id,
+                    eventName: updatedEvent.name,
+                    changeSummary: buildEditNotificationSummary(
+                        eventExists.toObject(),
+                        updateData
+                    ),
+                });
+            }
             return res.status(200).json({
                 success: true,
                 message: 'Event series updated (this and following sessions)',
@@ -546,6 +646,16 @@ export const editEvent = async (req, res, next) => {
         ).select('-secretId');
 
         if (!updatedEvent) throw new AppError(404, 'Event not found');
+
+        // Best-effort: notify joined gamers whenever the event is edited.
+        void notifyReservedUsersEventUpdated({
+            eventId: updatedEvent._id,
+            eventName: updatedEvent.name,
+            changeSummary: buildEditNotificationSummary(
+                eventExists.toObject(),
+                updateData
+            ),
+        });
 
         res.status(200).json({
             success: true,
@@ -597,6 +707,12 @@ export const cancelEvent = async (req, res, next) => {
             { status: 'cancelled', cancelledAt: new Date() },
             { new: true }
         );
+
+        // Best-effort: notify reserved users that the event was cancelled.
+        void notifyReservedUsersEventCancelled({
+            eventId: updated?._id,
+            eventName: updated?.name,
+        });
 
         res.status(200).json({
             success: true,
@@ -968,6 +1084,12 @@ export const approveJoinGroup = async (req, res, next) => {
         );
         if (!approve) throw new AppError(404, 'Join request not found');
 
+        void notifyJoinRequestApproved({
+            userId: result.userId,
+            requestType: 'group',
+            targetName: groupExists.name,
+        }).catch((err) => console.error('notifyJoinRequestApproved (group) failed:', err));
+
         res.status(201).json({
             success: true,
             message: 'Joined to group successfully',
@@ -1008,9 +1130,15 @@ export const approveJoinClub = async (req, res, next) => {
         );
         if (!approve) throw new AppError(404, 'Join request not found');
 
+        void notifyJoinRequestApproved({
+            userId: result.userId,
+            requestType: 'club',
+            targetName: clubExists.name,
+        }).catch((err) => console.error('notifyJoinRequestApproved (club) failed:', err));
+
         res.status(201).json({
             success: true,
-            message: 'Joined to group successfully',
+            message: 'Joined to club successfully',
         });
     } catch (err) {
         next(err);
@@ -1059,6 +1187,19 @@ export const inviteGroup = async (req, res, next) => {
             invitee: result.userId,
             group: result.groupId,
         });
+
+        const inviterName =
+            user.firstName && user.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : 'Someone';
+        void notifyGroupInvite({
+            userId: result.userId,
+            groupId: String(groupExists._id),
+            groupName: groupExists.name,
+            inviterName,
+        }).catch((err) =>
+            console.error('notifyGroupInvite failed:', err)
+        );
 
         res.status(201).json({
             success: true,
@@ -1116,6 +1257,19 @@ export const inviteEvent = async (req, res, next) => {
             invitee: result.userId,
             event: result.eventId,
         });
+
+        const inviterName =
+            user.firstName && user.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : 'A coach';
+        void notifyEventInvite({
+            userId: result.userId,
+            eventId: String(eventExists._id),
+            eventName: eventExists.name,
+            inviterName,
+        }).catch((err) =>
+            console.error('notifyEventInvite failed:', err)
+        );
 
         res.status(201).json({
             success: true,
@@ -1268,6 +1422,26 @@ export const approveReservation = async (req, res, next) => {
 
         reqExists.isApproved = true;
         await reqExists.save();
+
+        // Find the user this reservation belongs to via participant.
+        try {
+            const participantUser = await User.findOne({
+                participant: reqExists.participant,
+            })
+                .select('_id')
+                .lean();
+            if (participantUser) {
+                void notifyJoinRequestApproved({
+                    userId: participantUser._id.toString(),
+                    requestType: 'event',
+                    eventId: String(eventExists._id),
+                    eventName: eventExists.name,
+                });
+            }
+        } catch (err) {
+            console.error('notifyJoinRequestApproved (event) failed:', err);
+        }
+
         res.status(201).json({
             success: true,
             data: reqExists,
@@ -1277,19 +1451,40 @@ export const approveReservation = async (req, res, next) => {
     }
 };
 
+async function resolveCoachProfileContext(idParam) {
+    const parsedId = zodValidation.coachId.parse(idParam);
+
+    let coach = await Coach.findById(parsedId);
+    let user = null;
+
+    if (coach) {
+        user = await User.findOne({ coach: coach._id }).select(
+            '-email -phone -isEmailVerified -isPhoneVerified'
+        );
+        return { coach, user };
+    }
+
+    user = await User.findById(parsedId).select(
+        '-email -phone -isEmailVerified -isPhoneVerified'
+    );
+    if (!user?.coach) {
+        throw new AppError(404, 'Coach not found');
+    }
+
+    coach = await Coach.findById(user.coach);
+    if (!coach) {
+        throw new AppError(404, 'Coach not found');
+    }
+
+    return { coach, user };
+}
+
 export const getCoachDetails = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
 
-        const data = req.params.coachId;
-        const coachId = zodValidation.coachId.parse(data);
-
-        const coach = await Coach.findById(coachId);
-        if (!coach) throw new AppError(404, 'Coach not found');
-
-        const user = await User.findOne({
-            coach: coachId,
-        }).select('-email -phone -isEmailVerified -isPhoneVerified');
+        const { coach, user } = await resolveCoachProfileContext(req.params.coachId);
+        const coachId = coach._id;
 
         const club = user ? await Club.find({ creator: user._id }) : [];
         const clubGroup = await ClubGroup.find({ owner: coachId });

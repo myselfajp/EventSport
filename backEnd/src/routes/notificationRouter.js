@@ -11,6 +11,16 @@ router.delete('/:notificationId', notificationController.deleteNotification);
 
 // Admin only routes
 router.post('/create', adminMiddleware, notificationController.createNotification);
+router.get(
+    '/admin/segments',
+    adminMiddleware,
+    notificationController.listAudienceSegments
+);
+router.post(
+    '/admin/segment-create',
+    adminMiddleware,
+    notificationController.createSegmentNotification
+);
 
 export default router;
 

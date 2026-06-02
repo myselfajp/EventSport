@@ -5,6 +5,7 @@ import { MapPin } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
 import HorizontalEventScroller from "@/components/dashboard/HorizontalEventScroller";
 import EventCardTimes from "@/components/dashboard/EventCardTimes";
 import type { CheckInEventRef } from "@/app/lib/event-dashboard-utils";
@@ -42,6 +43,7 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
   const [events, setEvents] = useState<NearbyEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<NearbyEvent | null>(null);
+  const { onCoachClick, coachProfileModal } = useCoachProfileModal();
 
   useEffect(() => {
     if (!districtId) {
@@ -182,9 +184,10 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
                 } as React.ComponentProps<typeof ViewEventModal>["event"])
               : null
           }
-          onCoachClick={() => {}}
+          onCoachClick={onCoachClick}
         />
       )}
+      {!onEventClick && coachProfileModal}
     </>
   );
 };

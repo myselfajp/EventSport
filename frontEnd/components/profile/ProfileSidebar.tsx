@@ -71,7 +71,7 @@ interface ProfileSidebarProps {
   onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
-  onShowStaticPage?: (pageId: string) => void;
+  onShowStaticPage?: (pageName: string) => void;
   initialFacilities?: any[];
   initialCompanies?: any[];
 }
@@ -251,7 +251,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   useEffect(() => {
     const fetchStaticPages = async () => {
       try {
-        const res = await fetchJSON(EP.ADMIN.staticPages.getActive, { method: "GET" });
+        const res = await fetchJSON(
+          EP.PUBLIC.activeStaticPages,
+          { method: "GET" },
+          { skipAuth: true }
+        );
         if (res?.success && Array.isArray(res?.data)) {
           setStaticPages(res.data);
         }
@@ -995,10 +999,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             <nav className="space-y-1 mt-4">
               {staticPages.map((page) => (
                 <button
-                  key={page._id}
+                  key={page.name}
                   onClick={() => {
                     if (onShowStaticPage) {
-                      onShowStaticPage(page._id);
+                      onShowStaticPage(page.name);
                     }
                   }}
                   className="w-full flex items-center px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"

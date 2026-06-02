@@ -369,8 +369,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     // Facility Validation
     if (!initialData) {
       if (!formData.name) newErrors.name = "Facility Name is required";
-      if (!locationValue.district && !formData.address?.trim()) {
-        newErrors.address = "Select an Istanbul district or enter address";
+      if (!locationValue.district) {
+        newErrors.address = "Istanbul district is required";
       }
       if (!formData.phone || !isPhoneComplete(formData.phone))
         newErrors.phone = `Phone required (9 digits after ${PHONE_PREFIX})`;

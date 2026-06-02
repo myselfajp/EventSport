@@ -30,21 +30,52 @@ const notificationSchema = new mongoose.Schema(
             type: String,
             required: true,
             enum: [
+                // Generic event lifecycle
                 'event_created',
                 'event_updated',
                 'event_cancelled',
+                // Reservation lifecycle (gamer-side)
                 'reservation_approved',
                 'reservation_rejected',
                 'reservation_reminder',
+                'event_starts_soon_2h',
+                'reservation_event_updated',
+                'reservation_event_cancelled',
+                'waitlist_promoted',
+                // Check-in reminders
+                'check_in_opens_reminder_24h',
+                'check_in_opens_reminder_2h',
+                'check_in_opens_reminder_1h',
+                'check_in_payment_warning_15m',
+                // Certificates
                 'certificate_approved',
                 'certificate_rejected',
+                // Joins / invites
                 'join_request_approved',
                 'join_request_rejected',
                 'invite_received',
+                'invite_event_received',
+                'invite_group_received',
                 'message_received',
+                // Follow / discovery
                 'follow_new_event',
+                'nearby_event_created',
+                'club_new_event',
+                'club_group_new_event',
+                'facility_new_event',
+                // Coach / facility owner side
+                'event_capacity_full',
+                'event_capacity_min_reached',
+                'facility_event_created',
+                'coach_waitlist_backup_offer',
+                // Series
+                'series_sessions_cancelled',
+                'series_sessions_rescheduled',
+                'series_enrollment_confirmed',
+                // System
                 'system_announcement',
                 'maintenance_notice',
+                'segment_announcement',
             ],
         },
         title: {
@@ -76,7 +107,23 @@ const notificationSchema = new mongoose.Schema(
         },
         icon: {
             type: String,
-            enum: ['bell', 'check-circle', 'x-circle', 'calendar', 'user', 'alert', 'info'],
+            enum: [
+                'bell',
+                'check-circle',
+                'x-circle',
+                'calendar',
+                'user',
+                'alert',
+                'info',
+                'map-pin',
+                'users',
+                'coins',
+                'clock',
+                'flame',
+                'gift',
+                'star',
+                'megaphone',
+            ],
         },
         expiresAt: {
             type: Date,

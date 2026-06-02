@@ -50,14 +50,33 @@ interface Event {
   };
 }
 
+function coachDisplayName(data: CoachResponseData): string {
+  if (data.user?.firstName) {
+    return `${data.user.firstName} ${data.user.lastName || ""}`.trim();
+  }
+  return data.coach?.name?.trim() || "Coach";
+}
+
+function coachInitials(data: CoachResponseData): string {
+  if (data.user?.firstName) {
+    return `${data.user.firstName.charAt(0)}${(data.user.lastName || "").charAt(0)}`;
+  }
+  const parts = (data.coach?.name || "C").trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+  }
+  return parts[0].charAt(0).toUpperCase();
+}
+
 interface CoachResponseData {
   coach: {
     _id: string;
+    name?: string;
     isVerified: boolean;
     createdAt: string;
     about?: string;
   };
-  user: {
+  user?: {
     _id: string;
     firstName: string;
     lastName: string;
@@ -67,7 +86,7 @@ interface CoachResponseData {
     photo?: {
       path: string;
     };
-  };
+  } | null;
   branch: {
     _id: string;
     sport: {
@@ -98,6 +117,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
 }) => {
   const { data: currentUser } = useMe();
   const [data, setData] = useState<CoachResponseData | null>(null);
+  const [resolvedCoachId, setResolvedCoachId] = useState<string | null>(null);
   const [clubs, setClubs] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,7 +132,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const [showFollowersModal, setShowFollowersModal] = useState(false);
 
   const { data: followStats } = useCoachFollowStats(
-    isOpen ? coachId : null
+    isOpen ? resolvedCoachId : null
   );
   const followMutation = useFollowMutation();
   const unfollowMutation = useUnfollowMutation();
@@ -124,6 +144,9 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
       fetchCoachDetails(coachId);
     } else {
       setData(null);
+      setResolvedCoachId(null);
+      setClubs([]);
+      setGroups([]);
       setError(null);
       setShowCoachCalendar(false);
       setShowFollowersModal(false);
@@ -133,29 +156,38 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const fetchCoachDetails = async (id: string) => {
     setIsLoading(true);
     setError(null);
+    setResolvedCoachId(null);
     try {
-      // Fetch coach details and clubs/groups in parallel
-      const [coachResponse, clubsResponse, groupsResponse] = await Promise.all([
-        fetchJSON(EP.COACH.getCoachById(id), { method: "GET" }),
-        getCreatedClubs(id),
-        getCreatedGroups(id)
-      ]);
+      const coachResponse = await fetchJSON(EP.COACH.getCoachById(id), {
+        method: "GET",
+      });
 
       if (coachResponse?.success && coachResponse?.data) {
-        setData(coachResponse.data);
+        const payload = coachResponse.data as CoachResponseData;
+        setData(payload);
+        const coachDocId = payload.coach?._id || id;
+        setResolvedCoachId(coachDocId);
+
+        const userId = payload.user?._id;
+        const [clubsResponse, groupsResponse] = await Promise.all([
+          userId ? getCreatedClubs(userId) : Promise.resolve(null),
+          getCreatedGroups(coachDocId),
+        ]);
+
+        if (clubsResponse?.success && clubsResponse?.data) {
+          setClubs(clubsResponse.data);
+        } else {
+          setClubs([]);
+        }
+
+        if (groupsResponse?.success && groupsResponse?.data) {
+          setGroups(groupsResponse.data);
+        } else {
+          setGroups([]);
+        }
       } else {
         setError(coachResponse?.message || "Failed to load coach details");
       }
-
-      // Set clubs and groups
-      if (clubsResponse?.success && clubsResponse?.data) {
-        setClubs(clubsResponse.data);
-      }
-
-      if (groupsResponse?.success && groupsResponse?.data) {
-        setGroups(groupsResponse.data);
-      }
-
     } catch (err) {
       setError("An error occurred while fetching coach details");
       console.error(err);
@@ -218,11 +250,11 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   };
 
   const handleToggleFollow = () => {
-    if (!coachId || isFollowMutating) return;
+    if (!resolvedCoachId || isFollowMutating) return;
     if (followStats?.isFollowing) {
-      unfollowMutation.mutate({ type: "coach", id: coachId });
+      unfollowMutation.mutate({ type: "coach", id: resolvedCoachId });
     } else {
-      followMutation.mutate({ type: "coach", id: coachId });
+      followMutation.mutate({ type: "coach", id: resolvedCoachId });
     }
   };
 
@@ -235,9 +267,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
 
   const followerCount = followStats?.followerCount ?? 0;
   const followerLabel = followerCount === 1 ? "follower" : "followers";
-  const coachDisplayName = data
-    ? `${data.user.firstName} ${data.user.lastName}`.trim()
-    : undefined;
+  const profileDisplayName = data ? coachDisplayName(data) : undefined;
 
   return (
     <>
@@ -280,16 +310,15 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
               <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex flex-col sm:flex-row items-start gap-6">
                   <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 dark:bg-gray-700 rounded-full flex-shrink-0 overflow-hidden border-4 border-white dark:border-gray-600 shadow-md relative">
-                    {data.user.photo?.path ? (
+                    {data.user?.photo?.path ? (
                       <img
                         src={getImageUrl(data.user.photo.path)!}
-                        alt={data.user.firstName}
+                        alt={profileDisplayName}
                         className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-cyan-100 dark:bg-cyan-900 text-cyan-600 dark:text-cyan-400 text-3xl font-bold">
-                        {data.user.firstName.charAt(0)}
-                        {data.user.lastName.charAt(0)}
+                        {coachInitials(data)}
                       </div>
                     )}
                   </div>
@@ -297,7 +326,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center flex-wrap gap-2 sm:gap-3 mb-2">
                       <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate">
-                        {data.user.firstName} {data.user.lastName}
+                        {profileDisplayName}
                       </h3>
                       {data.coach.isVerified && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
@@ -319,7 +348,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-8 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {data.user.age && (
+                      {data.user?.age && (
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <span>{calculateAge(data.user.age)} years old</span>
@@ -331,7 +360,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                           Joined {formatDate(data.coach.createdAt)}
                         </span>
                       </div>
-                      {data.user.email && (
+                      {data.user?.email && (
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <a
@@ -342,7 +371,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                           </a>
                         </div>
                       )}
-                      {data.user.phone && (
+                      {data.user?.phone && (
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                           <a
@@ -718,7 +747,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
         <div className="max-w-6xl mx-auto h-full min-h-0">
           <CoachCalendar
             viewUserId={data.user._id}
-            coachDisplayName={`${data.user.firstName} ${data.user.lastName}`}
+            coachDisplayName={profileDisplayName}
             readOnly
             onBack={() => setShowCoachCalendar(false)}
           />
@@ -729,8 +758,8 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
     <CoachFollowersModal
       isOpen={showFollowersModal}
       onClose={() => setShowFollowersModal(false)}
-      coachId={coachId}
-      coachName={coachDisplayName}
+      coachId={resolvedCoachId}
+      coachName={profileDisplayName}
     />
     </>
   );

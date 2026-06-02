@@ -23,6 +23,7 @@ import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
 import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
+import { resolveCoachProfileId } from "@/app/lib/coach-profile-utils";
 
 interface Event {
   _id: string;
@@ -1032,7 +1033,9 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                       if (typeof owner === 'object' && owner !== null && 'firstName' in owner && owner.firstName) {
                         return (
                     <button
-                            onClick={() => onCoachClick(owner.coach || '')}
+                            onClick={() =>
+                              onCoachClick(resolveCoachProfileId(owner))
+                            }
                       className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 hover:underline font-medium"
                     >
                             {owner.firstName} {owner.lastName}
@@ -1064,7 +1067,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                         return (
                     <button
                       onClick={() =>
-                              onCoachClick(backupCoach.coach || '')
+                              onCoachClick(resolveCoachProfileId(backupCoach))
                       }
                       className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 hover:underline font-medium"
                     >

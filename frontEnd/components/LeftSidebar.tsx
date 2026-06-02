@@ -12,7 +12,7 @@ interface LeftSidebarProps {
   onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
-  onShowStaticPage?: (pageId: string) => void;
+  onShowStaticPage?: (pageName: string) => void;
 }
 
 // Fake user credentials for testing

@@ -1241,11 +1241,9 @@ export const createFacilitySchema = z
 
     private: z.boolean().optional(),
 })
-    .refine(
-        (data) =>
-            (data.address && String(data.address).trim()) || Boolean(data.district),
-        { message: 'Select an Istanbul district or enter a legacy address.' }
-    );
+    .refine((data) => Boolean(data.district), {
+        message: 'Istanbul district is required.',
+    });
 
 export const editFacilitySchema = z.object({
     name: z

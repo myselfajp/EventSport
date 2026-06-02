@@ -1,25 +1,93 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Menu, Calendar, Bell } from "lucide-react";
+import {
+  Menu,
+  Calendar,
+  Bell,
+  CheckCircle,
+  XCircle,
+  MapPin,
+  Users,
+  Coins,
+  Clock,
+  Flame,
+  Gift,
+  Star,
+  Megaphone,
+  AlertTriangle,
+  Info,
+  User,
+} from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { fetchJSON } from "../app/lib/api";
 import { EP } from "../app/lib/endpoints";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   onLeftSidebarToggle: () => void;
   onRightSidebarToggle: () => void;
 }
 
+const NOTIFICATION_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  bell: Bell,
+  "check-circle": CheckCircle,
+  "x-circle": XCircle,
+  calendar: Calendar,
+  user: User,
+  alert: AlertTriangle,
+  info: Info,
+  "map-pin": MapPin,
+  users: Users,
+  coins: Coins,
+  clock: Clock,
+  flame: Flame,
+  gift: Gift,
+  star: Star,
+  megaphone: Megaphone,
+};
+
+const PRIORITY_COLOR: Record<string, string> = {
+  low: "text-gray-400 dark:text-slate-500",
+  normal: "text-cyan-600 dark:text-cyan-400",
+  high: "text-orange-500 dark:text-orange-400",
+  urgent: "text-red-500 dark:text-red-400",
+};
+
+function getNotificationIcon(name?: string) {
+  if (!name) return Bell;
+  return NOTIFICATION_ICON_MAP[name] ?? Bell;
+}
+
 const Header: React.FC<HeaderProps> = ({
   onLeftSidebarToggle,
   onRightSidebarToggle,
 }) => {
+  const router = useRouter();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const handleNotificationClick = (notification: any) => {
+    if (!notification.isRead) {
+      handleMarkAsRead(notification._id);
+    }
+    const url = notification.actionUrl;
+    if (url && typeof url === "string") {
+      setIsNotificationsOpen(false);
+      try {
+        if (url.startsWith("/")) {
+          router.push(url);
+        } else {
+          window.location.href = url;
+        }
+      } catch {
+        /* ignore navigation errors */
+      }
+    }
+  };
 
   const formatTimeAgo = (date: string) => {
     const now = new Date();
@@ -193,39 +261,65 @@ const Header: React.FC<HeaderProps> = ({
                       No notifications yet
                     </div>
                   ) : (
-                    notifications.map((notification) => (
-                      <div
-                        key={notification._id}
-                        onClick={() => {
-                          if (!notification.isRead) {
-                            handleMarkAsRead(notification._id);
+                    notifications.map((notification) => {
+                      const Icon = getNotificationIcon(notification.icon);
+                      const colorClass =
+                        PRIORITY_COLOR[notification.priority] ??
+                        "text-gray-400 dark:text-slate-500";
+                      const clickable =
+                        !!notification.actionUrl || !notification.isRead;
+                      return (
+                        <div
+                          key={notification._id}
+                          onClick={
+                            clickable
+                              ? () => handleNotificationClick(notification)
+                              : undefined
                           }
-                        }}
-                        className={`p-3 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition-colors ${
-                          !notification.isRead
-                            ? "bg-blue-50 dark:bg-blue-900/20"
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <Bell className="w-4 h-4 text-gray-400 dark:text-slate-500 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 dark:text-slate-200">
-                              {notification.title}
-                            </p>
-                            <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed mt-1">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                              {formatTimeAgo(notification.createdAt)}
-                            </p>
+                          role={clickable ? "button" : undefined}
+                          tabIndex={clickable ? 0 : undefined}
+                          onKeyDown={
+                            clickable
+                              ? (e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    handleNotificationClick(notification);
+                                  }
+                                }
+                              : undefined
+                          }
+                          className={`p-3 transition-colors ${
+                            clickable
+                              ? "hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+                              : ""
+                          } ${
+                            !notification.isRead
+                              ? "bg-blue-50 dark:bg-blue-900/20"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Icon
+                              className={`w-4 h-4 ${colorClass} mt-0.5 flex-shrink-0`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 dark:text-slate-200">
+                                {notification.title}
+                              </p>
+                              <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed mt-1">
+                                {notification.message}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                                {formatTimeAgo(notification.createdAt)}
+                              </p>
+                            </div>
+                            {!notification.isRead && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
+                            )}
                           </div>
-                          {!notification.isRead && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
-                          )}
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
                 {notifications.length > 0 && unreadCount > 0 && (

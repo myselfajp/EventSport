@@ -13,6 +13,23 @@ import { getActiveCatalog } from './legalController.js';
 /** Slug: lowercase letters, digits, hyphens only (matches StaticPage.name usage). */
 const PUBLIC_PAGE_NAME_RE = /^[a-z0-9-]{1,80}$/;
 
+/** Active static pages for sidebar/footer navigation (no admin auth). */
+export const getPublicActiveStaticPages = async (_req, res, next) => {
+    try {
+        const pages = await StaticPage.find({ isActive: true })
+            .sort({ order: 1, createdAt: -1 })
+            .select('name title')
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: pages,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getPublicStaticPageByName = async (req, res, next) => {
     try {
         const raw = String(req.params.name ?? '').trim().toLowerCase();
