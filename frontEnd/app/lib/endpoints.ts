@@ -66,6 +66,7 @@ export const EP = {
   PUBLIC: {
     staticPageByName: (name: string) =>
       `${API_V1_BASE}/public/static-page/${encodeURIComponent(name)}`,
+    activeStaticPages: `${API_V1_BASE}/public/static-pages/active`,
     contractsCatalog: `${API_V1_BASE}/public/contracts`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
     dashboardHeroSlides: `${API_V1_BASE}/public/dashboard-hero-slides`,
@@ -330,6 +331,8 @@ export const EP = {
   EVENT_STYLE: { getEventStyle: `${API_V1_BASE}/get-event-style` },
   EVENTS: {
     getEvents: `${API_V1_BASE}/get-event`,
+    getEventById: (eventId: string) =>
+      `${API_V1_BASE}/get-event/${encodeURIComponent(eventId)}`,
     getEventSeries: (seriesId: string) =>
       `${API_V1_BASE}/get-event-series/${encodeURIComponent(seriesId)}`,
     eventEndPhotos: (eventId: string) =>
@@ -342,5 +345,7 @@ export const EP = {
     markAllAsRead: `${API_V1_BASE}/notifications/read-all`,
     delete: (notificationId: string) => `${API_V1_BASE}/notifications/${notificationId}`,
     create: `${API_V1_BASE}/notifications/create`, // Admin only
+    adminSegments: `${API_V1_BASE}/notifications/admin/segments`, // Admin only
+    createForSegments: `${API_V1_BASE}/notifications/admin/segment-create`, // Admin only
   },
 };

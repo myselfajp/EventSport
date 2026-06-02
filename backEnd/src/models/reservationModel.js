@@ -44,6 +44,22 @@ const reservationSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        checkInReminder1hSentAt: {
+            type: Date,
+            default: null,
+        },
+        checkInPaymentWarning15mSentAt: {
+            type: Date,
+            default: null,
+        },
+        eventStartReminder2hSentAt: {
+            type: Date,
+            default: null,
+        },
+        eventStartReminderSentAt: {
+            type: Date,
+            default: null,
+        },
         qr: {
             type: String,
         },

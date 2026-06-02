@@ -4,6 +4,10 @@ import NotificationRead from '../models/notificationReadModel.js';
 import User from '../models/userModel.js';
 import { mongoObjectId } from '../utils/validation.js';
 import { createNotification as createNotificationHelper } from '../utils/notificationHelper.js';
+import {
+    AUDIENCE_SEGMENTS,
+    resolveSegmentUserIds,
+} from '../utils/notificationAudience.js';
 
 export const getNotifications = async (req, res, next) => {
     try {
@@ -388,7 +392,20 @@ export const deleteNotification = async (req, res, next) => {
 // Admin only: Create notification
 export const createNotification = async (req, res, next) => {
     try {
-        const { scope, type, title, message, data, userId, targetRole, targetUsers, priority, icon, expiresAt } = req.body;
+        const {
+            scope,
+            type,
+            title,
+            message,
+            data,
+            userId,
+            targetRole,
+            targetUsers,
+            priority,
+            icon,
+            actionUrl,
+            expiresAt,
+        } = req.body;
 
         if (!scope || !type || !title || !message) {
             throw new AppError(400, 'Missing required fields: scope, type, title, message');
@@ -425,6 +442,10 @@ export const createNotification = async (req, res, next) => {
             notificationData.icon = icon;
         }
 
+        if (actionUrl) {
+            notificationData.actionUrl = actionUrl;
+        }
+
         if (expiresAt) {
             notificationData.expiresAt = expiresAt;
         }
@@ -435,6 +456,69 @@ export const createNotification = async (req, res, next) => {
             success: true,
             message: 'Notification created successfully',
             data: notification,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Admin only: list available audience segments (for the UI dropdown)
+export const listAudienceSegments = async (_req, res, next) => {
+    try {
+        res.status(200).json({
+            success: true,
+            data: AUDIENCE_SEGMENTS,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Admin only: send a notification to one or more audience segments at once
+export const createSegmentNotification = async (req, res, next) => {
+    try {
+        const {
+            segments,
+            type = 'segment_announcement',
+            title,
+            message,
+            priority,
+            icon,
+            actionUrl,
+            expiresAt,
+            data,
+        } = req.body;
+
+        if (!Array.isArray(segments) || segments.length === 0) {
+            throw new AppError(400, '`segments` must be a non-empty array');
+        }
+        if (!title || !message) {
+            throw new AppError(400, 'Missing required fields: title, message');
+        }
+
+        const userIds = await resolveSegmentUserIds(segments);
+        if (userIds.length === 0) {
+            throw new AppError(404, 'No users matched the selected segment(s).');
+        }
+
+        const notification = await createNotificationHelper({
+            scope: 'group',
+            type,
+            title,
+            message,
+            data: { ...(data || {}), segments },
+            targetUsers: userIds,
+            priority: priority || 'normal',
+            icon,
+            actionUrl,
+            expiresAt,
+            createdBy: req.user._id,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `Notification queued for ${userIds.length} user(s)`,
+            data: { notification, recipientCount: userIds.length },
         });
     } catch (err) {
         next(err);

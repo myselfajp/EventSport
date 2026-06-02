@@ -15,6 +15,8 @@ import { resolveEventDistrict } from './eventDistrictHelper.js';
 import {
     notifyUsersInEventDistrict,
     notifyCoachFollowersOfNewEvent,
+    notifyAffinityFollowersOfNewEvent,
+    notifyFacilityOwnerOfNewEvent,
 } from './eventDistrictHelper.js';
 import {
     notifySeriesSessionsCancelled,
@@ -119,6 +121,8 @@ export async function createRecurringEventSeries({
     // Notify coach followers only once per series (first session) to avoid spam.
     if (createdEvents[0]) {
         void notifyCoachFollowersOfNewEvent(createdEvents[0], user, coachName);
+        void notifyAffinityFollowersOfNewEvent(createdEvents[0], user._id);
+        void notifyFacilityOwnerOfNewEvent(createdEvents[0], user._id, coachName);
     }
 
     return {

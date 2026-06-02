@@ -393,7 +393,29 @@ export const getEvent = async (req, res, next) => {
         const data = req.params.eventId;
         const eventId = zodValidation.eventId.parse(data);
 
-        const eventExists = await Event.findById(eventId);
+        const eventExists = await Event.findById(eventId)
+            .populate([
+                { path: 'club', select: 'name' },
+                { path: 'group', select: 'name' },
+                { path: 'sport', select: 'name' },
+                { path: 'sportGroup', select: 'name' },
+                { path: 'style', select: 'name color checkInOpensHoursBeforeStart' },
+                { path: 'salon', select: 'name' },
+                {
+                    path: 'facility',
+                    select:
+                        'name address phone email photo mainSport membershipLevel private point createdAt location',
+                },
+                { path: 'district', select: 'name' },
+                { path: 'owner', select: 'firstName lastName photo coach' },
+                { path: 'backupCoach', select: 'firstName lastName photo coach' },
+                {
+                    path: 'series',
+                    select:
+                        'name frequency interval sessionCount priceType participationFeePerSession status',
+                },
+            ])
+            .lean();
         if (!eventExists) throw new AppError(404, 'Event not found');
 
         let reservation = null;

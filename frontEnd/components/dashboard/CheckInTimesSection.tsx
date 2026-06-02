@@ -16,6 +16,7 @@ import {
   type DashboardEvent,
 } from "@/app/lib/dashboard-event-sources";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
 import HorizontalEventScroller from "@/components/dashboard/HorizontalEventScroller";
 
 type CheckInTimesSectionProps = {
@@ -32,6 +33,7 @@ const CheckInTimesSection: React.FC<CheckInTimesSectionProps> = ({
   const [events, setEvents] = useState<DashboardEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<DashboardEvent | null>(null);
+  const { onCoachClick, coachProfileModal } = useCoachProfileModal();
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -158,8 +160,9 @@ const CheckInTimesSection: React.FC<CheckInTimesSectionProps> = ({
         isOpen={!!selectedEvent}
         onClose={() => setSelectedEvent(null)}
         event={selectedEvent as React.ComponentProps<typeof ViewEventModal>["event"]}
-        onCoachClick={() => {}}
+        onCoachClick={onCoachClick}
       />
+      {coachProfileModal}
     </>
   );
 };

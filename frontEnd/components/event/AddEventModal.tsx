@@ -58,6 +58,12 @@ function extractRefId(value: unknown): string {
   return "";
 }
 
+function extractFacilityDistrictId(
+  facility: { location?: { district?: unknown } } | undefined
+): string {
+  return extractRefId(facility?.location?.district);
+}
+
 function localDateInputValue(iso: string | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -122,6 +128,9 @@ interface Facility {
   _id: string;
   name: string;
   address: string;
+  location?: {
+    district?: string | { _id?: string };
+  };
 }
 
 interface Salon {
@@ -235,6 +244,18 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     loadingFacilities ||
     loadingSalons ||
     submitting;
+
+  const selectedFacility = useMemo(
+    () => facilities.find((f) => f._id === formData.facility),
+    [facilities, formData.facility]
+  );
+  const selectedFacilityDistrictId = useMemo(
+    () => extractFacilityDistrictId(selectedFacility),
+    [selectedFacility]
+  );
+  const showDistrictField =
+    formData.type !== "Online" &&
+    (!formData.facility || !selectedFacilityDistrictId);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -746,8 +767,11 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       if (field === "type" && value === "Online") {
         next.district = "";
       }
-      if (field === "facility" && value) {
-        next.district = "";
+      if (field === "facility") {
+        const facility = facilities.find((f) => f._id === value);
+        if (extractFacilityDistrictId(facility)) {
+          next.district = "";
+        }
       }
       return next;
     });
@@ -839,8 +863,15 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         return;
       }
 
-      if (!formData.facility && !formData.salon && !formData.district) {
-        setError("Select an Istanbul district when no facility is chosen");
+      const needsDistrict =
+        (!formData.facility && !formData.salon) ||
+        Boolean(formData.facility && !selectedFacilityDistrictId);
+      if (needsDistrict && !formData.district) {
+        setError(
+          formData.facility
+            ? "Selected facility has no district — select an Istanbul district below"
+            : "Select an Istanbul district when no facility is chosen"
+        );
         return;
       }
     }
@@ -1807,13 +1838,15 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 />
               </div>
 
-              {formData.type !== "Online" && !formData.facility && (
+              {showDistrictField && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Istanbul District <span className="text-red-500">*</span>
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    Required when no facility is selected. If you pick a facility, its district is used automatically.
+                    {formData.facility
+                      ? "This facility has no district on file. Select one for this event, or edit the facility to add a district permanently."
+                      : "Required when no facility is selected. If you pick a facility with a district, it is used automatically."}
                   </p>
                   <LocationFields
                     value={{

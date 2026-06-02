@@ -2,11 +2,17 @@ import Facility from '../models/facilityModel.js';
 import Salon from '../models/salonModel.js';
 import User from '../models/userModel.js';
 import Follow from '../models/followModel.js';
+import Club from '../models/clubModel.js';
+import ClubGroup from '../models/clubGroupModel.js';
 import { District } from '../models/locationModel.js';
 import { AppError } from '../utils/appError.js';
 import {
     notifyNearbyEventCreated,
     notifyCoachFollowersOfEvent,
+    notifyClubFollowersOfEvent,
+    notifyClubGroupFollowersOfEvent,
+    notifyFacilityFollowersOfEvent,
+    notifyFacilityOwnerNewEvent,
 } from './notificationHelper.js';
 
 /**
@@ -39,7 +45,7 @@ export async function resolveEventDistrict({ type, district, facility, salon }) 
 
     throw new AppError(
         400,
-        'District is required for non-online events. Select a district or a facility with a district.'
+        'The selected facility has no Istanbul district configured. Edit the facility to add a district, or select a district for this event.'
     );
 }
 
@@ -76,6 +82,168 @@ export async function notifyUsersInEventDistrict(event, ownerUserId, coachName) 
         }
     } catch (err) {
         console.error('Failed to send nearby event notifications:', err);
+    }
+}
+
+/**
+ * Notify followers of the event's club, club group, and/or facility.
+ * Best-effort: errors are logged, never thrown.
+ */
+export async function notifyAffinityFollowersOfNewEvent(event, ownerUserId) {
+    if (!event || event.private) return;
+
+    try {
+        // Club followers
+        if (event.club) {
+            try {
+                const clubDoc = await Club.findById(event.club).select('name').lean();
+                const followRows = await Follow.find({ followingClub: event.club })
+                    .select('follower')
+                    .lean();
+                const userIds = [
+                    ...new Set(
+                        followRows
+                            .map((r) => r.follower?.toString())
+                            .filter(
+                                (id) =>
+                                    id && id !== ownerUserId?.toString()
+                            )
+                    ),
+                ];
+                if (userIds.length > 0) {
+                    for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
+                        await notifyClubFollowersOfEvent({
+                            eventId: event._id.toString(),
+                            eventName: event.name,
+                            clubId: event.club.toString(),
+                            clubName: clubDoc?.name || 'Club',
+                            userIds: userIds.slice(i, i + NOTIFY_BATCH_SIZE),
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Club followers notification failed:', err);
+            }
+        }
+
+        // Club Group followers
+        if (event.group) {
+            try {
+                const groupDoc = await ClubGroup.findById(event.group).select('name').lean();
+                const followRows = await Follow.find({ followingClubGroup: event.group })
+                    .select('follower')
+                    .lean();
+                const userIds = [
+                    ...new Set(
+                        followRows
+                            .map((r) => r.follower?.toString())
+                            .filter(
+                                (id) => id && id !== ownerUserId?.toString()
+                            )
+                    ),
+                ];
+                if (userIds.length > 0) {
+                    for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
+                        await notifyClubGroupFollowersOfEvent({
+                            eventId: event._id.toString(),
+                            eventName: event.name,
+                            groupId: event.group.toString(),
+                            groupName: groupDoc?.name || 'Group',
+                            userIds: userIds.slice(i, i + NOTIFY_BATCH_SIZE),
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Group followers notification failed:', err);
+            }
+        }
+
+        // Facility followers
+        if (event.facility) {
+            try {
+                const facilityDoc = await Facility.findById(event.facility)
+                    .select('name')
+                    .lean();
+                const followRows = await Follow.find({
+                    followingFacility: event.facility,
+                })
+                    .select('follower')
+                    .lean();
+                const userIds = [
+                    ...new Set(
+                        followRows
+                            .map((r) => r.follower?.toString())
+                            .filter(
+                                (id) => id && id !== ownerUserId?.toString()
+                            )
+                    ),
+                ];
+                if (userIds.length > 0) {
+                    for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
+                        await notifyFacilityFollowersOfEvent({
+                            eventId: event._id.toString(),
+                            eventName: event.name,
+                            facilityId: event.facility.toString(),
+                            facilityName: facilityDoc?.name || 'Facility',
+                            userIds: userIds.slice(i, i + NOTIFY_BATCH_SIZE),
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Facility followers notification failed:', err);
+            }
+        }
+    } catch (err) {
+        console.error('notifyAffinityFollowersOfNewEvent failed:', err);
+    }
+}
+
+/**
+ * Notify the facility owner(s) when a new event is created at their facility.
+ * Looks up users where `facility === event.facility` (assumed owner relation).
+ * Best-effort.
+ */
+export async function notifyFacilityOwnerOfNewEvent(event, ownerUserId, coachName) {
+    if (!event?.facility || event.private) return;
+    try {
+        const facilityDoc = await Facility.findById(event.facility)
+            .select('name owner createdBy creator')
+            .lean();
+        if (!facilityDoc) return;
+
+        const ownerCandidates = new Set();
+        // Try common owner-style fields without making schema assumptions.
+        const candidateRefs = [facilityDoc.owner, facilityDoc.createdBy, facilityDoc.creator]
+            .filter(Boolean)
+            .map(String);
+        for (const id of candidateRefs) {
+            if (id !== ownerUserId?.toString()) ownerCandidates.add(id);
+        }
+
+        // Also notify users that have facility = event.facility (their own facility).
+        const facilityUsers = await User.find({
+            facility: event.facility,
+            isActive: { $ne: false },
+            _id: { $ne: ownerUserId },
+        })
+            .select('_id')
+            .lean();
+        for (const u of facilityUsers) {
+            ownerCandidates.add(u._id.toString());
+        }
+
+        const userIds = [...ownerCandidates];
+        if (userIds.length === 0) return;
+
+        await notifyFacilityOwnerNewEvent({
+            ownerUserIds: userIds,
+            eventId: event._id.toString(),
+            eventName: event.name,
+            facilityName: facilityDoc.name || 'your facility',
+            coachName: coachName || 'A coach',
+        });
+    } catch (err) {
+        console.error('notifyFacilityOwnerOfNewEvent failed:', err);
     }
 }
 

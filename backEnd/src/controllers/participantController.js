@@ -26,6 +26,50 @@ import {
     isWithinCheckInWindow,
 } from '../utils/eventCheckInHelper.js';
 import { enrollParticipantInSeries } from '../utils/eventSeriesService.js';
+import {
+    notifyCoachEventCapacityFull,
+    notifyCoachEventMinReached,
+} from '../utils/notificationHelper.js';
+
+/**
+ * After a successful reservation, check whether this signup just hit the
+ * minimum or maximum participant threshold for the event and notify the coach.
+ * Best-effort: never throws.
+ */
+async function notifyCoachCapacityMilestones(eventId) {
+    try {
+        const event = await Event.findById(eventId)
+            .select('name owner capacity minParticipants minimumParticipants')
+            .lean();
+        if (!event) return;
+
+        const approvedCount = await Reservation.countDocuments({
+            event: eventId,
+            isCancelled: false,
+            isWaitListed: false,
+        });
+
+        const minParticipants = event.minParticipants ?? event.minimumParticipants ?? 0;
+
+        if (event.capacity && approvedCount === event.capacity) {
+            void notifyCoachEventCapacityFull({
+                coachUserId: event.owner?.toString(),
+                eventId: eventId.toString(),
+                eventName: event.name,
+                capacity: event.capacity,
+            });
+        } else if (minParticipants > 0 && approvedCount === minParticipants) {
+            void notifyCoachEventMinReached({
+                coachUserId: event.owner?.toString(),
+                eventId: eventId.toString(),
+                eventName: event.name,
+                minParticipants,
+            });
+        }
+    } catch (err) {
+        console.error('notifyCoachCapacityMilestones failed:', err);
+    }
+}
 
 export const createProfile = async (req, res, next) => {
     try {
@@ -892,6 +936,8 @@ export const makeReservation = async (req, res, next) => {
                     ...baseExtra,
                 });
 
+                void notifyCoachCapacityMilestones(eventId);
+
                 return res.status(201).json({
                     success: true,
                     data: 'saved',
@@ -913,6 +959,8 @@ export const makeReservation = async (req, res, next) => {
                 isApproved: true,
                 ...baseExtra,
             });
+
+            void notifyCoachCapacityMilestones(eventId);
 
             return res.status(201).json({
                 success: true,
@@ -955,6 +1003,8 @@ export const makeReservation = async (req, res, next) => {
             isApproved: true,
             ...baseExtra,
         });
+
+        void notifyCoachCapacityMilestones(eventId);
 
         return res.status(201).json({
             success: true,

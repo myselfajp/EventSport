@@ -5,7 +5,9 @@ import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 
 export default function NotificationManagement() {
-  const [scope, setScope] = useState<"user" | "global" | "role" | "group">("user");
+  const [scope, setScope] = useState<
+    "user" | "global" | "role" | "group" | "segment"
+  >("user");
   const [type, setType] = useState<string>("system_announcement");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -25,27 +27,56 @@ export default function NotificationManagement() {
   const [selectedUsersData, setSelectedUsersData] = useState<any[]>([]);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState("");
-  
+
+  // For segment scope
+  const [availableSegments, setAvailableSegments] = useState<
+    { id: string; label: string }[]
+  >([]);
+  const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
+
+  const [actionUrl, setActionUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const notificationTypes = [
+    { value: "system_announcement", label: "System Announcement" },
+    { value: "maintenance_notice", label: "Maintenance Notice" },
+    { value: "segment_announcement", label: "Segment Announcement" },
     { value: "event_created", label: "Event Created" },
     { value: "event_updated", label: "Event Updated" },
     { value: "event_cancelled", label: "Event Cancelled" },
     { value: "reservation_approved", label: "Reservation Approved" },
     { value: "reservation_rejected", label: "Reservation Rejected" },
     { value: "reservation_reminder", label: "Reservation Reminder" },
+    { value: "event_starts_soon_2h", label: "Event Starts in 2h (Joined)" },
+    { value: "reservation_event_updated", label: "Reservation – Event Updated" },
+    { value: "reservation_event_cancelled", label: "Reservation – Event Cancelled" },
+    { value: "waitlist_promoted", label: "Waitlist Promoted" },
+    { value: "check_in_opens_reminder_24h", label: "Check-in Opens – 24h" },
+    { value: "check_in_opens_reminder_2h", label: "Check-in Opens – 2h" },
+    { value: "check_in_opens_reminder_1h", label: "Check-in Opens – 1h" },
+    { value: "check_in_payment_warning_15m", label: "Check-in Payment 15m Warning" },
     { value: "certificate_approved", label: "Certificate Approved" },
     { value: "certificate_rejected", label: "Certificate Rejected" },
     { value: "join_request_approved", label: "Join Request Approved" },
     { value: "join_request_rejected", label: "Join Request Rejected" },
-    { value: "invite_received", label: "Invite Received" },
+    { value: "invite_received", label: "Invite Received (legacy)" },
+    { value: "invite_event_received", label: "Event Invite Received" },
+    { value: "invite_group_received", label: "Group Invite Received" },
     { value: "message_received", label: "Message Received" },
-    { value: "follow_new_event", label: "Follow New Event" },
-    { value: "system_announcement", label: "System Announcement" },
-    { value: "maintenance_notice", label: "Maintenance Notice" },
+    { value: "follow_new_event", label: "Followed Coach – New Event" },
+    { value: "nearby_event_created", label: "Nearby Event Created" },
+    { value: "club_new_event", label: "Followed Club – New Event" },
+    { value: "club_group_new_event", label: "Followed Club Group – New Event" },
+    { value: "facility_new_event", label: "Followed Facility – New Event" },
+    { value: "event_capacity_full", label: "Event Capacity Full (Coach)" },
+    { value: "event_capacity_min_reached", label: "Event Min Reached (Coach)" },
+    { value: "facility_event_created", label: "Facility – New Event (Owner)" },
+    { value: "coach_waitlist_backup_offer", label: "Coach Waitlist Backup Offer" },
+    { value: "series_sessions_cancelled", label: "Series Sessions Cancelled" },
+    { value: "series_sessions_rescheduled", label: "Series Sessions Rescheduled" },
+    { value: "series_enrollment_confirmed", label: "Series Enrollment Confirmed" },
   ];
 
   const icons = [
@@ -56,6 +87,14 @@ export default function NotificationManagement() {
     { value: "user", label: "User" },
     { value: "alert", label: "Alert" },
     { value: "info", label: "Info" },
+    { value: "map-pin", label: "Map Pin" },
+    { value: "users", label: "Users" },
+    { value: "coins", label: "Coins" },
+    { value: "clock", label: "Clock" },
+    { value: "flame", label: "Flame" },
+    { value: "gift", label: "Gift" },
+    { value: "star", label: "Star" },
+    { value: "megaphone", label: "Megaphone" },
   ];
 
   const fetchUsers = async (search: string = "") => {
@@ -106,6 +145,33 @@ export default function NotificationManagement() {
     setSelectedUsersData(selectedUsersData.filter((u) => u._id !== userId));
   };
 
+  // Load audience segments once.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchJSON(EP.NOTIFICATIONS.adminSegments, {
+          method: "GET",
+        });
+        if (cancelled) return;
+        if (res?.success && Array.isArray(res.data)) {
+          setAvailableSegments(res.data);
+        }
+      } catch {
+        /* segments are optional; ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleSegment = (id: string) => {
+    setSelectedSegments((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -113,6 +179,43 @@ export default function NotificationManagement() {
     setLoading(true);
 
     try {
+      // Special path: segment scope uses a different endpoint.
+      if (scope === "segment") {
+        if (selectedSegments.length === 0) {
+          setError("Pick at least one audience segment.");
+          setLoading(false);
+          return;
+        }
+        const body: any = {
+          segments: selectedSegments,
+          type: type || "segment_announcement",
+          title,
+          message,
+          priority,
+        };
+        if (icon) body.icon = icon;
+        if (actionUrl) body.actionUrl = actionUrl;
+        if (expiresAt) body.expiresAt = expiresAt;
+
+        const res = await fetchJSON(EP.NOTIFICATIONS.createForSegments, {
+          method: "POST",
+          body,
+        });
+        if (res?.success) {
+          setSuccess(
+            res.message || "Notification queued for selected segments."
+          );
+          setTitle("");
+          setMessage("");
+          setExpiresAt("");
+          setActionUrl("");
+        } else {
+          setError(res?.message || "Failed to send segment notification");
+        }
+        setLoading(false);
+        return;
+      }
+
       const notificationData: any = {
         scope,
         type,
@@ -144,6 +247,10 @@ export default function NotificationManagement() {
         notificationData.icon = icon;
       }
 
+      if (actionUrl) {
+        notificationData.actionUrl = actionUrl;
+      }
+
       if (expiresAt) {
         notificationData.expiresAt = expiresAt;
       }
@@ -159,6 +266,7 @@ export default function NotificationManagement() {
         setTitle("");
         setMessage("");
         setExpiresAt("");
+        setActionUrl("");
         setUserId("");
         setSelectedUserIds([]);
         setTargetUsers([]);
@@ -207,8 +315,45 @@ export default function NotificationManagement() {
             <option value="global">All Users (Global)</option>
             <option value="role">By Role</option>
             <option value="group">Selected Users (Group)</option>
+            <option value="segment">By Audience Segment</option>
           </select>
         </div>
+
+        {scope === "segment" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+              Audience Segments <span className="text-red-500">*</span>
+            </label>
+            {availableSegments.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                Loading segments…
+              </p>
+            ) : (
+              <div className="border border-gray-200 dark:border-slate-600 rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+                {availableSegments.map((seg) => (
+                  <label
+                    key={seg.id}
+                    className="flex items-center gap-2 text-sm text-gray-800 dark:text-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSegments.includes(seg.id)}
+                      onChange={() => toggleSegment(seg.id)}
+                      className="rounded"
+                    />
+                    <span>{seg.label}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">
+                      ({seg.id})
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">
+              Multiple segments are merged (deduped union).
+            </p>
+          </div>
+        )}
 
         {/* User ID (for user scope) */}
         {scope === "user" && (
@@ -386,6 +531,24 @@ export default function NotificationManagement() {
           </select>
         </div>
 
+        {/* Action URL */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+            Action URL (Optional)
+          </label>
+          <input
+            type="text"
+            value={actionUrl}
+            onChange={(e) => setActionUrl(e.target.value)}
+            placeholder="/?event=ABC123 or https://..."
+            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+          />
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+            When set, clicking the notification navigates here. Use{" "}
+            <code>/?event=&lt;eventId&gt;</code> to deep-link an event.
+          </p>
+        </div>
+
         {/* Expires At */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
@@ -414,10 +577,10 @@ export default function NotificationManagement() {
               setTitle("");
               setMessage("");
               setExpiresAt("");
+              setActionUrl("");
               setUserId("");
               setSelectedUserIds([]);
               setTargetUsers([]);
-              setSelectedUsersData([]);
               setSelectedUsersData([]);
               setError("");
               setSuccess("");

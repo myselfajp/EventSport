@@ -9,6 +9,10 @@ import {
 const router = express.Router();
 
 router.get('/public/contracts', publicContentController.getPublicContractsCatalog);
+router.get(
+    '/public/static-pages/active',
+    publicContentController.getPublicActiveStaticPages
+);
 router.get('/public/static-page/:name', publicContentController.getPublicStaticPageByName);
 router.get('/public/dashboard-hero-slides', publicContentController.getPublicDashboardHeroSlides);
 router.get(

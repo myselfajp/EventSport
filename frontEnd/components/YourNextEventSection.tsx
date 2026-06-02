@@ -15,6 +15,7 @@ import {
   type DashboardEvent,
 } from "@/app/lib/dashboard-event-sources";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
 
 type YourNextEventSectionProps = {
   className?: string;
@@ -27,6 +28,7 @@ const YourNextEventSection: React.FC<YourNextEventSectionProps> = ({
   const [event, setEvent] = useState<DashboardEvent | null>(null);
   const [loading, setLoading] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
+  const { onCoachClick, coachProfileModal } = useCoachProfileModal();
   const [countdown, setCountdown] = useState<string | null>(null);
   const [emptyMessage, setEmptyMessage] = useState(
     "You haven't joined any upcoming event."
@@ -148,8 +150,9 @@ const YourNextEventSection: React.FC<YourNextEventSectionProps> = ({
         isOpen={viewOpen}
         onClose={() => setViewOpen(false)}
         event={event as React.ComponentProps<typeof ViewEventModal>["event"]}
-        onCoachClick={() => {}}
+        onCoachClick={onCoachClick}
       />
+      {coachProfileModal}
     </>
   );
 };

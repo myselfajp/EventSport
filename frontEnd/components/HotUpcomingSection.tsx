@@ -12,6 +12,7 @@ import {
   type CheckInEventRef,
 } from "@/app/lib/event-dashboard-utils";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
 import HorizontalEventScroller from "@/components/dashboard/HorizontalEventScroller";
 import EventCardTimes from "@/components/dashboard/EventCardTimes";
 
@@ -40,6 +41,7 @@ const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
   const [candidates, setCandidates] = useState<HotEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<HotEvent | null>(null);
+  const { onCoachClick, coachProfileModal } = useCoachProfileModal();
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const events = useMemo(
@@ -185,8 +187,9 @@ const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
         isOpen={!!selectedEvent}
         onClose={() => setSelectedEvent(null)}
         event={selectedEvent as React.ComponentProps<typeof ViewEventModal>["event"]}
-        onCoachClick={() => {}}
+        onCoachClick={onCoachClick}
       />
+      {coachProfileModal}
     </>
   );
 };
