@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Flame, Calendar } from "lucide-react";
+import { Flame } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
 import {
-  formatEventDateTime,
   formatCountdownToStart,
   isHotEvent,
   isUpcomingEvent,
+  type CheckInEventRef,
 } from "@/app/lib/event-dashboard-utils";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import HorizontalEventScroller from "@/components/dashboard/HorizontalEventScroller";
+import EventCardTimes from "@/components/dashboard/EventCardTimes";
 
-type HotEvent = {
+type HotEvent = CheckInEventRef & {
   _id: string;
   name: string;
   startTime: string;
@@ -24,7 +26,16 @@ type HotEvent = {
   district?: { name?: string };
 };
 
-const HotUpcomingSection: React.FC = () => {
+type HotUpcomingSectionProps = {
+  className?: string;
+};
+
+const COLUMN_CARD_CLASS =
+  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-orange-200 dark:border-orange-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-lg transition-all group";
+
+const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
+  className = "",
+}) => {
   const { data: user, isPending } = useMe();
   const [candidates, setCandidates] = useState<HotEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,43 +101,52 @@ const HotUpcomingSection: React.FC = () => {
   }, [user, isPending]);
 
   if (isPending || !user) return null;
-  if (!loading && events.length === 0) return null;
 
   return (
     <>
-      <section className="rounded-2xl border border-orange-200 dark:border-orange-900/50 bg-gradient-to-br from-orange-50 via-red-50/50 to-white dark:from-orange-950/30 dark:via-red-950/20 dark:to-slate-800/80 shadow-sm overflow-hidden">
-        <div className="px-4 sm:px-6 py-4 border-b border-orange-100 dark:border-orange-900/40 flex items-center gap-2">
-          <Flame className="w-5 h-5 text-orange-500 shrink-0" />
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-              HOT — Upcoming
-            </h2>
-            <p className="text-xs text-gray-500 dark:text-slate-400">
-              Starting within the next 3 hours
-            </p>
+      <section
+        className={`h-full flex flex-col rounded-2xl border border-orange-200 dark:border-orange-900/50 bg-gradient-to-br from-orange-50 via-red-50/50 to-white dark:from-orange-950/30 dark:via-red-950/20 dark:to-slate-800/80 shadow-sm overflow-hidden min-w-0 ${className}`}
+      >
+        <div className="px-4 py-3 border-b border-orange-100 dark:border-orange-900/40 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Flame className="w-5 h-5 text-orange-500 shrink-0" />
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                HOT EVENTS
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                Starting within the next 3 hours
+                {events.length > 1 ? " · swipe to see more" : ""}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="p-4 sm:p-6">
+        <div className="p-4 flex-1 flex flex-col min-h-0">
           {loading ? (
-            <div className="flex gap-3 overflow-hidden">
-              {[...Array(3)].map((_, i) => (
-                <div
-                  key={i}
-                  className="shrink-0 w-64 h-28 rounded-xl bg-orange-100/60 dark:bg-slate-700/50 animate-pulse"
-                />
-              ))}
+            <div className="flex-1 min-h-[140px] rounded-xl bg-orange-100/60 dark:bg-slate-700/50 animate-pulse" />
+          ) : events.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center min-h-[140px] rounded-xl border border-dashed border-orange-200 dark:border-orange-800/50 bg-white/40 dark:bg-slate-900/30 px-4">
+              <p className="text-sm text-gray-500 dark:text-slate-400 text-center">
+                No hot events in the next 3 hours.
+              </p>
             </div>
           ) : (
-            <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-thin">
+            <HorizontalEventScroller
+              itemCount={events.length}
+              activeDotClass="bg-orange-500"
+              ariaLabel="Hot upcoming events"
+              columnSlide
+            >
               {events.map((event) => {
                 const countdown = formatCountdownToStart(event.startTime, nowMs);
                 return (
                   <button
                     key={event._id}
                     type="button"
+                    data-event-card
                     onClick={() => setSelectedEvent(event)}
-                    className="snap-start shrink-0 w-64 sm:w-72 text-left p-4 rounded-xl border border-orange-200 dark:border-orange-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-lg transition-all group"
+                    className={COLUMN_CARD_CLASS}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500 text-white">
@@ -147,14 +167,16 @@ const HotUpcomingSection: React.FC = () => {
                         {event.sport.name}
                       </p>
                     )}
-                    <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-600 dark:text-slate-300">
-                      <Calendar className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formatEventDateTime(event.startTime)}</span>
-                    </div>
+                    <EventCardTimes event={event} />
+                    {event.facility?.name && (
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
+                        {event.facility.name}
+                      </p>
+                    )}
                   </button>
                 );
               })}
-            </div>
+            </HorizontalEventScroller>
           )}
         </div>
       </section>

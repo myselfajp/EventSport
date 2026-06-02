@@ -41,3 +41,58 @@ export function isHotEvent(startTime: string, nowMs = Date.now(), windowHours = 
   const windowMs = windowHours * 60 * 60 * 1000;
   return start > nowMs && start <= nowMs + windowMs;
 }
+
+export const DEFAULT_CHECK_IN_OPENS_HOURS = 48;
+
+export type CheckInEventRef = {
+  startTime?: string;
+  checkInOpensHoursBeforeStart?: number;
+  checkInOpensAt?: string;
+  style?: { checkInOpensHoursBeforeStart?: number } | null;
+};
+
+export function resolveCheckInOpensHours(event: CheckInEventRef): number {
+  if (
+    typeof event.checkInOpensHoursBeforeStart === "number" &&
+    event.checkInOpensHoursBeforeStart >= 0
+  ) {
+    return event.checkInOpensHoursBeforeStart;
+  }
+  const styleHours = event.style?.checkInOpensHoursBeforeStart;
+  if (typeof styleHours === "number" && styleHours >= 0) return styleHours;
+  return DEFAULT_CHECK_IN_OPENS_HOURS;
+}
+
+export function getCheckInOpensAt(event: CheckInEventRef): string | null {
+  if (event.checkInOpensAt) return event.checkInOpensAt;
+  if (!event.startTime) return null;
+  const hours = resolveCheckInOpensHours(event);
+  const startMs = new Date(event.startTime).getTime();
+  return new Date(startMs - hours * 60 * 60 * 1000).toISOString();
+}
+
+/** Countdown until check-in opens, or "Open now" if window is active */
+export function formatCheckInCountdown(
+  checkInOpensAt: string,
+  startTime: string,
+  nowMs = Date.now()
+) {
+  const opens = new Date(checkInOpensAt).getTime();
+  const start = new Date(startTime).getTime();
+  const now = nowMs;
+
+  if (now >= opens && now < start) return "Open now";
+  if (now >= start) return null;
+
+  const diff = opens - now;
+  if (diff <= 0) return "Open now";
+
+  const totalMinutes = Math.floor(diff / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) return `Opens in ${hours}h ${minutes}m`;
+  if (hours > 0) return `Opens in ${hours}h`;
+  if (minutes > 0) return `Opens in ${minutes}m`;
+  return "Opens in < 1m";
+}
