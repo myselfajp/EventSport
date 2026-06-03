@@ -9,10 +9,8 @@ import ProfileSidebar from "./profile/ProfileSidebar";
 interface LeftSidebarProps {
   isOpen: boolean;
   gamerProfileOpenSignal?: number;
-  onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
-  onShowStaticPage?: (pageName: string) => void;
 }
 
 // Fake user credentials for testing
@@ -66,10 +64,8 @@ const DUMMY_COMPANIES = [
 const LeftSidebar: React.FC<LeftSidebarProps> = ({
   isOpen,
   gamerProfileOpenSignal = 0,
-  onShowCalendar,
   onShowFollowings,
   onShowFavorites,
-  onShowStaticPage,
 }) => {
   const { data: user, isLoading: userLoading } = useMe();
   const { mutate: signOut } = useSignOut();
@@ -103,10 +99,8 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         <ProfileSidebar
           onLogout={handleLogout}
           gamerProfileOpenSignal={gamerProfileOpenSignal}
-          onShowCalendar={onShowCalendar}
           onShowFollowings={onShowFollowings}
           onShowFavorites={onShowFavorites}
-          onShowStaticPage={onShowStaticPage}
           initialFacilities={
             FAKE_USER.facility
               ? DUMMY_FACILITIES.filter((f) =>

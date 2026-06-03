@@ -264,12 +264,6 @@ const EventsDashboard = () => {
       <LeftSidebar
         isOpen={leftSidebarOpen}
         gamerProfileOpenSignal={gamerProfileOpenSignal}
-        onShowCalendar={() => {
-          setShowFollowings(false);
-          setShowFavorites(false);
-          setShowCoachCalendar(true);
-          setLeftSidebarOpen(false);
-        }}
         onShowFollowings={() => {
           setShowCoachCalendar(false);
           setShowFavorites(false);
@@ -280,13 +274,6 @@ const EventsDashboard = () => {
           setShowCoachCalendar(false);
           setShowFollowings(false);
           setShowFavorites(true);
-          setLeftSidebarOpen(false);
-        }}
-        onShowStaticPage={(pageName: string) => {
-          setShowCoachCalendar(false);
-          setShowFollowings(false);
-          setShowFavorites(false);
-          setSelectedStaticPageName(pageName);
           setLeftSidebarOpen(false);
         }}
       />
