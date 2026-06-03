@@ -79,8 +79,7 @@ export async function fetchUserDashboardEvents(
 
   if (user.participant) {
     try {
-      // Use "all" — "registered" excludes isCheckedIn:true, so checked-in gamers
-      // would miss upcoming events in Your Next Event / Check-in columns.
+      // Use "all" so dashboard widgets include both upcoming and past joined events.
       const res = await fetchJSON(EP.PARTICIPANT.myReservations, {
         method: "POST",
         body: {

@@ -1504,6 +1504,8 @@ export const getMyReservations = async (req, res, next) => {
         const reservationScope =
             scopeRaw === 'registered' || scopeRaw === 'participated' ? scopeRaw : 'all';
 
+        const now = new Date();
+
         // Build query for reservations
         const query = {
             participant: user.participant,
@@ -1511,9 +1513,48 @@ export const getMyReservations = async (req, res, next) => {
         };
 
         if (reservationScope === 'registered') {
-            query.isCheckedIn = false;
+            // Joined / registered; event has not ended yet (upcoming or in progress)
+            const activeEventIds = await Event.find({
+                endTime: { $gt: now },
+                status: { $ne: 'cancelled' },
+            }).distinct('_id');
+
+            if (activeEventIds.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    data: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: 0,
+                        total: 0,
+                        perPage,
+                    },
+                });
+            }
+
+            query.event = { $in: activeEventIds };
         } else if (reservationScope === 'participated') {
-            query.isCheckedIn = true;
+            // Joined (not waitlisted); event has ended
+            const endedEventIds = await Event.find({
+                endTime: { $lte: now },
+                status: { $ne: 'cancelled' },
+            }).distinct('_id');
+
+            if (endedEventIds.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    data: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: 0,
+                        total: 0,
+                        perPage,
+                    },
+                });
+            }
+
+            query.event = { $in: endedEventIds };
+            query.isWaitListed = false;
         }
 
         // Count total
