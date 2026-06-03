@@ -15,13 +15,11 @@ import {
   Trash2,
   Edit,
   Check,
-  Calendar,
   Camera,
   Loader2,
   Shield,
   Layers,
   Heart,
-  FileText,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -68,10 +66,8 @@ import { fetchJSON } from "@/app/lib/api";
 interface ProfileSidebarProps {
   onLogout: () => void;
   gamerProfileOpenSignal?: number;
-  onShowCalendar?: () => void;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
-  onShowStaticPage?: (pageName: string) => void;
   initialFacilities?: any[];
   initialCompanies?: any[];
 }
@@ -79,10 +75,8 @@ interface ProfileSidebarProps {
 const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   onLogout,
   gamerProfileOpenSignal = 0,
-  onShowCalendar,
   onShowFollowings,
   onShowFavorites,
-  onShowStaticPage,
   initialFacilities = [],
   initialCompanies = [],
 }) => {
@@ -91,10 +85,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const queryClient = useQueryClient();
   const hasCoachProfile = !!user?.coach;
   const hasGamerProfile = !!user?.participant;
-  const canUseCoachCalendar = hasCoachProfile || user?.role === 0;
-  const [staticPages, setStaticPages] = useState<Array<{ _id: string; name: string; title: string }>>([]);
-
-  const [activePanel, setActivePanel] = useState<"home" | "profile">("home");
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
   const [isFacilityModalOpen, setIsFacilityModalOpen] = useState(false);
   const [isClubModalOpen, setIsClubModalOpen] = useState(false);
@@ -247,28 +237,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     }
   }, [user]);
 
-  // Fetch static pages
-  useEffect(() => {
-    const fetchStaticPages = async () => {
-      try {
-        const res = await fetchJSON(
-          EP.PUBLIC.activeStaticPages,
-          { method: "GET" },
-          { skipAuth: true }
-        );
-        if (res?.success && Array.isArray(res?.data)) {
-          setStaticPages(res.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch static pages:", err);
-      }
-    };
-    fetchStaticPages();
-  }, []);
-
   useEffect(() => {
     if (!gamerProfileOpenSignal) return;
-    setActivePanel("profile");
     setIsParticipantModalOpen(true);
   }, [gamerProfileOpenSignal]);
 
@@ -788,8 +758,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     }
   };
 
-  const showHomePanel = () => setActivePanel("home");
-  const showProfilePanel = () => setActivePanel("profile");
+  const quickActionCard =
+    "flex flex-col items-center justify-center py-2 px-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center min-h-[4.75rem] w-full";
 
   return (
     <div className="h-full overflow-y-auto p-4 sm:p-6 flex flex-col">
@@ -874,12 +844,14 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         </p>
       </div>
 
-      {!hasGamerProfile && activePanel === "home" && (
+      {!hasGamerProfile && (
         <GamerProfileRequiredBanner className="mb-4" />
       )}
 
-      <div className="flex justify-between mb-6 sm:mb-8 text-center gap-3">
+      {/* Quick actions — 7 items in one row (replaces old Favorites / Following cards) */}
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-6 sm:mb-8 w-full">
         <button
+          type="button"
           onClick={() => {
             if (onShowFavorites) {
               onShowFavorites();
@@ -887,17 +859,20 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               router.push("/favorites");
             }
           }}
-          className="flex-1 flex flex-col items-center border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
+          className={quickActionCard}
+          title="Likes"
         >
-          <div className="font-bold text-gray-800 dark:text-white text-sm sm:text-base flex items-center gap-1">
-            <Heart className="w-4 h-4 text-red-500" />
+          <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
+          <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-white tabular-nums leading-none mt-1">
             {totalFavorites}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Favorites
-          </div>
+          </span>
+          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
+            Likes
+          </span>
         </button>
+
         <button
+          type="button"
           onClick={() => {
             if (onShowFollowings) {
               onShowFollowings();
@@ -905,316 +880,204 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               router.push("/followings");
             }
           }}
-          className="flex-1 flex flex-col items-center border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
+          className={quickActionCard}
+          title="Following"
         >
-          <div className="font-bold text-gray-800 dark:text-white text-sm sm:text-base flex items-center gap-1">
-            <Users className="w-4 h-4 text-cyan-500" />
-            {isFollowsFetching && !followsData ? "..." : totalFollows}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-500 shrink-0" />
+          <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-white tabular-nums leading-none mt-1">
+            {isFollowsFetching && !followsData ? "…" : totalFollows}
+          </span>
+          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
             Following
-          </div>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          disabled
+          className={`${quickActionCard} opacity-50 cursor-not-allowed hover:bg-white dark:hover:bg-gray-800`}
+          title="Activity — coming soon"
+        >
+          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
+            Activity
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsFindModalOpen(true)}
+          className={quickActionCard}
+          title="Find"
+        >
+          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300 shrink-0" />
+          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
+            Find
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsUserEditModalOpen(true)}
+          className={quickActionCard}
+          title="Edit Account Info"
+        >
+          <Edit className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+          <span className="text-[8px] sm:text-[9px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
+            Edit Account Info
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsParticipantModalOpen(true)}
+          className={`${quickActionCard} ${
+            !hasGamerProfile
+              ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30"
+              : ""
+          }`}
+          title="Gamer Profile"
+        >
+          <User
+            className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
+              hasGamerProfile
+                ? "text-cyan-600 dark:text-cyan-400"
+                : "text-amber-600 dark:text-amber-400"
+            }`}
+          />
+          <span className="text-[8px] sm:text-[9px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
+            Gamer Profile
+          </span>
+        </button>
+
+        <button
+          type="button"
+          disabled
+          className={`${quickActionCard} opacity-50 cursor-not-allowed hover:bg-white dark:hover:bg-gray-800`}
+          title="Settings — coming soon"
+        >
+          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
+            Settings
+          </span>
         </button>
       </div>
 
-      {activePanel === "home" ? (
-        <>
-          <nav className="space-y-1">
-            <button
-              onClick={showProfilePanel}
-              className="w-full flex items-center px-3 py-2 text-sm text-gray-800 dark:text-white bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-400 dark:hover:border-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg transition-colors"
-            >
-              <User className="w-4 h-4 mr-3 text-cyan-500" />
-              <div className="flex-1 text-left">
-                <div className="font-semibold">Profile</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  View and edit your account
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-            </button>
-
-            <button
-              onClick={() => setIsFindModalOpen(true)}
-              className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <Search className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
-              <div className="flex-1">
-                <div>Find</div>
-                <div className="text-xs text-gray-400 dark:text-gray-500">
-                  Search coaches, facilities...
-                </div>
-              </div>
-            </button>
-
-            {canUseCoachCalendar && onShowCalendar && (
-              <button
-                onClick={onShowCalendar}
-                className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <Calendar className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
-                <div className="flex-1 text-left">
-                  <div>My Calendar</div>
-                  <div className="text-xs text-gray-400 dark:text-gray-500">
-                    View events & schedules
-                  </div>
-                </div>
-              </button>
-            )}
-
-            <a
-              href="#"
-              className="flex items-center px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <Activity className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
-              Activity
-            </a>
-            <button
-              onClick={() => {
-                if (onShowFollowings) {
-                  onShowFollowings();
-                } else {
-                  router.push("/followings");
-                }
-              }}
-              className="w-full flex items-center px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
-            >
-              <Users className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
-              Following
-            </button>
-            <a
-              href="#"
-              className="flex items-center px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <Settings className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
-              Settings
-            </a>
-          </nav>
-
-          {/* Divider */}
-          <div className="my-4 border-t border-gray-200 dark:border-gray-700"></div>
-
-          {/* Static Pages */}
-          {staticPages.length > 0 && (
-            <nav className="space-y-1 mt-4">
-              {staticPages.map((page) => (
-                <button
-                  key={page.name}
-                  onClick={() => {
-                    if (onShowStaticPage) {
-                      onShowStaticPage(page.name);
-                    }
-                  }}
-                  className="w-full flex items-center px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
-                >
-                  <FileText className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
-                  {page.title}
-                </button>
-              ))}
-            </nav>
-          )}
-        </>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={showHomePanel}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              <ChevronRight className="w-4 h-4 rotate-180" />
-              Back
-            </button>
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Profile
-              </div>
-              <div className="text-sm font-semibold text-gray-800 dark:text-white">
-                Account details
-              </div>
+      {hasCoachProfile && (
+        <button
+          type="button"
+          onClick={handleOpenCoachModal}
+          className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors text-left"
+        >
+          <div className="p-1.5 rounded-md bg-green-100 dark:bg-green-900/50">
+            <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-gray-800 dark:text-white text-sm">
+              Edit Coach Profile
+            </div>
+            <div className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+              <Check className="w-3 h-3" />
+              Coach profile active
             </div>
           </div>
+          <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        </button>
+      )}
 
-          {/* Participant Section */}
+      <div className="space-y-2 mb-6">
+        <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
+          Need specialized accounts?
+        </h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Add or edit your coach profile and manage facility, salon, club, or
+          sport community resources.
+        </p>
+
+        <div className="grid grid-cols-4 gap-2 sm:gap-3">
           <button
-            onClick={() => setIsParticipantModalOpen(true)}
-            className={`w-full rounded-lg p-3 transition-all group flex items-center justify-between border ${
-              hasGamerProfile
-                ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
-                : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 ring-1 ring-amber-200/80 dark:ring-amber-800/60"
-            }`}
+            type="button"
+            onClick={() => setIsFacilitiesListOpen(true)}
+            className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                <User className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-              </div>
-              <div>
-                <div className="font-medium text-gray-800 dark:text-white text-sm flex items-center flex-wrap gap-2">
-                  Gamer Profile
-                  {!hasGamerProfile && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
-                      Required
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {hasGamerProfile
-                    ? "View and edit your gamer information"
-                    : "Create your profile to join events"}
-                </div>
-              </div>
+            <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+              <Home className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
+            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
+              My Facilities
+            </span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+              {facilities.length}
+            </span>
           </button>
 
-          {/* Edit Coach and Account Info */}
-          <div className="space-y-2">
-            {hasCoachProfile && (
-              <button
-                onClick={handleOpenCoachModal}
-                className={`w-full bg-white dark:bg-gray-800 border rounded-lg p-3 transition-all group ${
-                  "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-1.5 rounded-md bg-green-100 dark:bg-green-900/50`}>
-                    <Users className={`w-4 h-4 text-green-600 dark:text-green-400`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-800 dark:text-white text-sm">
-                      Edit Coach Profile
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      <span className="inline-flex items-center text-green-600 dark:text-green-400">
-                        <Check className="w-3 h-3 mr-0.5" />
-                        Added
-                      </span>
-                      <span className="text-gray-400 dark:text-gray-500">
-                        ·
-                      </span>
-                      <span>Edit your credentials</span>
-                    </div>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-green-600 dark:group-hover:text-green-400`} />
-                </div>
-              </button>
-            )}
-
-            <button
-              onClick={() => setIsUserEditModalOpen(true)}
-              className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-cyan-300 dark:hover:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg p-3 transition-all group flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="bg-cyan-50 dark:bg-cyan-900/50 p-1.5 rounded-md group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/70">
-                  <Edit className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <div>
-                  <div className="font-medium text-gray-800 dark:text-white text-sm">
-                    Edit Account Info
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Update name, email, phone, district, password
-                  </div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
-              Need specialized accounts?
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Add or edit your coach profile and manage facility, salon, club,
-              or sport community resources.
-            </p>
-
-            <div className="grid grid-cols-4 gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => setIsFacilitiesListOpen(true)}
-                className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
-              >
-                <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
-                  <Home className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
-                  My Facilities
-                </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-                  {facilities.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsCompaniesListOpen(true)}
-                className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
-              >
-                <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
-                  <Building className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
-                  My Companies
-                </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-                  {companies.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsClubsListOpen(true)}
-                className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
-              >
-                <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
-                  <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
-                  My Clubs
-                </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-                  {myClubs.length}
-                </span>
-              </button>
-
-              {hasCoachProfile || user?.role === 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setIsGroupsListOpen(true)}
-                  className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
-                >
-                  <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
-                    <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
-                    My Communities
-                  </span>
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-                    {myGroups.length}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleOpenCoachModal}
-                  className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-all"
-                >
-                  <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/50 mb-1">
-                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
-                    Apply
-                  </span>
-                  <span className="text-[10px] text-orange-600 dark:text-orange-400 text-center leading-tight">
-                    coach
-                  </span>
-                </button>
-              )}
+          <button
+            type="button"
+            onClick={() => setIsCompaniesListOpen(true)}
+            className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
+          >
+            <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+              <Building className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
-          </div>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
+              My Companies
+            </span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+              {companies.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsClubsListOpen(true)}
+            className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
+          >
+            <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
+              My Clubs
+            </span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+              {myClubs.length}
+            </span>
+          </button>
+
+          {hasCoachProfile || user?.role === 0 ? (
+            <button
+              type="button"
+              onClick={() => setIsGroupsListOpen(true)}
+              className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
+            >
+              <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+                <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
+                My Communities
+              </span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                {myGroups.length}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleOpenCoachModal}
+              className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-all"
+            >
+              <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/50 mb-1">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
+                Apply
+              </span>
+              <span className="text-[10px] text-orange-600 dark:text-orange-400 text-center leading-tight">
+                coach
+              </span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Coach Modal */}
       <CoachModal
