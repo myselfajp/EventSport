@@ -17,12 +17,17 @@ router.post('/get-sport-group/', referenceDataController.getSportGroup);
 router.put('/update-sport-group/:sportGroupId', referenceDataController.updateSportGroup);
 router.delete('/delete-sport-group/:sportGroupId', referenceDataController.deleteSportGroup);
 // sport
-router.post('/create-sport/:sportGroupId', uploadFile({ fieldName: 'icon', optional: true }), referenceDataController.createSport);
-router.put('/update-sport/:sportId', (req, res, next) => {
-    console.log('Route matched - update-sport');
-    console.log('Route params:', req.params);
-    next();
-}, uploadFile({ fieldName: 'icon', optional: true }), referenceDataController.updateSport);
+const sportUploadFields = uploadFile({
+    mode: 'fields',
+    optional: true,
+    fields: [
+        { name: 'icon', maxCount: 1 },
+        { name: 'coachBadge', maxCount: 1 },
+    ],
+});
+
+router.post('/create-sport/:sportGroupId', sportUploadFields, referenceDataController.createSport);
+router.put('/update-sport/:sportId', sportUploadFields, referenceDataController.updateSport);
 router.post('/get-sport/', referenceDataController.getSport);
 router.delete('/delete-sport/:sportId', referenceDataController.deleteSport);
 // eventStyle

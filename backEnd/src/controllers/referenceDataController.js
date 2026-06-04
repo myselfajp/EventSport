@@ -9,6 +9,16 @@ import {
     checkInOpensHoursBeforeStart,
 } from '../utils/validation.js';
 
+function pickUploadedFile(fileMeta, fieldName) {
+    if (!fileMeta) return null;
+    if (fileMeta.path) {
+        return fieldName === 'icon' ? fileMeta : null;
+    }
+    const files = fileMeta[fieldName];
+    if (Array.isArray(files) && files.length > 0) return files[0];
+    return null;
+}
+
 // sportGoal
 export const createSportGoal = async (req, res, next) => {
     try {
@@ -245,18 +255,29 @@ export const createSport = async (req, res, next) => {
         const sportGroup = await SportGroup.findById(sportGroupId);
         if (!sportGroup) throw new AppError(404);
 
-        const iconData = req.fileMeta ? {
-            path: req.fileMeta.path,
-            originalName: req.fileMeta.originalName,
-            mimeType: req.fileMeta.mimeType,
-            size: req.fileMeta.size,
-        } : null;
+        const iconFile = pickUploadedFile(req.fileMeta, 'icon');
+        const coachBadgeFile = pickUploadedFile(req.fileMeta, 'coachBadge');
 
         const createSport = await Sport.create({
             name: result,
             group: sportGroupId,
             groupName: sportGroup.name,
-            icon: iconData,
+            ...(iconFile && {
+                icon: {
+                    path: iconFile.path,
+                    originalName: iconFile.originalName,
+                    mimeType: iconFile.mimeType,
+                    size: iconFile.size,
+                },
+            }),
+            ...(coachBadgeFile && {
+                coachBadge: {
+                    path: coachBadgeFile.path,
+                    originalName: coachBadgeFile.originalName,
+                    mimeType: coachBadgeFile.mimeType,
+                    size: coachBadgeFile.size,
+                },
+            }),
         });
         if (!createSport) throw new AppError(404);
 
@@ -316,11 +337,6 @@ export const updateSport = async (req, res, next) => {
         const sportId = mongoObjectId.parse(req.params.sportId);
         const sportName = req.body?.name;
         
-        console.log('updateSport - req.body:', req.body);
-        console.log('updateSport - sportName:', sportName);
-        console.log('updateSport - sportId:', sportId);
-        console.log('updateSport - req.fileMeta:', req.fileMeta);
-        
         if (!sportName) {
             throw new AppError(400, 'Sport name is required');
         }
@@ -330,12 +346,22 @@ export const updateSport = async (req, res, next) => {
         if (!sport) throw new AppError(404);
 
         const updateData = { name: result };
-        if (req.fileMeta) {
+        const iconFile = pickUploadedFile(req.fileMeta, 'icon');
+        const coachBadgeFile = pickUploadedFile(req.fileMeta, 'coachBadge');
+        if (iconFile) {
             updateData.icon = {
-                path: req.fileMeta.path,
-                originalName: req.fileMeta.originalName,
-                mimeType: req.fileMeta.mimeType,
-                size: req.fileMeta.size,
+                path: iconFile.path,
+                originalName: iconFile.originalName,
+                mimeType: iconFile.mimeType,
+                size: iconFile.size,
+            };
+        }
+        if (coachBadgeFile) {
+            updateData.coachBadge = {
+                path: coachBadgeFile.path,
+                originalName: coachBadgeFile.originalName,
+                mimeType: coachBadgeFile.mimeType,
+                size: coachBadgeFile.size,
             };
         }
 

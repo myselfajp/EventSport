@@ -24,6 +24,7 @@ import { useMe } from "@/app/hooks/useAuth";
 import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { resolveCoachProfileId } from "@/app/lib/coach-profile-utils";
+import EventLikeButton from "@/components/favorite/EventLikeButton";
 
 interface Event {
   _id: string;
@@ -1696,6 +1697,12 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   <Ban className="w-4 h-4" />
                   {cancellingEvent ? "Cancelling…" : "Cancel event"}
                 </button>
+              )}
+              {user?.participant && event?._id && (
+                <EventLikeButton
+                  eventId={String(event._id)}
+                  eventEntity={event as Record<string, unknown>}
+                />
               )}
               {!event.private && !isCancelled && sharePayload && (
                 <button

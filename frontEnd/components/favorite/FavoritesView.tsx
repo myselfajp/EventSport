@@ -19,7 +19,7 @@ const FavoritesView: React.FC<FavoritesViewProps> = ({ onBack }) => {
         >
           <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-slate-300" />
         </button>
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Favorites</h2>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Likes</h2>
       </div>
 
       <div className="flex-1">

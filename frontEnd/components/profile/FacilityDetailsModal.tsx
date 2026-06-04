@@ -18,6 +18,7 @@ import { Facility, SportResponse } from "@/app/lib/types";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import ClubViewModal, { type ClubViewModalClub } from "@/components/ClubViewModal";
 import GroupViewModal, { type GroupViewModalGroup } from "@/components/GroupViewModal";
+import EntityFollowButton from "@/components/follow/EntityFollowButton";
 
 type ViewEventModalEvent = NonNullable<
   React.ComponentProps<typeof ViewEventModal>["event"]
@@ -228,7 +229,7 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
                       <Home className="w-10 h-10 text-green-600 dark:text-green-400" />
                     )}
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                       {facility.name}
                     </h3>
@@ -236,6 +237,9 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
                     <p className="text-sm text-gray-500 dark:text-gray-500">
                       Added {formatDate(facility.createdAt)}
                     </p>
+                    <div className="mt-3">
+                      <EntityFollowButton type="facility" entityId={facilityId} />
+                    </div>
                   </div>
                 </div>
 

@@ -52,6 +52,8 @@ export default function NotificationManagement() {
     { value: "event_starts_soon_2h", label: "Event Starts in 2h (Joined)" },
     { value: "reservation_event_updated", label: "Reservation – Event Updated" },
     { value: "reservation_event_cancelled", label: "Reservation – Event Cancelled" },
+    { value: "liked_event_updated", label: "Liked Event – Updated" },
+    { value: "liked_event_cancelled", label: "Liked Event – Cancelled" },
     { value: "waitlist_promoted", label: "Waitlist Promoted" },
     { value: "check_in_opens_reminder_24h", label: "Check-in Opens – 24h" },
     { value: "check_in_opens_reminder_2h", label: "Check-in Opens – 2h" },

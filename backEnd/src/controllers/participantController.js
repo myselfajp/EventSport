@@ -574,7 +574,16 @@ export const getFavorites = async (req, res, next) => {
                 })
                 .populate({
                     path: 'event',
-                    select: 'name photo banner startTime endTime sport facility',
+                    select:
+                        'name photo banner startTime endTime type private status createdAt sport sportGroup facility owner club group',
+                    populate: [
+                        { path: 'sport', select: 'name' },
+                        { path: 'sportGroup', select: 'name' },
+                        { path: 'facility', select: 'name address photo' },
+                        { path: 'owner', select: 'firstName lastName coach' },
+                        { path: 'club', select: 'name' },
+                        { path: 'group', select: 'name' },
+                    ],
                 })
                 .sort(sort)
                 .skip(skip)

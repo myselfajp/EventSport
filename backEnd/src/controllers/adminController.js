@@ -133,7 +133,7 @@ export const getAllUsers = async (req, res, next) => {
                     const approvedBranches = await Branch.find({
                         coach: coachId,
                         status: 'Approved',
-                    }).populate('sport', 'name groupName icon').lean();
+                    }).populate('sport', 'name groupName icon coachBadge').lean();
                     
                     const approvedBranchesCount = approvedBranches.length;
                     const sports = approvedBranches.map((branch) => ({
@@ -549,7 +549,7 @@ export const getPendingCoaches = async (req, res, next) => {
                 path: 'coach',
                 select: 'name isVerified',
             })
-            .populate('sport', 'name groupName icon')
+            .populate('sport', 'name groupName icon coachBadge')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -655,7 +655,7 @@ export const approveCertificate = async (req, res, next) => {
             { new: true }
         )
             .populate('coach')
-            .populate('sport', 'name icon');
+            .populate('sport', 'name icon coachBadge');
 
         if (!branch) {
             throw new AppError(404, 'Branch not found');
@@ -708,7 +708,7 @@ export const rejectCertificate = async (req, res, next) => {
             { new: true }
         )
             .populate('coach')
-            .populate('sport', 'name icon');
+            .populate('sport', 'name icon coachBadge');
 
         if (!branch) {
             throw new AppError(404, 'Branch not found');
@@ -759,7 +759,7 @@ export const getCoachDetails = async (req, res, next) => {
         const allBranches = await Branch.find({
             coach: coachId,
         })
-            .populate('sport', 'name groupName icon')
+            .populate('sport', 'name groupName icon coachBadge')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -879,7 +879,7 @@ export const getFacilityDetails = async (req, res, next) => {
         const salons = await Salon.find({
             facility: { $in: facilityIds },
         })
-            .populate('sport', 'name groupName icon')
+            .populate('sport', 'name groupName icon coachBadge')
             .populate('sportGroup', 'name')
             .lean();
 
@@ -993,7 +993,7 @@ export const getCoachBranches = async (req, res, next) => {
             .sort({ branchOrder: 1 })
             .populate({
                 path: 'sport',
-                select: 'name groupName icon',
+                select: 'name groupName icon coachBadge',
             })
             .lean();
 

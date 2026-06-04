@@ -59,7 +59,8 @@ import ViewEventModal from "@/components/event/ViewEventModal";
 import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
 import UserEditModal from "./UserEditModal";
 import { EP } from "@/app/lib/endpoints";
-import { defaultFavorites, useFavorites } from "@/app/hooks/useFavorites";
+import { primaryBranchCoachBadgeUrl } from "@/app/lib/coach-badge-utils";
+import { useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
 import { fetchJSON } from "@/app/lib/api";
 
@@ -128,15 +129,24 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     enabled: !!coachId && !!hasCoachProfile,
   });
 
+  const { data: coachBranchesRes } = useQuery({
+    queryKey: ["coach-branches", coachId],
+    queryFn: () =>
+      fetchJSON(EP.COACH.getCurrentBranches, { method: "GET" }),
+    enabled: !!coachId && !!hasCoachProfile,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const coachProfileBadgeUrl = React.useMemo(
+    () => primaryBranchCoachBadgeUrl(coachBranchesRes?.data),
+    [coachBranchesRes?.data]
+  );
+
   const myClubs = myClubsData?.data || [];
   const myGroups = myGroupsData?.data || [];
 
-  const { data: favoritesData } = useFavorites();
-  const favorites = favoritesData?.data || defaultFavorites;
-  const totalFavorites =
-    (favorites.coach?.length || 0) +
-    (favorites.facility?.length || 0) +
-    (favorites.event?.length || 0);
+  const { data: likesData } = useFavorites({ eventsOnly: true });
+  const totalLikes = likesData?.data?.event?.length ?? 0;
 
   const {
     data: followsData,
@@ -250,6 +260,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const handleCreateCoach = async (formData: any) => {
     console.log("Coach profile saved:", formData);
     await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    await queryClient.invalidateQueries({ queryKey: ["coach-branches"] });
     setIsCoachModalOpen(false);
   };
 
@@ -794,7 +805,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               title="Coach"
             >
               <img
-                src="/assets/coach-badge.png"
+                src={coachProfileBadgeUrl}
                 alt="Coach Badge"
                 className="w-8 h-8 object-contain"
               />
@@ -864,7 +875,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         >
           <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
           <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-white tabular-nums leading-none mt-1">
-            {totalFavorites}
+            {totalLikes}
           </span>
           <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
             Likes

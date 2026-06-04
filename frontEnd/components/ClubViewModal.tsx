@@ -5,6 +5,7 @@ import { X, ShieldCheck, Calendar, ChevronRight } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { fetchLinkedEvents, type LinkedEvent } from "@/app/lib/linked-events";
 import ViewEventModal from "@/components/event/ViewEventModal";
+import EntityFollowButton from "@/components/follow/EntityFollowButton";
 
 type ViewEventModalEvent = NonNullable<
   React.ComponentProps<typeof ViewEventModal>["event"]
@@ -115,13 +116,16 @@ const ClubViewModal: React.FC<ClubViewModalProps> = ({
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <EntityFollowButton type="club" entityId={clubId} />
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">

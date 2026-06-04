@@ -31,6 +31,12 @@ const sportSchema = new mongoose.Schema(
             mimeType: { type: String },
             size: { type: Number },
         },
+        coachBadge: {
+            path: { type: String },
+            originalName: { type: String },
+            mimeType: { type: String },
+            size: { type: Number },
+        },
     },
     { timestamps: true }
 );

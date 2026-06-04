@@ -22,6 +22,12 @@ interface Sport {
     mimeType: string;
     size: number;
   } | null;
+  coachBadge?: {
+    path: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +106,8 @@ export default function EnumManagement() {
   });
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [coachBadgeFile, setCoachBadgeFile] = useState<File | null>(null);
+  const [coachBadgePreview, setCoachBadgePreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === "sports") {
@@ -287,6 +295,8 @@ export default function EnumManagement() {
     setFormData({ name: "", color: "#000000", checkInOpensHoursBeforeStart: 48 });
     setIconFile(null);
     setIconPreview(null);
+    setCoachBadgeFile(null);
+    setCoachBadgePreview(null);
     setShowSportModal(true);
   };
 
@@ -298,10 +308,16 @@ export default function EnumManagement() {
       checkInOpensHoursBeforeStart: 48,
     });
     setIconFile(null);
+    setCoachBadgeFile(null);
     if (sport.icon?.path) {
       setIconPreview(getImageUrl(sport.icon.path) || null);
     } else {
       setIconPreview(null);
+    }
+    if (sport.coachBadge?.path) {
+      setCoachBadgePreview(getImageUrl(sport.coachBadge.path) || null);
+    } else {
+      setCoachBadgePreview(null);
     }
     setShowSportModal(true);
   };
@@ -325,6 +341,27 @@ export default function EnumManagement() {
   const removeIcon = () => {
     setIconFile(null);
     setIconPreview(null);
+  };
+
+  const handleCoachBadgeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.match(/image\/(png|jpg|jpeg)/)) {
+        setError("Allowed file types: png, jpg, jpeg");
+        return;
+      }
+      setCoachBadgeFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCoachBadgePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeCoachBadge = () => {
+    setCoachBadgeFile(null);
+    setCoachBadgePreview(null);
   };
 
   const handleDeleteSport = async (sportId: string) => {
@@ -364,6 +401,9 @@ export default function EnumManagement() {
       if (iconFile) {
         formDataToSend.append("icon", iconFile);
       }
+      if (coachBadgeFile) {
+        formDataToSend.append("coachBadge", coachBadgeFile);
+      }
 
       const res = await apiFetch(url, {
         method: editingSport ? "PUT" : "POST",
@@ -376,6 +416,8 @@ export default function EnumManagement() {
         setShowSportModal(false);
         setIconFile(null);
         setIconPreview(null);
+        setCoachBadgeFile(null);
+        setCoachBadgePreview(null);
         if (selectedGroup) {
           fetchSports(selectedGroup);
         }
@@ -1204,6 +1246,36 @@ export default function EnumManagement() {
                 />
                 <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                   Upload an icon image (PNG, JPG, JPEG). Leave empty to keep existing icon or have no icon.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+                  Coach badge
+                </label>
+                {coachBadgePreview && (
+                  <div className="mb-2 relative inline-block">
+                    <img
+                      src={coachBadgePreview}
+                      alt="Coach badge preview"
+                      className="w-16 h-16 object-contain border border-gray-300 dark:border-slate-600 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeCoachBadge}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleCoachBadgeUpload}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Shown on coach profiles for branch 1 of this sport. PNG, JPG, or JPEG.
                 </p>
               </div>
               <div className="flex gap-2">
