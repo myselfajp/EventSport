@@ -83,6 +83,64 @@ const buildFollowsUrl = (params?: FollowParams) => {
   return qs ? `${EP.PARTICIPANT.getFollows}?${qs}` : EP.PARTICIPANT.getFollows;
 };
 
+/** Entity id from a follow list row (matches API populated refs). */
+export function getFollowEntryEntityId(type: FollowType, entry: any): string {
+  if (!entry) return "";
+  if (type === "coach") {
+    return String(
+      entry?.followingCoach?._id ||
+        entry?.followingCoach?.id ||
+        entry?.followingCoach ||
+        entry?.coachId ||
+        ""
+    );
+  }
+  if (type === "facility") {
+    return String(
+      entry?.followingFacility?._id ||
+        entry?.followingFacility?.id ||
+        entry?.followingFacility ||
+        entry?.facilityId ||
+        ""
+    );
+  }
+  if (type === "company") {
+    return String(
+      entry?.followingCompany?._id ||
+        entry?.followingCompany?.id ||
+        entry?.followingCompany ||
+        entry?.companyId ||
+        ""
+    );
+  }
+  if (type === "club") {
+    return String(
+      entry?.followingClub?._id ||
+        entry?.followingClub?.id ||
+        entry?.followingClub ||
+        entry?.clubId ||
+        ""
+    );
+  }
+  return String(
+    entry?.followingClubGroup?._id ||
+      entry?.followingClubGroup?.id ||
+      entry?.followingClubGroup ||
+      entry?.groupId ||
+      ""
+  );
+}
+
+export function isEntityFollowedInList(
+  grouped: Record<FollowType, any[]> | undefined,
+  type: FollowType,
+  entityId?: string | null
+): boolean {
+  if (!entityId || !grouped) return false;
+  const list = grouped[type] || [];
+  return list.some((entry) => getFollowEntryEntityId(type, entry) === entityId);
+}
+
 const detectType = (item: any): FollowType | null => {
   const raw = item?.followingType;
   if (raw && typeof raw === "string") {

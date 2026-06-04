@@ -41,6 +41,8 @@ const notificationSchema = new mongoose.Schema(
                 'event_starts_soon_2h',
                 'reservation_event_updated',
                 'reservation_event_cancelled',
+                'liked_event_updated',
+                'liked_event_cancelled',
                 'waitlist_promoted',
                 // Check-in reminders
                 'check_in_opens_reminder_24h',

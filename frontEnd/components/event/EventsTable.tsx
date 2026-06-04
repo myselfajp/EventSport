@@ -175,7 +175,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
     e.stopPropagation();
     if (!eventItem?._id) return;
     if (!canFavorite) {
-      alert("Create a gamer profile to add favorites.");
+      alert("Create a gamer profile to like events.");
       return;
     }
     const animKey = `event-${eventItem._id}`;
@@ -635,8 +635,8 @@ const EventsTable: React.FC<EventsTableProps> = ({
                         <button
                           aria-label={
                             isFavorited(favorites, "event", event._id)
-                              ? "Favorited"
-                              : "Add to favorites"
+                              ? "Unlike"
+                              : "Like event"
                           }
                           onClick={(e) => handleFavoriteEvent(e, event)}
                           disabled={

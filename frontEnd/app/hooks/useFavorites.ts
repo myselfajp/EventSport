@@ -178,14 +178,15 @@ const removeFromFavorites = (
   return result;
 };
 
-export function useFavorites() {
+export function useFavorites(options?: { eventsOnly?: boolean }) {
   const { data: user } = useMe();
+  const eventsOnly = options?.eventsOnly === true;
 
   return useQuery({
-    queryKey: ["favorites", user?._id],
+    queryKey: ["favorites", user?._id, eventsOnly ? "event" : "all"],
     queryFn: async () => {
       const params = new URLSearchParams({
-        type: "all",
+        type: eventsOnly ? "event" : "all",
         page: "1",
         limit: "100",
         sort: "-createdAt",
@@ -267,9 +268,19 @@ export function useAddFavorite() {
       }));
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["favorites", user?._id] });
+      invalidateLikeQueries(queryClient, user?._id);
     },
   });
+}
+
+function invalidateLikeQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  userId?: string
+) {
+  if (!userId) return;
+  queryClient.invalidateQueries({ queryKey: ["favorites", userId] });
+  queryClient.invalidateQueries({ queryKey: ["favorites", userId, "event"] });
+  queryClient.invalidateQueries({ queryKey: ["favorites", userId, "all"] });
 }
 
 export function useRemoveFavorite() {
@@ -319,9 +330,18 @@ export function useRemoveFavorite() {
       }));
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["favorites", user?._id] });
+      invalidateLikeQueries(queryClient, user?._id);
     },
   });
+}
+
+/** Event likes only (same API as favorites with type=event). */
+export function useEventLikes() {
+  return useFavorites({ eventsOnly: true });
+}
+
+export function isEventLiked(favorites: any, eventId: string): boolean {
+  return isFavorited(favorites, "event", eventId);
 }
 
 export function isFavorited(

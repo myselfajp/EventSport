@@ -262,6 +262,46 @@ export const notifyReservationEventUpdated = async ({
     });
 };
 
+export const notifyLikedEventCancelled = async ({
+    userIds,
+    eventId,
+    eventName,
+}) => {
+    if (!userIds?.length) return null;
+    return createNotification({
+        scope: 'group',
+        type: 'liked_event_cancelled',
+        title: 'Liked event cancelled',
+        message: `"${eventName}" was cancelled. You had liked this event.`,
+        data: { eventId, eventName },
+        targetUsers: userIds,
+        priority: 'high',
+        icon: 'x-circle',
+        actionUrl: eventActionUrl(eventId),
+    });
+};
+
+export const notifyLikedEventUpdated = async ({
+    userIds,
+    eventId,
+    eventName,
+    changeSummary,
+}) => {
+    if (!userIds?.length) return null;
+    const detail = changeSummary ? ` ${changeSummary}` : '';
+    return createNotification({
+        scope: 'group',
+        type: 'liked_event_updated',
+        title: 'Liked event updated',
+        message: `"${eventName}" was updated.${detail}`,
+        data: { eventId, eventName, changeSummary },
+        targetUsers: userIds,
+        priority: 'normal',
+        icon: 'star',
+        actionUrl: eventActionUrl(eventId),
+    });
+};
+
 export const notifyWaitlistPromoted = async ({
     userId,
     eventId,

@@ -6,6 +6,7 @@ import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { Company } from "@/app/lib/types";
 import { getCompanyTypeLabel } from "@/app/lib/company-types";
+import EntityFollowButton from "@/components/follow/EntityFollowButton";
 
 interface CompanyDetailsModalProps {
   isOpen: boolean;
@@ -23,6 +24,8 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US");
   };
+
+  const companyId = company?._id ? String(company._id) : "";
 
   if (!isOpen) return null;
 
@@ -71,6 +74,9 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                   <p className="text-sm text-gray-500 dark:text-gray-500">
                     Added {formatDate(company.createdAt)}
                   </p>
+                  <div className="mt-3">
+                    <EntityFollowButton type="company" entityId={companyId} />
+                  </div>
                 </div>
               </div>
 
