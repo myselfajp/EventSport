@@ -35,6 +35,7 @@ import {
   SportResponse,
 } from "@/app/lib/types";
 import UserProfileModal from "../UserProfileModal";
+import CoachDetailModal from "../CoachDetailModal";
 import FacilityDetailsModal from "./FacilityDetailsModal";
 import CompanyDetailsModal from "./CompanyDetailsModal";
 import ClubViewModal from "../ClubViewModal";
@@ -76,6 +77,32 @@ type SearchType =
   | "club"
   | "group";
 
+const SEARCH_TYPE_LABELS: Record<
+  SearchType,
+  { singular: string; plural: string; placeholder: string }
+> = {
+  coach: { singular: "Coach", plural: "coaches", placeholder: "coach" },
+  participant: { singular: "Gamer", plural: "gamers", placeholder: "gamer" },
+  facility: {
+    singular: "Facility",
+    plural: "facilities",
+    placeholder: "facility",
+  },
+  company: { singular: "Company", plural: "companies", placeholder: "company" },
+  club: { singular: "Club", plural: "clubs", placeholder: "club" },
+  group: {
+    singular: "Community",
+    plural: "communities",
+    placeholder: "community",
+  },
+};
+
+function getSearchTypeLabel(type: SearchType, plural = false) {
+  return plural
+    ? SEARCH_TYPE_LABELS[type].plural
+    : SEARCH_TYPE_LABELS[type].singular;
+}
+
 const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   const [selectedType, setSelectedType] = useState<SearchType>("coach");
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,6 +122,10 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     "coach" | "participant"
   >("coach");
   const [showProfile, setShowProfile] = useState(false);
+  const [selectedCoachProfileId, setSelectedCoachProfileId] = useState<
+    string | null
+  >(null);
+  const [showCoachProfile, setShowCoachProfile] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(
     null
@@ -633,11 +664,11 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
           perPage: response.pagination?.perPage || 5,
         });
       } else {
-        setError(response?.message || "Failed to search groups");
+        setError(response?.message || "Failed to search communities");
         setSearchResults([]);
       }
     } catch (err) {
-      setError("An error occurred while searching groups");
+      setError("An error occurred while searching communities");
       setSearchResults([]);
       console.error("Error searching groups:", err);
     } finally {
@@ -914,8 +945,14 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     userId: string,
     context?: "coach" | "participant"
   ) => {
+    const ctx = context || "coach";
+    if (ctx === "coach") {
+      setSelectedCoachProfileId(userId);
+      setShowCoachProfile(true);
+      return;
+    }
     setSelectedUserId(userId);
-    setSelectedUserContext(context || "coach");
+    setSelectedUserContext(ctx);
     setShowProfile(true);
   };
 
@@ -943,6 +980,11 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     setShowProfile(false);
     setSelectedUserId(null);
     setSelectedUserContext("coach");
+  };
+
+  const handleCloseCoachProfile = () => {
+    setShowCoachProfile(false);
+    setSelectedCoachProfileId(null);
   };
 
   const handleCloseFacilityDetails = () => {
@@ -980,6 +1022,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     setShowProfile(false);
     setSelectedUserId(null);
     setSelectedUserContext("coach");
+    setShowCoachProfile(false);
+    setSelectedCoachProfileId(null);
     setHasSearched(false);
     setSportGroupFilter("");
     setSportFilter("");
@@ -1171,7 +1215,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                     selectedType === "group" ? "text-cyan-300" : "text-gray-400"
                   }`}
                 >
-                  Group
+                  Community
                 </span>
               </button>
             </div>
@@ -1180,15 +1224,14 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
           {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Search{" "}
-              {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}
+              Search {getSearchTypeLabel(selectedType)}
             </label>
             <div className="relative">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Enter ${selectedType} name...`}
+                placeholder={`Enter ${SEARCH_TYPE_LABELS[selectedType].placeholder} name...`}
                 className="w-full px-4 py-3 pr-12 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
               />
               <button
@@ -1293,7 +1336,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <Search className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p className="text-sm">
-                  No {selectedType}s found for "{searchQuery}"
+                  No {getSearchTypeLabel(selectedType, true)} found for "
+                  {searchQuery}"
                 </p>
               </div>
             ) : searchResults.length === 0 ? (
@@ -1301,8 +1345,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                 <Search className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p className="text-sm">
                   {hasSearched
-                    ? `No ${selectedType}s found for your search`
-                    : `Loading ${selectedType}s...`}
+                    ? `No ${getSearchTypeLabel(selectedType, true)} found for your search`
+                    : `Loading ${getSearchTypeLabel(selectedType, true)}...`}
                 </p>
               </div>
             ) : (
@@ -1864,12 +1908,18 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
 
-      {/* User Profile Modal */}
+      {/* Gamer profile (Find → Gamer) */}
       <UserProfileModal
         isOpen={showProfile}
         onClose={handleCloseUserProfile}
         userId={selectedUserId}
         context={selectedUserContext}
+      />
+
+      <CoachDetailModal
+        isOpen={showCoachProfile}
+        onClose={handleCloseCoachProfile}
+        coachId={selectedCoachProfileId}
       />
 
       {/* Facility Details Modal */}

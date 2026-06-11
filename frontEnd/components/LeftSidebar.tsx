@@ -11,6 +11,7 @@ interface LeftSidebarProps {
   gamerProfileOpenSignal?: number;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
+  onShowActivity?: () => void;
 }
 
 // Fake user credentials for testing
@@ -66,6 +67,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   gamerProfileOpenSignal = 0,
   onShowFollowings,
   onShowFavorites,
+  onShowActivity,
 }) => {
   const { data: user, isLoading: userLoading } = useMe();
   const { mutate: signOut } = useSignOut();
@@ -101,6 +103,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
           gamerProfileOpenSignal={gamerProfileOpenSignal}
           onShowFollowings={onShowFollowings}
           onShowFavorites={onShowFavorites}
+          onShowActivity={onShowActivity}
           initialFacilities={
             FAKE_USER.facility
               ? DUMMY_FACILITIES.filter((f) =>

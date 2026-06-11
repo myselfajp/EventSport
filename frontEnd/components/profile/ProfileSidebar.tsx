@@ -58,6 +58,7 @@ import UserProfileModal from "@/components/UserProfileModal";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
 import UserEditModal from "./UserEditModal";
+import SettingsModal from "@/components/settings/SettingsModal";
 import { EP } from "@/app/lib/endpoints";
 import { primaryBranchCoachBadgeUrl } from "@/app/lib/coach-badge-utils";
 import { useFavorites } from "@/app/hooks/useFavorites";
@@ -69,6 +70,7 @@ interface ProfileSidebarProps {
   gamerProfileOpenSignal?: number;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
+  onShowActivity?: () => void;
   initialFacilities?: any[];
   initialCompanies?: any[];
 }
@@ -78,6 +80,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   gamerProfileOpenSignal = 0,
   onShowFollowings,
   onShowFavorites,
+  onShowActivity,
   initialFacilities = [],
   initialCompanies = [],
 }) => {
@@ -95,6 +98,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isGroupsListOpen, setIsGroupsListOpen] = useState(false);
   const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
 
   const { data: allFacilities = [] } = useQuery({
@@ -774,12 +778,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
   return (
     <div className="h-full overflow-y-auto p-4 sm:p-6 flex flex-col">
-      <div className="flex items-center justify-between mb-6 sm:mb-8">
-        <h1 className="text-lg sm:text-xl font-bold text-cyan-500">
-          Events Dashboard
-        </h1>
-      </div>
-
       <div className="flex flex-col items-center mb-6 sm:mb-8">
         <div className="relative group">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center mb-3 overflow-hidden bg-gray-100 dark:bg-gray-700">
@@ -905,11 +903,17 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
         <button
           type="button"
-          disabled
-          className={`${quickActionCard} opacity-50 cursor-not-allowed hover:bg-white dark:hover:bg-gray-800`}
-          title="Activity — coming soon"
+          onClick={() => {
+            if (onShowActivity) {
+              onShowActivity();
+            } else {
+              router.push("/activity");
+            }
+          }}
+          className={quickActionCard}
+          title="Activity"
         >
-          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-violet-500 shrink-0" />
           <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
             Activity
           </span>
@@ -963,11 +967,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
         <button
           type="button"
-          disabled
-          className={`${quickActionCard} opacity-50 cursor-not-allowed hover:bg-white dark:hover:bg-gray-800`}
-          title="Settings — coming soon"
+          onClick={() => setIsSettingsModalOpen(true)}
+          className={quickActionCard}
+          title="Settings"
         >
-          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 shrink-0" />
+          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300 shrink-0" />
           <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
             Settings
           </span>
@@ -1816,6 +1820,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       <UserEditModal
         isOpen={isUserEditModalOpen}
         onClose={() => setIsUserEditModalOpen(false)}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
     </div>
   );

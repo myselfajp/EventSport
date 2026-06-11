@@ -10,6 +10,7 @@ import {
     signupSchema,
     sendRegistrationOtpSchema,
     editUserSchema,
+    accountSettingsSchema,
 } from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
 import { generateTokens, sendTokens } from '../utils/jwtHelper.js';
@@ -494,6 +495,55 @@ export const editUser = async (req, res, next) => {
             success: true,
             message: PasswordChanged ? 'Password changed successfully' : 'Data updated',
             data: editUser,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateAccountSettings = async (req, res, next) => {
+    try {
+        if (!req.user) throw new AppError(401);
+
+        const { marketingConsent, commercialMessagesVersionId } =
+            accountSettingsSchema.parse(req.body);
+
+        if (marketingConsent) {
+            const cmDoc = await LegalDocument.findById(commercialMessagesVersionId).lean();
+            if (!cmDoc || cmDoc.docType !== 'commercial_messages' || !cmDoc.isActive) {
+                throw new AppError(400, 'Invalid or inactive commercial messages consent version.');
+            }
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $set: {
+                    marketingConsent: {
+                        agreed: marketingConsent,
+                        consentedAt: marketingConsent ? new Date() : null,
+                    },
+                },
+            },
+            { new: true }
+        )
+            .select('-__v -password')
+            .populate({ path: 'location.district', select: 'name' });
+
+        if (!updatedUser) throw new AppError(404, 'Kullanıcı bulunamadı.');
+
+        if (marketingConsent && commercialMessagesVersionId) {
+            await recordLegalAcceptance(req, req.user._id, {
+                versionId: commercialMessagesVersionId,
+                expectedDocType: 'commercial_messages',
+                context: 'marketing',
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Settings updated',
+            data: updatedUser,
         });
     } catch (err) {
         next(err);

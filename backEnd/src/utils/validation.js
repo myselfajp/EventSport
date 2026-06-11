@@ -345,6 +345,23 @@ export const editUserSchema = z
         }
     );
 
+export const accountSettingsSchema = z
+    .object({
+        marketingConsent: z.boolean({
+            error: () => ({ message: 'marketingConsent must be true or false.' }),
+        }),
+        commercialMessagesVersionId: mongoObjectId.optional(),
+    })
+    .superRefine((data, ctx) => {
+        if (data.marketingConsent && !data.commercialMessagesVersionId) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'commercialMessagesVersionId is required when enabling marketing consent.',
+                path: ['commercialMessagesVersionId'],
+            });
+        }
+    });
+
 /** Admin-only user updates (includes role, active flag, permission groups). */
 export const adminEditUserSchema = z
     .object({

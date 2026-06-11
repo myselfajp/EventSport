@@ -15,8 +15,10 @@ import {
   Pencil,
   Share2,
   Ban,
+  Users,
 } from "lucide-react";
 import AddEventModal from "@/components/event/AddEventModal";
+import EventParticipantsModal from "@/components/event/EventParticipantsModal";
 import ShareEventDialog from "@/components/event/ShareEventDialog";
 import type { EventSharePayload } from "@/app/lib/event-share";
 import { EP } from "@/app/lib/endpoints";
@@ -89,6 +91,7 @@ interface Event {
   endTime: string;
   createdAt: string;
   capacity?: number;
+  participantCount?: number;
   level?: number;
   type?: string;
   priceType?: string;
@@ -238,6 +241,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   const [endPhotosGallery, setEndPhotosGallery] = useState<EndPhotoGalleryItem[]>([]);
   const [loadingEndPhotos, setLoadingEndPhotos] = useState(false);
   const [galleryLightboxUrl, setGalleryLightboxUrl] = useState<string | null>(null);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   // Calculate if within deadline (less than 2 days to event start)
   const isFreeEvent = event?.priceType === 'Free';
@@ -1676,6 +1680,21 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   )}
                 </button>
               )}
+              {isOwner && event?._id && (
+                <button
+                  type="button"
+                  onClick={() => setShowParticipantsModal(true)}
+                  className="px-4 py-2.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <Users className="w-4 h-4" />
+                  Participants
+                  {event.participantCount !== undefined && (
+                    <span className="text-xs font-semibold">
+                      ({event.participantCount})
+                    </span>
+                  )}
+                </button>
+              )}
               {canEditEvent && (
                 <button
                   type="button"
@@ -1730,6 +1749,13 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
         isOpen={showShareDialog}
         onClose={() => setShowShareDialog(false)}
         payload={sharePayload}
+      />
+
+      <EventParticipantsModal
+        isOpen={showParticipantsModal}
+        onClose={() => setShowParticipantsModal(false)}
+        eventId={event?._id ? String(event._id) : null}
+        eventName={event?.name}
       />
 
       {showCancelScopeModal && (

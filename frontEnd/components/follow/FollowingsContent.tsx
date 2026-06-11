@@ -20,7 +20,7 @@ import {
 } from "@/app/hooks/useFollows";
 import { useMe } from "@/app/hooks/useAuth";
 import { EP } from "@/app/lib/endpoints";
-import UserProfileModal from "@/components/UserProfileModal";
+import CoachDetailModal from "@/components/CoachDetailModal";
 import FacilityDetailsModal from "@/components/profile/FacilityDetailsModal";
 import CompanyDetailsModal from "@/components/profile/CompanyDetailsModal";
 import ClubViewModal from "@/components/ClubViewModal";
@@ -514,11 +514,10 @@ const FollowingsContent: React.FC = () => {
         onClose={() => setSelectedGroup(null)}
         group={selectedGroup}
       />
-      <UserProfileModal
+      <CoachDetailModal
         isOpen={!!selectedCoachId}
         onClose={() => setSelectedCoachId(null)}
-        userId={selectedCoachId}
-        context="coach"
+        coachId={selectedCoachId}
       />
     </div>
   );
