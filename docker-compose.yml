@@ -94,6 +94,8 @@ services:
 
 volumes:
   mongodb_data:
+    external: true
+    name: eventsport_mongodb_data_prod
 
 networks:
   eventsport_network:

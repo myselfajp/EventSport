@@ -91,6 +91,11 @@ export function formatCheckInCountdown(
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
+  if (hours > 72) {
+    const days = Math.ceil(hours / 24);
+    return `Opens in ${days} day${days === 1 ? "" : "s"}`;
+  }
+
   if (hours > 0 && minutes > 0) return `Opens in ${hours}h ${minutes}m`;
   if (hours > 0) return `Opens in ${hours}h`;
   if (minutes > 0) return `Opens in ${minutes}m`;

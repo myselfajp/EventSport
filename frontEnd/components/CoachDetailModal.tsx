@@ -241,10 +241,16 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isOwnProfile =
+    !!currentUser?._id &&
+    !!data?.user?._id &&
+    currentUser._id === data.user._id;
   const isGamerViewer =
     !!currentUser?.participant &&
     !!data?.user?._id &&
-    currentUser._id !== data.user._id;
+    !isOwnProfile;
+  const canViewCoachCalendar =
+    !!currentUser && !!data?.user?._id && !isOwnProfile;
 
   const followerCount = followStats?.followerCount ?? 0;
   const followerLabel = followerCount === 1 ? "follower" : "followers";
@@ -365,9 +371,9 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                       )}
                     </div>
 
-                    {(isGamerViewer || !!currentUser) && (
+                    {(canViewCoachCalendar || isGamerViewer || !!currentUser) && (
                       <div className="mt-4 flex flex-wrap items-center gap-2">
-                        {isGamerViewer && (
+                        {canViewCoachCalendar && (
                           <button
                             type="button"
                             onClick={() => setShowCoachCalendar(true)}

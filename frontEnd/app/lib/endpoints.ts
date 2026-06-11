@@ -83,6 +83,7 @@ export const EP = {
     signOut: `${AUTH_API}/sign-out`,
     me: `${AUTH_API}/get-current-user`,
     editUser: `${AUTH_API}/edit-user`,
+    accountSettings: `${AUTH_API}/account-settings`,
     getUsers: `${AUTH_API}/get-user`,
     getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,
   },

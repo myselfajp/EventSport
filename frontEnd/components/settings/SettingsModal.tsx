@@ -1,0 +1,212 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Loader2, Mail, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMe } from "@/app/hooks/useAuth";
+import { apiFetch } from "@/app/lib/api";
+import { EP } from "@/app/lib/endpoints";
+import LegalContentModal from "@/components/auth/LegalContentModal";
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+type CommercialDoc = {
+  _id: string;
+  title: string;
+  content: string;
+};
+
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  const { data: user } = useMe();
+  const queryClient = useQueryClient();
+
+  const [promotionalEmails, setPromotionalEmails] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [activeCommercialMessages, setActiveCommercialMessages] =
+    useState<CommercialDoc | null>(null);
+  const [loadingLegal, setLoadingLegal] = useState(false);
+  const [legalModal, setLegalModal] = useState<CommercialDoc | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setPromotionalEmails(Boolean(user?.marketingConsent?.agreed));
+    setError("");
+  }, [isOpen, user?.marketingConsent?.agreed]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const load = async () => {
+      setLoadingLegal(true);
+      try {
+        const res = await fetch(
+          EP.LEGAL.getActive("commercial_messages"),
+          { credentials: "include" }
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!cancelled && body?.success && body?.data) {
+          setActiveCommercialMessages(body.data as CommercialDoc);
+        } else if (!cancelled) {
+          setActiveCommercialMessages(null);
+        }
+      } catch {
+        if (!cancelled) setActiveCommercialMessages(null);
+      } finally {
+        if (!cancelled) setLoadingLegal(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  const persistMarketingConsent = async (nextValue: boolean) => {
+    if (!user) return;
+    if (nextValue && !activeCommercialMessages?._id) {
+      setError(
+        "Commercial messages consent is not available until an active text is published in Admin → Legal."
+      );
+      return;
+    }
+
+    const previous = promotionalEmails;
+    setPromotionalEmails(nextValue);
+    setSaving(true);
+    setError("");
+
+    try {
+      const payload: Record<string, unknown> = {
+        marketingConsent: nextValue,
+      };
+      if (nextValue && activeCommercialMessages?._id) {
+        payload.commercialMessagesVersionId = activeCommercialMessages._id;
+      }
+
+      const res = await apiFetch(EP.AUTH.accountSettings, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        throw new Error(
+          body?.message || body?.error || "Failed to update settings"
+        );
+      }
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    } catch (err) {
+      setPromotionalEmails(previous);
+      setError(
+        err instanceof Error ? err.message : "Failed to update settings"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            Settings
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            aria-label="Close settings"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {error ? (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          ) : null}
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
+              Communications
+            </p>
+
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40">
+              <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-900/30 shrink-0">
+                <Mail className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Promotional emails
+                  </p>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={promotionalEmails}
+                    disabled={saving || loadingLegal || (!promotionalEmails && !activeCommercialMessages)}
+                    onClick={() => void persistMarketingConsent(!promotionalEmails)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      promotionalEmails
+                        ? "bg-cyan-500"
+                        : "bg-gray-300 dark:bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        promotionalEmails ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                    {saving ? (
+                      <Loader2 className="absolute -right-7 w-4 h-4 animate-spin text-cyan-500" />
+                    ) : null}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                  Receive event updates, offers, and announcements by email.
+                </p>
+                {activeCommercialMessages ? (
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal(activeCommercialMessages)}
+                    className="text-xs text-cyan-600 dark:text-cyan-400 underline mt-2"
+                  >
+                    View commercial messages policy
+                  </button>
+                ) : loadingLegal ? (
+                  <p className="text-xs text-gray-400 mt-2">Loading policy…</p>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                    Opt-in unavailable until a commercial messages text is published.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {legalModal ? (
+        <LegalContentModal
+          title={legalModal.title}
+          content={legalModal.content}
+          onClose={() => setLegalModal(null)}
+        />
+      ) : null}
+    </div>
+  );
+};
+
+export default SettingsModal;

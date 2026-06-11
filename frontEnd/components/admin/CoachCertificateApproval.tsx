@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
-import UserProfileModal from "../UserProfileModal";
+import CoachDetailModal from "../CoachDetailModal";
 
 interface Branch {
   _id: string;
@@ -430,11 +430,10 @@ export default function CoachCertificateApproval() {
         </div>
       )}
 
-      <UserProfileModal
+      <CoachDetailModal
         isOpen={!!profileUserId}
         onClose={() => setProfileUserId(null)}
-        userId={profileUserId}
-        context="coach"
+        coachId={profileUserId}
       />
     </div>
   );

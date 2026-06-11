@@ -11,6 +11,7 @@ import EventsTable from "./event/EventsTable";
 import CoachCalendar from "./CoachCalendar";
 import FollowingsView from "./follow/FollowingsView";
 import FavoritesView from "./favorite/FavoritesView";
+import ActivityView from "./activity/ActivityView";
 import SportsBanner from "./SportsBanner";
 import StaticPageView from "./StaticPageView";
 import AddEventModal from "./event/AddEventModal";
@@ -38,6 +39,7 @@ const EventsDashboard = () => {
   const [showCoachCalendar, setShowCoachCalendar] = useState(false);
   const [showFollowings, setShowFollowings] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const [selectedStaticPageName, setSelectedStaticPageName] = useState<string | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const [heroSlides, setHeroSlides] = useState<DashboardHeroSlideDTO[]>([]);
@@ -267,13 +269,22 @@ const EventsDashboard = () => {
         onShowFollowings={() => {
           setShowCoachCalendar(false);
           setShowFavorites(false);
+          setShowActivity(false);
           setShowFollowings(true);
           setLeftSidebarOpen(false);
         }}
         onShowFavorites={() => {
           setShowCoachCalendar(false);
           setShowFollowings(false);
+          setShowActivity(false);
           setShowFavorites(true);
+          setLeftSidebarOpen(false);
+        }}
+        onShowActivity={() => {
+          setShowCoachCalendar(false);
+          setShowFollowings(false);
+          setShowFavorites(false);
+          setShowActivity(true);
           setLeftSidebarOpen(false);
         }}
       />
@@ -309,21 +320,25 @@ const EventsDashboard = () => {
             {!showCoachCalendar &&
               !showFollowings &&
               !showFavorites &&
+              !showActivity &&
               !selectedStaticPageName && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
                     <YourNextEventSection />
+                    <NearbyEventsSection
+                      districtId={userDistrictId}
+                      districtName={userDistrictName}
+                    />
                     <HotUpcomingSection />
                     <CheckInTimesSection />
                   </div>
-                  <NearbyEventsSection
-                    districtId={userDistrictId}
-                    districtName={userDistrictName}
-                  />
                 </div>
               )}
 
-            {!showCoachCalendar && !showFollowings && !showFavorites && (
+            {!showCoachCalendar &&
+              !showFollowings &&
+              !showFavorites &&
+              !showActivity && (
               <SportsBanner
                 selectedSportId={filters.sport}
                 onSportClick={handleSportFilter}
@@ -338,6 +353,8 @@ const EventsDashboard = () => {
                 <FollowingsView onBack={() => setShowFollowings(false)} />
               ) : showFavorites ? (
                 <FavoritesView onBack={() => setShowFavorites(false)} />
+              ) : showActivity ? (
+                <ActivityView onBack={() => setShowActivity(false)} />
               ) : selectedStaticPageName ? (
                 <StaticPageView
                   pageName={selectedStaticPageName}

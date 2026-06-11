@@ -1461,13 +1461,13 @@ async function resolveCoachProfileContext(idParam) {
 
     if (coach) {
         user = await User.findOne({ coach: coach._id }).select(
-            '-email -phone -isEmailVerified -isPhoneVerified'
+            '-password -isEmailVerified -isPhoneVerified'
         );
         return { coach, user };
     }
 
     user = await User.findById(parsedId).select(
-        '-email -phone -isEmailVerified -isPhoneVerified'
+        '-password -isEmailVerified -isPhoneVerified'
     );
     if (!user?.coach) {
         throw new AppError(404, 'Coach not found');

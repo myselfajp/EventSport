@@ -288,7 +288,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
               className="bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
-              Add Event
+              Create Event
             </button>
           ) : null}
         </div>
@@ -624,7 +624,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                       className="bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors mx-auto"
                     >
                       <Plus className="w-4 h-4" />
-                      Add Event
+                      Create Event
                     </button>
                   )}
                 </div>
