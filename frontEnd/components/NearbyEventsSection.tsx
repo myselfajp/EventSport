@@ -8,6 +8,7 @@ import ViewEventModal from "@/components/event/ViewEventModal";
 import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
 import HorizontalEventScroller from "@/components/dashboard/HorizontalEventScroller";
 import EventCardTimes from "@/components/dashboard/EventCardTimes";
+import EventCardThumbnail from "@/components/dashboard/EventCardThumbnail";
 import type { CheckInEventRef } from "@/app/lib/event-dashboard-utils";
 
 const MAX_NEARBY_EVENTS = 8;
@@ -22,6 +23,8 @@ type NearbyEvent = CheckInEventRef & {
   district?: DistrictRef | string;
   sport?: { name?: string };
   facility?: { name?: string };
+  photo?: { path?: string };
+  banner?: { path?: string };
 };
 
 type NearbyEventsSectionProps = {
@@ -32,7 +35,7 @@ type NearbyEventsSectionProps = {
 };
 
 const COLUMN_CARD_CLASS =
-  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all group";
+  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all group flex flex-row gap-3 items-start";
 
 const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
   districtId,
@@ -149,20 +152,27 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
                   onClick={() => openEvent(event)}
                   className={COLUMN_CARD_CLASS}
                 >
-                  <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-cyan-700 dark:group-hover:text-cyan-300">
-                    {event.name}
-                  </p>
-                  {event.sport?.name && (
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                      {event.sport.name}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-cyan-700 dark:group-hover:text-cyan-300">
+                      {event.name}
                     </p>
-                  )}
-                  <EventCardTimes event={event} />
-                  {event.facility?.name && (
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
-                      {event.facility.name}
-                    </p>
-                  )}
+                    {event.sport?.name && (
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                        {event.sport.name}
+                      </p>
+                    )}
+                    <EventCardTimes event={event} />
+                    {event.facility?.name && (
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
+                        {event.facility.name}
+                      </p>
+                    )}
+                  </div>
+                  <EventCardThumbnail
+                    photo={event.photo}
+                    banner={event.banner}
+                    alt={event.name}
+                  />
                 </button>
               ))}
             </HorizontalEventScroller>
