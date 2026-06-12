@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { FOOTER_NAV_LINKS } from "@/app/lib/footer-config";
 

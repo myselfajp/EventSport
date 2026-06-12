@@ -1,7 +1,7 @@
 /** Contract categories (English keys). */
 export const CONTRACT_CATEGORIES = ['legal', 'gamer', 'coach'];
 
-export const LEGAL_DOC_TYPES = ['kvkk', 'terms', 'commercial_messages'];
+export const LEGAL_DOC_TYPES = ['kvkk', 'terms', 'commercial_messages', 'cookie_policy'];
 export const GAMER_DOC_TYPES = ['distance_selling', 'event_contract'];
 export const COACH_DOC_TYPES = [
     'coach_agreement',
@@ -27,6 +27,7 @@ export const DEFAULT_TITLES_TR = {
     kvkk: 'KVKK Aydınlatma Metni',
     terms: 'Kullanım Şartları',
     commercial_messages: 'Ticari Elektronik İleti Onayı (IYS)',
+    cookie_policy: 'Çerez Politikası',
     distance_selling: 'Mesafeli Satış Sözleşmesi',
     event_contract: 'Etkinlik Sözleşmesi',
     coach_agreement: 'Antrenör Sözleşmesi',
@@ -65,6 +66,7 @@ export const SOZLESMELER_SECTION_ANCHORS = {
     kvkk: 'kvkk',
     terms: 'terms',
     commercial_messages: 'commercial-messages',
+    cookie_policy: 'cookie-policy',
     distance_selling: 'distance-selling',
     event_contract: 'event-contract',
     coach_agreement: 'coach-agreement',

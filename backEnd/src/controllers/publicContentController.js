@@ -68,7 +68,7 @@ export const getPublicDashboardHeroSlides = async (req, res, next) => {
         const slides = await DashboardHeroSlide.find({ isActive: true })
             .sort({ order: 1, createdAt: -1 })
             .select(
-                'badgeLabel title subtitle image imageAlt ctaLabel ctaHref ctaRequiresAdminRole order'
+                'badgeLabel title subtitle image imageAlt ctaLabel ctaHref ctaRequiresAdminRole order createdAt'
             )
             .lean();
 
@@ -88,6 +88,7 @@ export const getPublicDashboardHeroSlides = async (req, res, next) => {
             ctaHref: row.ctaHref || '',
             ctaRequiresAdminRole: !!row.ctaRequiresAdminRole,
             order: row.order ?? 0,
+            createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
         }));
 
         res.status(200).json({

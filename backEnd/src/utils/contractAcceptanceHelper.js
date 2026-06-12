@@ -137,3 +137,51 @@ export async function recordMarketingConsent(req, userId, agreed, context = 'mar
         ...meta,
     });
 }
+
+function resolveCookieConsentChoice(preferences) {
+    const { functional, analytics, marketing } = preferences;
+    if (functional && analytics && marketing) return 'accept_all';
+    if (!functional && !analytics && !marketing) return 'essential_only';
+    return 'custom';
+}
+
+function cookieConsentTitle(choice) {
+    switch (choice) {
+        case 'accept_all':
+            return 'Cookie consent — Accept all';
+        case 'essential_only':
+            return 'Cookie consent — Essential only';
+        default:
+            return 'Cookie consent — Custom preferences';
+    }
+}
+
+export async function recordCookieConsent(req, userId, preferences, opts = {}) {
+    const { visitorKey = null, consentedAt = new Date() } = opts;
+    const meta = clientMetaFromRequest(req);
+    const choice = resolveCookieConsentChoice(preferences);
+
+    const activePolicy = await LegalDocument.findOne({
+        docType: 'cookie_policy',
+        isActive: true,
+    }).lean();
+
+    return ContractAcceptance.create({
+        user: userId || null,
+        contractKey: 'cookie_consent',
+        source: activePolicy ? 'legal' : 'declaration',
+        title: cookieConsentTitle(choice),
+        legalDocumentId: activePolicy?._id ?? null,
+        version: activePolicy?.version ?? null,
+        context: 'cookie_consent',
+        acceptedAt: consentedAt instanceof Date ? consentedAt : new Date(consentedAt),
+        visitorKey: visitorKey || undefined,
+        cookiePreferences: {
+            choice,
+            functional: !!preferences.functional,
+            analytics: !!preferences.analytics,
+            marketing: !!preferences.marketing,
+        },
+        ...meta,
+    });
+}
