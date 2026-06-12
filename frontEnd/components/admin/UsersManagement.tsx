@@ -68,7 +68,7 @@ interface User {
   createdAt: string;
 }
 
-type ProfileTab = 'participant' | 'coach' | 'facility';
+type ProfileTab = 'participant' | 'coach' | 'facility' | 'leaderboard';
 
 type ActivityParticipantRow = {
   participantId: string;
@@ -92,11 +92,32 @@ type ActivityCoachRow = {
   lastParticipationAt?: string;
 };
 
+type ActivityFacilityRow = {
+  facilityId: string;
+  facilityName: string;
+  totalParticipations: number;
+  eventCount: number;
+  lastParticipationAt?: string;
+};
+
+type ActivityGroupRow = {
+  groupId: string;
+  groupName: string;
+  clubName?: string;
+  totalParticipations: number;
+  eventCount: number;
+  lastParticipationAt?: string;
+};
+
 type ActivityLeaderboard = {
   topParticipant: ActivityParticipantRow | null;
   topCoach: ActivityCoachRow | null;
+  topFacility: ActivityFacilityRow | null;
+  topGroup: ActivityGroupRow | null;
   participantLeaderboard: ActivityParticipantRow[];
   coachLeaderboard: ActivityCoachRow[];
+  facilityLeaderboard: ActivityFacilityRow[];
+  groupLeaderboard: ActivityGroupRow[];
 };
 
 export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: boolean }) {
@@ -157,16 +178,22 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
 
   useEffect(() => {
     setPage(1);
-    fetchUsers();
+    if (activeTab !== "leaderboard") {
+      fetchUsers();
+    }
   }, [activeTab, search]);
 
   useEffect(() => {
-    fetchUsers();
+    if (activeTab !== "leaderboard") {
+      fetchUsers();
+    }
   }, [page]);
 
   useEffect(() => {
-    fetchActivityLeaderboard();
-  }, []);
+    if (activeTab === "leaderboard") {
+      fetchActivityLeaderboard();
+    }
+  }, [activeTab]);
 
   const fetchUsers = async () => {
     try {
@@ -688,7 +715,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
           <button
             type="button"
             onClick={() => void exportUsersCsv()}
-            disabled={exporting}
+            disabled={exporting || activeTab === "leaderboard"}
             className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-60"
           >
             <Download className="w-4 h-4" />
@@ -744,9 +771,222 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
           >
             Facilities
           </button>
+          <button
+            onClick={() => setActiveTab('leaderboard')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'leaderboard'
+                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            Leaderboard
+          </button>
         </nav>
       </div>
 
+      {activeTab === "leaderboard" ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+                Most Active Gamers
+              </h3>
+              {activityLoading ? (
+                <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  Top {activity?.participantLeaderboard?.length ?? 0}
+                </span>
+              )}
+            </div>
+            {activity?.topParticipant && (
+              <div className="mb-3 rounded border border-emerald-300/70 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 p-2 text-sm">
+                <span className="font-medium">Top participant:</span>{" "}
+                {activity.topParticipant.firstName} {activity.topParticipant.lastName} (
+                {activity.topParticipant.totalParticipations} participations)
+              </div>
+            )}
+            <div className="max-h-56 overflow-auto text-sm">
+              {(activity?.participantLeaderboard || []).map((row, idx) => (
+                <div
+                  key={`${row.userId}-${row.participantId}`}
+                  className="py-2 border-b border-gray-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-gray-900 dark:text-slate-100">
+                      #{idx + 1} {row.firstName} {row.lastName}
+                    </div>
+                    <div className="text-emerald-700 dark:text-emerald-300 font-semibold">
+                      {row.totalParticipations}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    User ID: <code className="select-all">{row.userId}</code>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Last join: {formatDateTime(row.lastParticipationAt)}
+                  </div>
+                </div>
+              ))}
+              {!activityLoading && !activity?.participantLeaderboard?.length && (
+                <div className="text-gray-500 dark:text-slate-400">No participation data yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+                Most Active Coaches
+              </h3>
+              {activityLoading ? (
+                <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  Top {activity?.coachLeaderboard?.length ?? 0}
+                </span>
+              )}
+            </div>
+            {activity?.topCoach && (
+              <div className="mb-3 rounded border border-cyan-300/70 bg-cyan-50 dark:bg-cyan-900/20 dark:border-cyan-800 p-2 text-sm">
+                <span className="font-medium">Top coach:</span>{" "}
+                {activity.topCoach.firstName} {activity.topCoach.lastName} (
+                {activity.topCoach.totalParticipations} participations)
+              </div>
+            )}
+            <div className="max-h-56 overflow-auto text-sm">
+              {(activity?.coachLeaderboard || []).map((row, idx) => (
+                <div
+                  key={`${row.coachUserId}-${row.coachId}`}
+                  className="py-2 border-b border-gray-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-gray-900 dark:text-slate-100">
+                      #{idx + 1} {row.firstName} {row.lastName}
+                    </div>
+                    <div className="text-cyan-700 dark:text-cyan-300 font-semibold">
+                      {row.totalParticipations}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Coach ID: <code className="select-all">{row.coachId}</code>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Events: {row.eventCount} • Last join: {formatDateTime(row.lastParticipationAt)}
+                  </div>
+                </div>
+              ))}
+              {!activityLoading && !activity?.coachLeaderboard?.length && (
+                <div className="text-gray-500 dark:text-slate-400">No coach participation data yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+                Most Active Facilities
+              </h3>
+              {activityLoading ? (
+                <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  Top {activity?.facilityLeaderboard?.length ?? 0}
+                </span>
+              )}
+            </div>
+            {activity?.topFacility && (
+              <div className="mb-3 rounded border border-amber-300/70 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-2 text-sm">
+                <span className="font-medium">Top facility:</span>{" "}
+                {activity.topFacility.facilityName} (
+                {activity.topFacility.totalParticipations} participations)
+              </div>
+            )}
+            <div className="max-h-56 overflow-auto text-sm">
+              {(activity?.facilityLeaderboard || []).map((row, idx) => (
+                <div
+                  key={row.facilityId}
+                  className="py-2 border-b border-gray-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-gray-900 dark:text-slate-100">
+                      #{idx + 1} {row.facilityName}
+                    </div>
+                    <div className="text-amber-700 dark:text-amber-300 font-semibold">
+                      {row.totalParticipations}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Facility ID: <code className="select-all">{row.facilityId}</code>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Events: {row.eventCount} • Last join: {formatDateTime(row.lastParticipationAt)}
+                  </div>
+                </div>
+              ))}
+              {!activityLoading && !activity?.facilityLeaderboard?.length && (
+                <div className="text-gray-500 dark:text-slate-400">No facility participation data yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+                Most Active Groups
+              </h3>
+              {activityLoading ? (
+                <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  Top {activity?.groupLeaderboard?.length ?? 0}
+                </span>
+              )}
+            </div>
+            {activity?.topGroup && (
+              <div className="mb-3 rounded border border-violet-300/70 bg-violet-50 dark:bg-violet-900/20 dark:border-violet-800 p-2 text-sm">
+                <span className="font-medium">Top group:</span>{" "}
+                {activity.topGroup.groupName}
+                {activity.topGroup.clubName ? ` (${activity.topGroup.clubName})` : ""} (
+                {activity.topGroup.totalParticipations} participations)
+              </div>
+            )}
+            <div className="max-h-56 overflow-auto text-sm">
+              {(activity?.groupLeaderboard || []).map((row, idx) => (
+                <div
+                  key={row.groupId}
+                  className="py-2 border-b border-gray-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-gray-900 dark:text-slate-100">
+                      #{idx + 1} {row.groupName}
+                      {row.clubName ? (
+                        <span className="font-normal text-gray-500 dark:text-slate-400">
+                          {" "}
+                          · {row.clubName}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-violet-700 dark:text-violet-300 font-semibold">
+                      {row.totalParticipations}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Group ID: <code className="select-all">{row.groupId}</code>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Events: {row.eventCount} • Last join: {formatDateTime(row.lastParticipationAt)}
+                  </div>
+                </div>
+              ))}
+              {!activityLoading && !activity?.groupLeaderboard?.length && (
+                <div className="text-gray-500 dark:text-slate-400">No group participation data yet.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="flex gap-4">
         <input
           type="text"
@@ -758,104 +998,6 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
           }}
           className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
         />
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-900 dark:text-slate-100">
-              Most Active Gamers
-            </h3>
-            {activityLoading ? (
-              <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
-            ) : (
-              <span className="text-xs text-gray-500 dark:text-slate-400">
-                Top {activity?.participantLeaderboard?.length ?? 0}
-              </span>
-            )}
-          </div>
-          {activity?.topParticipant && (
-            <div className="mb-3 rounded border border-emerald-300/70 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 p-2 text-sm">
-              <span className="font-medium">Top participant:</span>{" "}
-              {activity.topParticipant.firstName} {activity.topParticipant.lastName} (
-              {activity.topParticipant.totalParticipations} participations)
-            </div>
-          )}
-          <div className="max-h-56 overflow-auto text-sm">
-            {(activity?.participantLeaderboard || []).map((row, idx) => (
-              <div
-                key={`${row.userId}-${row.participantId}`}
-                className="py-2 border-b border-gray-200 dark:border-slate-700"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium text-gray-900 dark:text-slate-100">
-                    #{idx + 1} {row.firstName} {row.lastName}
-                  </div>
-                  <div className="text-emerald-700 dark:text-emerald-300 font-semibold">
-                    {row.totalParticipations}
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-slate-400">
-                  User ID: <code className="select-all">{row.userId}</code>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-slate-400">
-                  Last join: {formatDateTime(row.lastParticipationAt)}
-                </div>
-              </div>
-            ))}
-            {!activityLoading && !activity?.participantLeaderboard?.length && (
-              <div className="text-gray-500 dark:text-slate-400">No participation data yet.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-900 dark:text-slate-100">
-              Most Active Coaches
-            </h3>
-            {activityLoading ? (
-              <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
-            ) : (
-              <span className="text-xs text-gray-500 dark:text-slate-400">
-                Top {activity?.coachLeaderboard?.length ?? 0}
-              </span>
-            )}
-          </div>
-          {activity?.topCoach && (
-            <div className="mb-3 rounded border border-cyan-300/70 bg-cyan-50 dark:bg-cyan-900/20 dark:border-cyan-800 p-2 text-sm">
-              <span className="font-medium">Top coach:</span>{" "}
-              {activity.topCoach.firstName} {activity.topCoach.lastName} (
-              {activity.topCoach.totalParticipations} participations)
-            </div>
-          )}
-          <div className="max-h-56 overflow-auto text-sm">
-            {(activity?.coachLeaderboard || []).map((row, idx) => (
-              <div
-                key={`${row.coachUserId}-${row.coachId}`}
-                className="py-2 border-b border-gray-200 dark:border-slate-700"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium text-gray-900 dark:text-slate-100">
-                    #{idx + 1} {row.firstName} {row.lastName}
-                  </div>
-                  <div className="text-cyan-700 dark:text-cyan-300 font-semibold">
-                    {row.totalParticipations}
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-slate-400">
-                  Coach ID: <code className="select-all">{row.coachId}</code>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-slate-400">
-                  Events: {row.eventCount} • Last join: {formatDateTime(row.lastParticipationAt)}
-                </div>
-              </div>
-            ))}
-            {!activityLoading && !activity?.coachLeaderboard?.length && (
-              <div className="text-gray-500 dark:text-slate-400">No coach participation data yet.</div>
-            )}
-          </div>
-        </div>
       </div>
 
       {error && (
@@ -1099,6 +1241,8 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
               Next
             </button>
           </div>
+        </>
+      )}
         </>
       )}
 

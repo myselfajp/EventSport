@@ -217,9 +217,6 @@ const Header: React.FC<HeaderProps> = ({
           >
             <Menu className="w-5 h-5" />
           </button>
-          <h2 className="font-semibold text-gray-800 dark:text-slate-100 text-sm md:text-base">
-            Dashboard
-          </h2>
         </div>
 
         {/* Calendar, Theme Toggle, and Notification buttons */}

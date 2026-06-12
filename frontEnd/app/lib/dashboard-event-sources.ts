@@ -15,6 +15,8 @@ export type DashboardEvent = CheckInEventRef & {
   type?: string;
   sport?: { name?: string };
   facility?: { name?: string; _id?: string };
+  photo?: { path?: string };
+  banner?: { path?: string };
   reservation?: {
     isApproved?: boolean;
     isWaitListed?: boolean;

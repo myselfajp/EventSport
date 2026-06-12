@@ -232,7 +232,7 @@ export const getAllUsers = async (req, res, next) => {
 };
 
 /**
- * Leaderboard for most active participant and coach by joined participation count.
+ * Leaderboard for most active participants, coaches, facilities, and groups by joined participation count.
  */
 export const getUserActivityLeaderboard = async (req, res, next) => {
     try {
@@ -346,13 +346,94 @@ export const getUserActivityLeaderboard = async (req, res, next) => {
             },
         ]);
 
+        const buildVenueLeaderboard = (matchField) =>
+            Reservation.aggregate([
+                { $match: { isJoined: true, event: { $exists: true, $ne: null } } },
+                {
+                    $lookup: {
+                        from: 'events',
+                        localField: 'event',
+                        foreignField: '_id',
+                        as: 'event',
+                    },
+                },
+                { $unwind: '$event' },
+                { $match: { [`event.${matchField}`]: { $exists: true, $ne: null } } },
+                {
+                    $group: {
+                        _id: `$event.${matchField}`,
+                        totalParticipations: { $sum: 1 },
+                        eventIds: { $addToSet: '$event._id' },
+                        lastParticipationAt: { $max: '$updatedAt' },
+                    },
+                },
+                {
+                    $addFields: {
+                        eventCount: { $size: '$eventIds' },
+                    },
+                },
+                { $sort: { totalParticipations: -1, eventCount: -1, lastParticipationAt: -1 } },
+                { $limit: limit },
+            ]);
+
+        const [facilityAgg, groupAgg] = await Promise.all([
+            buildVenueLeaderboard('facility'),
+            buildVenueLeaderboard('group'),
+        ]);
+
+        const facilityIds = facilityAgg.map((row) => row._id);
+        const groupIds = groupAgg.map((row) => row._id);
+
+        const [facilities, groups] = await Promise.all([
+            facilityIds.length
+                ? Facility.find({ _id: { $in: facilityIds } })
+                      .select('name')
+                      .lean()
+                : [],
+            groupIds.length
+                ? ClubGroup.find({ _id: { $in: groupIds } })
+                      .select('name clubName')
+                      .lean()
+                : [],
+        ]);
+
+        const facilityById = new Map(facilities.map((f) => [String(f._id), f]));
+        const groupById = new Map(groups.map((g) => [String(g._id), g]));
+
+        const facilityLeaderboard = facilityAgg.map((row) => {
+            const facility = facilityById.get(String(row._id));
+            return {
+                facilityId: row._id,
+                facilityName: facility?.name || 'Unknown facility',
+                totalParticipations: row.totalParticipations,
+                eventCount: row.eventCount,
+                lastParticipationAt: row.lastParticipationAt,
+            };
+        });
+
+        const groupLeaderboard = groupAgg.map((row) => {
+            const group = groupById.get(String(row._id));
+            return {
+                groupId: row._id,
+                groupName: group?.name || 'Unknown group',
+                clubName: group?.clubName || '',
+                totalParticipations: row.totalParticipations,
+                eventCount: row.eventCount,
+                lastParticipationAt: row.lastParticipationAt,
+            };
+        });
+
         res.status(200).json({
             success: true,
             data: {
                 topParticipant: participantLeaderboard[0] || null,
                 topCoach: coachLeaderboard[0] || null,
+                topFacility: facilityLeaderboard[0] || null,
+                topGroup: groupLeaderboard[0] || null,
                 participantLeaderboard,
                 coachLeaderboard,
+                facilityLeaderboard,
+                groupLeaderboard,
                 limit,
             },
         });

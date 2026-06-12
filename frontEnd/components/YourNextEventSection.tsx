@@ -16,6 +16,7 @@ import {
 } from "@/app/lib/dashboard-event-sources";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
+import EventCardThumbnail from "@/components/dashboard/EventCardThumbnail";
 
 type YourNextEventSectionProps = {
   className?: string;
@@ -110,31 +111,38 @@ const YourNextEventSection: React.FC<YourNextEventSectionProps> = ({
             <button
               type="button"
               onClick={() => setViewOpen(true)}
-              className="flex-1 w-full text-left group flex flex-col p-4 rounded-xl bg-white/80 dark:bg-slate-900/50 border border-cyan-100 dark:border-cyan-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all min-h-[140px]"
+              className="flex-1 w-full text-left group flex flex-row gap-3 items-start p-4 rounded-xl bg-white/80 dark:bg-slate-900/50 border border-cyan-100 dark:border-cyan-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all min-h-[140px]"
             >
-              {countdown && (
-                <div className="flex items-center gap-1.5 self-start mb-2 px-2.5 py-1 rounded-full bg-cyan-600 text-white text-xs font-semibold">
-                  <Clock className="w-3.5 h-3.5" />
-                  Starts in {countdown}
+              <div className="flex-1 min-w-0 flex flex-col">
+                {countdown && (
+                  <div className="flex items-center gap-1.5 self-start mb-2 px-2.5 py-1 rounded-full bg-cyan-600 text-white text-xs font-semibold">
+                    <Clock className="w-3.5 h-3.5" />
+                    Starts in {countdown}
+                  </div>
+                )}
+                <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-cyan-700 dark:group-hover:text-cyan-300">
+                  {event.name}
+                </p>
+                {event.sport?.name && (
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                    {event.sport.name}
+                  </p>
+                )}
+                <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-600 dark:text-slate-300">
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span>Starts {formatEventDateTime(event.startTime)}</span>
                 </div>
-              )}
-              <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-cyan-700 dark:group-hover:text-cyan-300">
-                {event.name}
-              </p>
-              {event.sport?.name && (
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                  {event.sport.name}
-                </p>
-              )}
-              <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-600 dark:text-slate-300">
-                <Calendar className="w-3.5 h-3.5 shrink-0" />
-                <span>Starts {formatEventDateTime(event.startTime)}</span>
+                {event.facility?.name && (
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
+                    {event.facility.name}
+                  </p>
+                )}
               </div>
-              {event.facility?.name && (
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
-                  {event.facility.name}
-                </p>
-              )}
+              <EventCardThumbnail
+                photo={event.photo}
+                banner={event.banner}
+                alt={event.name}
+              />
             </button>
           ) : (
             <div className="flex-1 flex items-center justify-center min-h-[140px] rounded-xl border border-dashed border-cyan-200 dark:border-cyan-800/50 bg-white/40 dark:bg-slate-900/30 px-4">

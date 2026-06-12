@@ -15,6 +15,7 @@ import ViewEventModal from "@/components/event/ViewEventModal";
 import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
 import HorizontalEventScroller from "@/components/dashboard/HorizontalEventScroller";
 import EventCardTimes from "@/components/dashboard/EventCardTimes";
+import EventCardThumbnail from "@/components/dashboard/EventCardThumbnail";
 
 type HotEvent = CheckInEventRef & {
   _id: string;
@@ -25,6 +26,8 @@ type HotEvent = CheckInEventRef & {
   sport?: { name?: string };
   facility?: { name?: string };
   district?: { name?: string };
+  photo?: { path?: string };
+  banner?: { path?: string };
 };
 
 type HotUpcomingSectionProps = {
@@ -32,7 +35,7 @@ type HotUpcomingSectionProps = {
 };
 
 const COLUMN_CARD_CLASS =
-  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-orange-200 dark:border-orange-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-lg transition-all group";
+  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-orange-200 dark:border-orange-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-lg transition-all group flex flex-row gap-3 items-start";
 
 const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
   className = "",
@@ -150,31 +153,38 @@ const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
                     onClick={() => setSelectedEvent(event)}
                     className={COLUMN_CARD_CLASS}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500 text-white">
-                        <Flame className="w-3 h-3" />
-                        HOT
-                      </span>
-                      {countdown && (
-                        <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
-                          {countdown}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500 text-white">
+                          <Flame className="w-3 h-3" />
+                          HOT
                         </span>
+                        {countdown && (
+                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                            {countdown}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-orange-700 dark:group-hover:text-orange-300">
+                        {event.name}
+                      </p>
+                      {event.sport?.name && (
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                          {event.sport.name}
+                        </p>
+                      )}
+                      <EventCardTimes event={event} />
+                      {event.facility?.name && (
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
+                          {event.facility.name}
+                        </p>
                       )}
                     </div>
-                    <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-orange-700 dark:group-hover:text-orange-300">
-                      {event.name}
-                    </p>
-                    {event.sport?.name && (
-                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                        {event.sport.name}
-                      </p>
-                    )}
-                    <EventCardTimes event={event} />
-                    {event.facility?.name && (
-                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">
-                        {event.facility.name}
-                      </p>
-                    )}
+                    <EventCardThumbnail
+                      photo={event.photo}
+                      banner={event.banner}
+                      alt={event.name}
+                    />
                   </button>
                 );
               })}

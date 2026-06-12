@@ -88,8 +88,6 @@ const EventsDashboard = () => {
             ctaHref: row.ctaHref ? String(row.ctaHref) : undefined,
             ctaRequiresAdminRole: !!row.ctaRequiresAdminRole,
             order: typeof row.order === "number" ? row.order : 0,
-            createdAt:
-              typeof row.createdAt === "string" ? row.createdAt : null,
           };
         })
       );

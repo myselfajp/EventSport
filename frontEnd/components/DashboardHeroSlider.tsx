@@ -15,7 +15,6 @@ export type DashboardHeroSlideDTO = {
   ctaHref?: string;
   ctaRequiresAdminRole?: boolean;
   order?: number;
-  createdAt?: string | null;
 };
 
 const FALLBACK_SLIDES: DashboardHeroSlideDTO[] = [
@@ -53,19 +52,6 @@ function navigateTracked(slide: DashboardHeroSlideDTO) {
   window.location.href = url;
 }
 
-function formatAddedDate(iso?: string | null): string | null {
-  if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return null;
-  }
-}
-
 type Props = {
   slides: DashboardHeroSlideDTO[];
   firstName?: string | null;
@@ -92,7 +78,6 @@ function SlideContent({
   const showCta = !!(slide.ctaLabel?.trim() && canUseLink);
   const imageOnly =
     !!imgUrl && !showTitle && !showSubtitle && !showBadge && !showCta;
-  const addedLabel = formatAddedDate(slide.createdAt);
 
   const imageBlock = imgUrl ? (
     <div
@@ -130,13 +115,6 @@ function SlideContent({
 
   return (
     <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-2xl overflow-hidden min-h-[180px]">
-      {addedLabel ? (
-        <div className="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-black/35 backdrop-blur-sm border border-white/10">
-          <span className="text-[11px] font-medium text-slate-300 tracking-wide">
-            Added {addedLabel}
-          </span>
-        </div>
-      ) : null}
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-orange-500/10 to-pink-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />
       <div
