@@ -7,6 +7,7 @@ import React, {
   useState,
   useCallback,
 } from "react";
+import { isCategoryAllowed } from "@/app/lib/cookie-consent";
 
 type Theme = "light" | "dark" | "system";
 
@@ -36,6 +37,7 @@ function getSystemTheme(): "light" | "dark" {
  */
 function getStoredTheme(): Theme {
   if (typeof window === "undefined") return "system";
+  if (!isCategoryAllowed("functional")) return "system";
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark" || stored === "system") {
@@ -109,11 +111,13 @@ export function ThemeProvider({
       setResolvedTheme(resolved);
       applyTheme(resolved);
 
-      // Store preference
-      try {
-        localStorage.setItem(storageKey, newTheme);
-      } catch {
-        // localStorage might be unavailable
+      // Store preference when functional cookies are allowed
+      if (isCategoryAllowed("functional")) {
+        try {
+          localStorage.setItem(storageKey, newTheme);
+        } catch {
+          // localStorage might be unavailable
+        }
       }
     },
     [resolveTheme, applyTheme, storageKey]
@@ -153,6 +157,23 @@ export function ThemeProvider({
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, [theme, mounted, applyTheme]);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const handleConsentUpdate = () => {
+      const stored = getStoredTheme();
+      const resolved = resolveTheme(stored);
+      setThemeState(stored);
+      setResolvedTheme(resolved);
+      applyTheme(resolved);
+    };
+
+    window.addEventListener("cookie-consent-updated", handleConsentUpdate);
+    return () => {
+      window.removeEventListener("cookie-consent-updated", handleConsentUpdate);
+    };
+  }, [mounted, resolveTheme, applyTheme]);
 
   // Prevent flash of incorrect theme
   const value: ThemeContextType = {

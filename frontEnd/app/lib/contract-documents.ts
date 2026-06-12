@@ -6,6 +6,7 @@ export type LegalDocType =
   | "kvkk"
   | "terms"
   | "commercial_messages"
+  | "cookie_policy"
   | "distance_selling"
   | "event_contract"
   | "coach_agreement"
@@ -17,6 +18,7 @@ export const LEGAL_DOC_TYPES: LegalDocType[] = [
   "kvkk",
   "terms",
   "commercial_messages",
+  "cookie_policy",
 ];
 
 export const GAMER_DOC_TYPES: LegalDocType[] = [
@@ -41,6 +43,7 @@ export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
   kvkk: "KVKK",
   terms: "Terms of Use",
   commercial_messages: "Commercial messages (IYS)",
+  cookie_policy: "Cookie Policy",
   distance_selling: "Distance selling agreement",
   event_contract: "Event agreement",
   coach_agreement: "Coach agreement",
@@ -54,6 +57,7 @@ export const DEFAULT_TITLES_TR: Record<LegalDocType, string> = {
   kvkk: "KVKK Aydınlatma Metni",
   terms: "Kullanım Şartları",
   commercial_messages: "Ticari Elektronik İleti Onayı (IYS)",
+  cookie_policy: "Çerez Politikası",
   distance_selling: "Mesafeli Satış Sözleşmesi",
   event_contract: "Etkinlik Sözleşmesi",
   coach_agreement: "Antrenör Sözleşmesi",
@@ -79,6 +83,7 @@ export const SOZLESMELER_SECTION_ANCHORS: Record<LegalDocType, string> = {
   kvkk: "kvkk",
   terms: "terms",
   commercial_messages: "commercial-messages",
+  cookie_policy: "cookie-policy",
   distance_selling: "distance-selling",
   event_contract: "event-contract",
   coach_agreement: "coach-agreement",

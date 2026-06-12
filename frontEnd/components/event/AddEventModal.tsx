@@ -5,6 +5,10 @@ import { X, Upload, ImageIcon, ChevronDown, Search } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { LEVEL_DEFINITIONS } from "@/app/lib/level-definitions";
+import {
+  getEventLinkSecurityHint,
+  parseSecureEventLink,
+} from "@/app/lib/event-link-security";
 import LocationFields from "@/components/location/LocationFields";
 import LevelDefinitions from "@/components/LevelDefinitions";
 
@@ -889,17 +893,12 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     const rawLink = formData.eventLink.trim();
     let normalizedLink = "";
     if (rawLink) {
-      normalizedLink = /^https?:\/\//i.test(rawLink)
-        ? rawLink
-        : `https://${rawLink}`;
-      if (!/^https?:\/\/.+/i.test(normalizedLink)) {
-        setError("Enter a valid http or https URL for the event link");
+      const linkResult = parseSecureEventLink(rawLink);
+      if (!linkResult.ok) {
+        setError(linkResult.error);
         return;
       }
-      if (normalizedLink.length > 500) {
-        setError("Event link must be at most 500 characters");
-        return;
-      }
+      normalizedLink = linkResult.url;
     }
 
     setSubmitting(true);
@@ -2070,18 +2069,32 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   Optional. Registration page, live stream, tickets, or any related link
-                  (shown as a clickable link on the event page).
+                  (shown on the event page). <strong>HTTPS only</strong> — insecure or
+                  unsupported link types are blocked.
                 </p>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
+                  spellCheck={false}
                   value={formData.eventLink}
                   onChange={(e) =>
                     handleInputChange("eventLink", e.target.value)
                   }
                   placeholder="https://example.com/register"
                   maxLength={500}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  title="Enter a secure HTTPS URL (https://example.com)"
+                  className={`w-full px-4 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
+                    getEventLinkSecurityHint(formData.eventLink)
+                      ? "border-amber-400 dark:border-amber-600"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {getEventLinkSecurityHint(formData.eventLink) ? (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                    {getEventLinkSecurityHint(formData.eventLink)}
+                  </p>
+                ) : null}
               </div>
 
               <div>

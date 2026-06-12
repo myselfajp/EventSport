@@ -11,13 +11,14 @@ import {
     sendRegistrationOtpSchema,
     editUserSchema,
     accountSettingsSchema,
+    cookieConsentSchema,
 } from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
 import { generateTokens, sendTokens } from '../utils/jwtHelper.js';
 import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '../middleware/accountLockout.js';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
-import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
+import { recordLegalAcceptance, recordCookieConsent } from '../utils/contractAcceptanceHelper.js';
 import { sendRegistrationOtpEmail } from '../utils/emailService.js';
 import {
     assertCanResendOtp,
@@ -544,6 +545,34 @@ export const updateAccountSettings = async (req, res, next) => {
             success: true,
             message: 'Settings updated',
             data: updatedUser,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const saveCookieConsent = async (req, res, next) => {
+    try {
+        const body = cookieConsentSchema.parse(req.body);
+        const userId = req.user?._id ?? null;
+
+        await recordCookieConsent(
+            req,
+            userId,
+            {
+                functional: body.functional,
+                analytics: body.analytics,
+                marketing: body.marketing,
+            },
+            {
+                visitorKey: body.visitorKey ?? null,
+                consentedAt: body.consentedAt ? new Date(body.consentedAt) : new Date(),
+            }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Cookie consent recorded',
         });
     } catch (err) {
         next(err);

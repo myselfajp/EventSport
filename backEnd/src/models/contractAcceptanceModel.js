@@ -5,7 +5,7 @@ const contractAcceptanceSchema = new mongoose.Schema(
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: true,
+            default: null,
             index: true,
         },
         contractKey: {
@@ -42,7 +42,7 @@ const contractAcceptanceSchema = new mongoose.Schema(
         },
         context: {
             type: String,
-            enum: ['signup', 'event_reservation', 'coach_profile', 'marketing'],
+            enum: ['signup', 'event_reservation', 'coach_profile', 'marketing', 'cookie_consent'],
             required: true,
             index: true,
         },
@@ -64,6 +64,20 @@ const contractAcceptanceSchema = new mongoose.Schema(
         },
         ipAddress: { type: String },
         userAgent: { type: String },
+        visitorKey: {
+            type: String,
+            default: null,
+            index: true,
+        },
+        cookiePreferences: {
+            choice: {
+                type: String,
+                enum: ['accept_all', 'essential_only', 'custom'],
+            },
+            functional: { type: Boolean },
+            analytics: { type: Boolean },
+            marketing: { type: Boolean },
+        },
     },
     { timestamps: true }
 );

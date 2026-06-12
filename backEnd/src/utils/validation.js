@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseSecureEventLink } from './eventLinkSecurity.js';
 
 const passwordMin = 8;
 // Yalnızca aşırı uzunluk / istismar (DoS) saldırılarına karşı sert tavan; ürün açısından "üst sınır yok" kabul edilebilir.
@@ -361,6 +362,14 @@ export const accountSettingsSchema = z
             });
         }
     });
+
+export const cookieConsentSchema = z.object({
+    functional: z.boolean(),
+    analytics: z.boolean(),
+    marketing: z.boolean(),
+    visitorKey: z.string().trim().min(8).max(128).optional(),
+    consentedAt: z.string().datetime().optional(),
+});
 
 /** Admin-only user updates (includes role, active flag, permission groups). */
 export const adminEditUserSchema = z
@@ -881,11 +890,18 @@ export const createEventSchema = z
             .trim()
             .max(500, 'Event link must be at most 500 characters')
             .optional()
-            .refine(
-                (v) => !v || /^https?:\/\/.+/i.test(v),
-                'Event link must be a valid http or https URL.'
-            )
-            .default(''),
+            .default('')
+            .transform((v, ctx) => {
+                const result = parseSecureEventLink(v);
+                if (!result.ok) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: result.error,
+                    });
+                    return z.NEVER;
+                }
+                return result.url;
+            }),
     })
     .superRefine((data, ctx) => {
         const isOnline = data.type === 'Online';

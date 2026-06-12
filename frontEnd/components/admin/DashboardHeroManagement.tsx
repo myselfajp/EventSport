@@ -20,6 +20,8 @@ interface HeroSlide {
   order: number;
   clickCount?: number;
   lastClickedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const emptyForm = {
@@ -37,6 +39,21 @@ const emptyForm = {
 function slideThumbUrl(s: HeroSlide) {
   if (!s.image?.path) return null;
   return EP.assetUrl(s.image.path);
+}
+
+function formatSlideDate(iso?: string): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
 }
 
 type HeroSection = "slides" | "statistics";
@@ -291,6 +308,7 @@ export default function DashboardHeroManagement() {
                 </th>
                 <th className="px-4 py-3 font-medium text-gray-600 dark:text-slate-300">Order</th>
                 <th className="px-4 py-3 font-medium text-gray-600 dark:text-slate-300">Title</th>
+                <th className="px-4 py-3 font-medium text-gray-600 dark:text-slate-300">Added</th>
                 <th className="px-4 py-3 font-medium text-gray-600 dark:text-slate-300">Active</th>
                 <th className="px-4 py-3 font-medium text-gray-600 dark:text-slate-300">Clicks</th>
                 <th className="px-4 py-3 font-medium text-gray-600 dark:text-slate-300">Link</th>
@@ -325,6 +343,9 @@ export default function DashboardHeroManagement() {
                         {s.title || (
                           <span className="text-slate-400 italic">(image / text)</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-slate-400 text-xs whitespace-nowrap">
+                        {formatSlideDate(s.createdAt)}
                       </td>
                       <td className="px-4 py-3">{s.isActive ? "Yes" : "No"}</td>
                       <td className="px-4 py-3 text-gray-900 dark:text-slate-100 tabular-nums">
