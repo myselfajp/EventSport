@@ -17,6 +17,7 @@ export const ADMIN_PERMISSION_KEYS = [
     'admin.static_pages',
     'admin.dashboard_hero',
     'admin.suggestions',
+    'admin.reports',
 ];
 
 export const ADMIN_PERMISSION_LABELS = {
@@ -32,6 +33,7 @@ export const ADMIN_PERMISSION_LABELS = {
     'admin.static_pages': 'Statik sayfalar',
     'admin.dashboard_hero': 'Ana sayfa hero',
     'admin.suggestions': 'Öneriler',
+    'admin.reports': 'Reports',
 };
 
 export function isValidAdminPermissionKey(key) {

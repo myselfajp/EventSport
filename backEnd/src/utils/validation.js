@@ -1671,3 +1671,33 @@ export const suggestionSubmitSchema = z.object({
     email: z.string().email('Geçerli bir e-posta girin.').optional(),
     contactName: z.string().trim().max(120, 'İsim en fazla 120 karakter olabilir.').optional(),
 });
+
+export const REPORT_REASONS = [
+    'impersonation',
+    'fake_profile',
+    'misleading_event',
+    'inappropriate_content',
+    'spam',
+    'harassment',
+    'other',
+];
+
+export const submitReportSchema = z.object({
+    targetType: z.enum(['user', 'coach', 'event', 'facility', 'company', 'club', 'community']),
+    targetId: mongoObjectId,
+    reason: z.enum(REPORT_REASONS).optional(),
+    details: z.string().trim().max(500, 'Details must be at most 500 characters.').optional().default(''),
+});
+
+export const adminListReportsSchema = z.object({
+    perPage: z.number().int().min(1).max(100).optional().default(20),
+    pageNumber: z.number().int().min(1).optional().default(1),
+    status: z.enum(['open', 'resolved', 'dismissed', 'all']).optional().default('open'),
+    targetType: z.enum(['user', 'coach', 'event', 'facility', 'company', 'club', 'community']).optional(),
+    search: z.string().optional(),
+});
+
+export const resolveReportSchema = z.object({
+    action: z.enum(['dismiss', 'suspend_user', 'cancel_event', 'delete_event']),
+    note: z.string().trim().max(500).optional().default(''),
+});

@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { X, ShieldCheck, Calendar, ChevronRight } from "lucide-react";
+import { X, ShieldCheck, Calendar, ChevronRight, Flag } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { fetchLinkedEvents, type LinkedEvent } from "@/app/lib/linked-events";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
+import ReportModal from "@/components/report/ReportModal";
+import { useMe } from "@/app/hooks/useAuth";
 
 type ViewEventModalEvent = NonNullable<
   React.ComponentProps<typeof ViewEventModal>["event"]
@@ -14,6 +16,7 @@ type ViewEventModalEvent = NonNullable<
 export type ClubViewModalClub = {
   _id: string;
   name: string;
+  creator?: string;
   vision?: string;
   conditions?: string;
   president?: string;
@@ -40,8 +43,17 @@ const ClubViewModal: React.FC<ClubViewModalProps> = ({
   const [eventsTotal, setEventsTotal] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<LinkedEvent | null>(null);
   const [isEventViewOpen, setIsEventViewOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const { data: currentUser } = useMe();
 
   const clubId = club?._id ? String(club._id) : "";
+
+  const ownsClub =
+    club?.creator &&
+    currentUser?._id &&
+    String(club.creator) === String(currentUser._id);
+
+  const canReport = Boolean(currentUser && clubId && !ownsClub);
 
   const loadClubEvents = useCallback(async () => {
     if (!clubId) return;
@@ -266,7 +278,17 @@ const ClubViewModal: React.FC<ClubViewModalProps> = ({
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end">
+          <div className="p-6 border-t border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end gap-2">
+            {canReport && (
+              <button
+                type="button"
+                onClick={() => setShowReportModal(true)}
+                className="px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <Flag className="w-4 h-4" />
+                Report
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -294,6 +316,16 @@ const ClubViewModal: React.FC<ClubViewModalProps> = ({
             } as ViewEventModalEvent
           }
           onCoachClick={() => {}}
+        />
+      )}
+
+      {canReport && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="club"
+          targetId={clubId}
+          targetLabel={club.name}
         />
       )}
     </>

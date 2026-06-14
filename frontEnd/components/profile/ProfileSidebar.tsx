@@ -774,7 +774,46 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   };
 
   const quickActionCard =
-    "flex flex-col items-center justify-center py-2 px-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center min-h-[4.75rem] w-full";
+    "flex flex-col items-center py-1.5 px-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center w-full";
+
+  const QuickActionButton = ({
+    onClick,
+    title,
+    icon,
+    label,
+    count,
+    className = "",
+  }: {
+    onClick: () => void;
+    title: string;
+    icon: React.ReactNode;
+    label: string;
+    count?: string | number | null;
+    className?: string;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${quickActionCard} ${className}`}
+      title={title}
+    >
+      <div className="flex h-4 sm:h-5 w-full shrink-0 items-center justify-center">
+        {icon}
+      </div>
+      <div className="flex h-3.5 sm:h-4 w-full shrink-0 items-center justify-center">
+        {count != null && count !== "" ? (
+          <span className="text-[11px] sm:text-xs font-bold text-gray-800 dark:text-white tabular-nums leading-none">
+            {count}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-h-[1.25rem] w-full items-start justify-center">
+        <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight text-center px-0.5 line-clamp-2">
+          {label}
+        </span>
+      </div>
+    </button>
+  );
 
   return (
     <div className="h-full overflow-y-auto p-4 sm:p-6 flex flex-col">
@@ -858,9 +897,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       )}
 
       {/* Quick actions — 7 items in one row (replaces old Favorites / Following cards) */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-6 sm:mb-8 w-full">
-        <button
-          type="button"
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-6 sm:mb-8 w-full items-stretch">
+        <QuickActionButton
           onClick={() => {
             if (onShowFavorites) {
               onShowFavorites();
@@ -868,20 +906,13 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               router.push("/favorites");
             }
           }}
-          className={quickActionCard}
           title="Likes"
-        >
-          <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
-          <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-white tabular-nums leading-none mt-1">
-            {totalLikes}
-          </span>
-          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
-            Likes
-          </span>
-        </button>
+          icon={<Heart className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />}
+          count={totalLikes}
+          label="Likes"
+        />
 
-        <button
-          type="button"
+        <QuickActionButton
           onClick={() => {
             if (onShowFollowings) {
               onShowFollowings();
@@ -889,20 +920,13 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               router.push("/followings");
             }
           }}
-          className={quickActionCard}
           title="Following"
-        >
-          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-500 shrink-0" />
-          <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-white tabular-nums leading-none mt-1">
-            {isFollowsFetching && !followsData ? "…" : totalFollows}
-          </span>
-          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
-            Following
-          </span>
-        </button>
+          icon={<Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-500 shrink-0" />}
+          count={isFollowsFetching && !followsData ? "…" : totalFollows}
+          label="Following"
+        />
 
-        <button
-          type="button"
+        <QuickActionButton
           onClick={() => {
             if (onShowActivity) {
               onShowActivity();
@@ -910,72 +934,51 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               router.push("/activity");
             }
           }}
-          className={quickActionCard}
           title="Activity"
-        >
-          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-violet-500 shrink-0" />
-          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
-            Activity
-          </span>
-        </button>
+          icon={<Activity className="w-4 h-4 sm:w-5 sm:h-5 text-violet-500 shrink-0" />}
+          label="Activity"
+        />
 
-        <button
-          type="button"
+        <QuickActionButton
           onClick={() => setIsFindModalOpen(true)}
-          className={quickActionCard}
           title="Find"
-        >
-          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300 shrink-0" />
-          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
-            Find
-          </span>
-        </button>
+          icon={<Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300 shrink-0" />}
+          label="Find"
+        />
 
-        <button
-          type="button"
+        <QuickActionButton
           onClick={() => setIsUserEditModalOpen(true)}
-          className={quickActionCard}
           title="Edit Account Info"
-        >
-          <Edit className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400 shrink-0" />
-          <span className="text-[8px] sm:text-[9px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
-            Edit Account Info
-          </span>
-        </button>
+          icon={<Edit className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400 shrink-0" />}
+          label="Edit Account Info"
+        />
 
-        <button
-          type="button"
+        <QuickActionButton
           onClick={() => setIsParticipantModalOpen(true)}
-          className={`${quickActionCard} ${
+          title="Gamer Profile"
+          icon={
+            <User
+              className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
+                hasGamerProfile
+                  ? "text-cyan-600 dark:text-cyan-400"
+                  : "text-amber-600 dark:text-amber-400"
+              }`}
+            />
+          }
+          label="Gamer Profile"
+          className={
             !hasGamerProfile
               ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30"
               : ""
-          }`}
-          title="Gamer Profile"
-        >
-          <User
-            className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
-              hasGamerProfile
-                ? "text-cyan-600 dark:text-cyan-400"
-                : "text-amber-600 dark:text-amber-400"
-            }`}
-          />
-          <span className="text-[8px] sm:text-[9px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
-            Gamer Profile
-          </span>
-        </button>
+          }
+        />
 
-        <button
-          type="button"
+        <QuickActionButton
           onClick={() => setIsSettingsModalOpen(true)}
-          className={quickActionCard}
           title="Settings"
-        >
-          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300 shrink-0" />
-          <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-2 px-0.5">
-            Settings
-          </span>
-        </button>
+          icon={<Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300 shrink-0" />}
+          label="Settings"
+        />
       </div>
 
       {hasCoachProfile && (

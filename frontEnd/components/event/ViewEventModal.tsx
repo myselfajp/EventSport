@@ -16,7 +16,9 @@ import {
   Share2,
   Ban,
   Users,
+  Flag,
 } from "lucide-react";
+import ReportModal from "@/components/report/ReportModal";
 import AddEventModal from "@/components/event/AddEventModal";
 import EventParticipantsModal from "@/components/event/EventParticipantsModal";
 import ShareEventDialog from "@/components/event/ShareEventDialog";
@@ -201,6 +203,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   const [enrollingInSeries, setEnrollingInSeries] = useState(false);
   const [resolvedCheckInHours, setResolvedCheckInHours] = useState(48);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [joinStatus, setJoinStatus] = useState<{
@@ -295,6 +298,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   const isPartOfSeries = !!(event?.isRecurring && seriesId);
   const canEditEvent = isOwner && !isCancelled;
   const canCancelEvent = isOwner && !isCancelled;
+  const canReportEvent = user && !isOwner && event?._id;
   const isEventStaff = isOwner || isBackupCoach;
   const isParticipant = !!user?.participant;
 
@@ -1733,6 +1737,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   Share
                 </button>
               )}
+              {canReportEvent && (
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(true)}
+                  className="px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <Flag className="w-4 h-4" />
+                  Report
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -1750,6 +1764,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
         onClose={() => setShowShareDialog(false)}
         payload={sharePayload}
       />
+
+      {canReportEvent && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="event"
+          targetId={String(event._id)}
+          targetLabel={event.name}
+        />
+      )}
 
       <EventParticipantsModal
         isOpen={showParticipantsModal}

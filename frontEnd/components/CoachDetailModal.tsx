@@ -8,7 +8,9 @@ import {
   ShieldCheck,
   User,
   Users,
+  Flag,
 } from "lucide-react";
+import ReportModal from "@/components/report/ReportModal";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -124,6 +126,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [showCoachCalendar, setShowCoachCalendar] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const { data: followStats } = useCoachFollowStats(
     isOpen ? resolvedCoachId : null
@@ -399,6 +402,17 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                           <Users className="w-4 h-4" />
                           View followers
                         </button>
+
+                        {currentUser && !isOwnProfile && resolvedCoachId && (
+                          <button
+                            type="button"
+                            onClick={() => setShowReportModal(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <Flag className="w-4 h-4" />
+                            Report
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -717,6 +731,16 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
       coachId={resolvedCoachId}
       coachName={profileDisplayName}
     />
+
+    {resolvedCoachId && (
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="coach"
+        targetId={resolvedCoachId}
+        targetLabel={profileDisplayName}
+      />
+    )}
     </>
   );
 };

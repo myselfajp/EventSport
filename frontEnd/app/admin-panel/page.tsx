@@ -14,6 +14,7 @@ import NotificationManagement from "../../components/admin/NotificationManagemen
 import ContractsManagement from "../../components/admin/ContractsManagement";
 import StaticPagesManagement from "../../components/admin/StaticPagesManagement";
 import SuggestionsManagement from "../../components/admin/SuggestionsManagement";
+import ReportsManagement from "../../components/admin/ReportsManagement";
 import DashboardHeroManagement from "../../components/admin/DashboardHeroManagement";
 import AdminPermissionGroupsManagement from "../../components/admin/AdminPermissionGroupsManagement";
 import BlacklistManagement from "../../components/admin/BlacklistManagement";
@@ -28,6 +29,7 @@ type TabType =
   | "contracts"
   | "site-pages"
   | "suggestions"
+  | "reports"
   | "dashboard-hero"
   | "permission-groups";
 
@@ -42,6 +44,7 @@ const TAB_ORDER: TabType[] = [
   "site-pages",
   "dashboard-hero",
   "suggestions",
+  "reports",
   "permission-groups",
 ];
 
@@ -56,6 +59,7 @@ const TAB_LABEL: Record<TabType, string> = {
   "site-pages": "Site pages",
   "dashboard-hero": "Dashboard hero",
   suggestions: "Suggestions",
+  reports: "Reports",
   "permission-groups": "İzin grupları",
 };
 
@@ -71,6 +75,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   "site-pages": "admin.static_pages",
   "dashboard-hero": "admin.dashboard_hero",
   suggestions: "admin.suggestions",
+  reports: "admin.reports",
 };
 
 export default function AdminPanelPage() {
@@ -218,6 +223,7 @@ export default function AdminPanelPage() {
             {activeTab === "site-pages" && <StaticPagesManagement />}
             {activeTab === "dashboard-hero" && <DashboardHeroManagement />}
             {activeTab === "suggestions" && <SuggestionsManagement />}
+            {activeTab === "reports" && <ReportsManagement />}
             {activeTab === "permission-groups" && <AdminPermissionGroupsManagement />}
           </div>
         </div>
