@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Building, Phone, Mail, MapPin, Calendar } from "lucide-react";
+import { X, Building, Phone, Mail, MapPin, Calendar, Flag } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { Company } from "@/app/lib/types";
 import { getCompanyTypeLabel } from "@/app/lib/company-types";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
+import ReportModal from "@/components/report/ReportModal";
+import { useMe } from "@/app/hooks/useAuth";
 
 interface CompanyDetailsModalProps {
   isOpen: boolean;
@@ -19,13 +21,24 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   onClose,
   company,
 }) => {
-
+  const [showReportModal, setShowReportModal] = useState(false);
+  const { data: currentUser } = useMe();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US");
   };
 
   const companyId = company?._id ? String(company._id) : "";
+
+  const ownsCompany =
+    companyId &&
+    Array.isArray(currentUser?.company) &&
+    currentUser.company.some((entry: { _id?: string } | string) => {
+      const id = typeof entry === "string" ? entry : entry?._id;
+      return id && String(id) === companyId;
+    });
+
+  const canReport = Boolean(currentUser && companyId && !ownsCompany);
 
   if (!isOpen) return null;
 
@@ -74,8 +87,18 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                   <p className="text-sm text-gray-500 dark:text-gray-500">
                     Added {formatDate(company.createdAt)}
                   </p>
-                  <div className="mt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <EntityFollowButton type="company" entityId={companyId} />
+                    {canReport && (
+                      <button
+                        type="button"
+                        onClick={() => setShowReportModal(true)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-lg transition-colors"
+                      >
+                        <Flag className="w-4 h-4" />
+                        Report
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -116,6 +139,16 @@ const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
           )}
         </div>
       </div>
+
+      {canReport && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="company"
+          targetId={companyId}
+          targetLabel={company?.name}
+        />
+      )}
     </div>
   );
 };

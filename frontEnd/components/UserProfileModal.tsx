@@ -20,7 +20,9 @@ import {
   Image as ImageIcon,
   ShieldCheck,
   ChevronRight,
+  Flag,
 } from "lucide-react";
+import ReportModal from "@/components/report/ReportModal";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -73,6 +75,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [selectedCoachEvent, setSelectedCoachEvent] =
     useState<CoachProfileEvent | null>(null);
   const [isEventViewOpen, setIsEventViewOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -358,6 +361,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   if (!isOpen) return null;
 
+  const canReportUser =
+    currentUser?._id &&
+    userId &&
+    String(currentUser._id) !== String(userId);
+
+  const reportTargetLabel = user
+    ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email
+    : undefined;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
@@ -368,6 +380,16 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
                 User Profile
               </h2>
+              {canReportUser && (
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  Report
+                </button>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -926,6 +948,16 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               setIsGroupModalOpen(true);
             }
           }}
+        />
+      )}
+
+      {canReportUser && userId && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="user"
+          targetId={userId}
+          targetLabel={reportTargetLabel}
         />
       )}
     </div>

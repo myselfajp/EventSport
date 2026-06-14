@@ -85,6 +85,9 @@ export const EP = {
     usCities: (state: string) =>
       `${LOCATION_API}/us/cities?state=${encodeURIComponent(state)}`,
   },
+  REPORT: {
+    submit: `${API_V1_BASE}/report`,
+  },
   AUTH: {
     signIn: `${AUTH_API}/sign-in`,
     sendRegistrationOtp: `${AUTH_API}/send-registration-otp`,
@@ -188,6 +191,10 @@ export const EP = {
         `${ADMIN_API}/users/${userId}/contract-acceptances`,
     },
     suggestions: `${ADMIN_API}/suggestions`,
+    reports: {
+      list: `${ADMIN_API}/reports`,
+      resolve: (reportId: string) => `${ADMIN_API}/reports/${reportId}/resolve`,
+    },
     dashboardHeaderLogo: {
       get: `${ADMIN_API}/dashboard-header-logo`,
       update: `${ADMIN_API}/dashboard-header-logo`,

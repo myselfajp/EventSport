@@ -11,6 +11,7 @@ import {
   Award,
   Calendar,
   ChevronRight,
+  Flag,
 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -19,6 +20,8 @@ import ViewEventModal from "@/components/event/ViewEventModal";
 import ClubViewModal, { type ClubViewModalClub } from "@/components/ClubViewModal";
 import GroupViewModal, { type GroupViewModalGroup } from "@/components/GroupViewModal";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
+import ReportModal from "@/components/report/ReportModal";
+import { useMe } from "@/app/hooks/useAuth";
 
 type ViewEventModalEvent = NonNullable<
   React.ComponentProps<typeof ViewEventModal>["event"]
@@ -60,8 +63,20 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
   const [isClubModalOpen, setIsClubModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const { data: currentUser } = useMe();
 
   const facilityId = facility?._id ? String(facility._id) : "";
+
+  const ownsFacility =
+    facilityId &&
+    Array.isArray(currentUser?.facility) &&
+    currentUser.facility.some((entry: { _id?: string } | string) => {
+      const id = typeof entry === "string" ? entry : entry?._id;
+      return id && String(id) === facilityId;
+    });
+
+  const canReport = Boolean(currentUser && facilityId && !ownsFacility);
 
   useEffect(() => {
     if (isOpen && facility?.mainSport) {
@@ -237,8 +252,18 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
                     <p className="text-sm text-gray-500 dark:text-gray-500">
                       Added {formatDate(facility.createdAt)}
                     </p>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <EntityFollowButton type="facility" entityId={facilityId} />
+                      {canReport && (
+                        <button
+                          type="button"
+                          onClick={() => setShowReportModal(true)}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-lg transition-colors"
+                        >
+                          <Flag className="w-4 h-4" />
+                          Report
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -442,6 +467,16 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
         }}
         group={selectedGroup}
       />
+
+      {canReport && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="facility"
+          targetId={facilityId}
+          targetLabel={facility?.name}
+        />
+      )}
     </>
   );
 };

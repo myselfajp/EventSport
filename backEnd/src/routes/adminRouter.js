@@ -6,6 +6,7 @@ import * as legalController from '../controllers/legalController.js';
 import * as contractAcceptanceController from '../controllers/contractAcceptanceController.js';
 import * as adminPermissionGroupController from '../controllers/adminPermissionGroupController.js';
 import * as blacklistController from '../controllers/blacklistController.js';
+import * as reportController from '../controllers/reportController.js';
 import { requireAdminPermission, requireFullAdmin } from '../middleware/requireAdminPermission.js';
 
 const HEADER_LOGO_MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -62,6 +63,14 @@ router.post('/blacklist', blacklistPerm, blacklistController.listBlacklist);
 router.post('/blacklist/create', blacklistPerm, blacklistController.createBlacklistEntry);
 router.post('/blacklist/from-user/:userId', blacklistPerm, blacklistController.blacklistUser);
 router.delete('/blacklist/:entryId', blacklistPerm, blacklistController.removeBlacklistEntry);
+
+// Reports (moderation queue)
+router.post('/reports', requireAdminPermission('admin.reports'), reportController.listReports);
+router.put(
+    '/reports/:reportId/resolve',
+    requireAdminPermission('admin.reports'),
+    reportController.resolveReport
+);
 
 // Coach Certificate Approval
 router.post('/coaches/pending', requireAdminPermission('admin.coaches'), adminController.getPendingCoaches);

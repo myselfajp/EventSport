@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { X, Users, Calendar, ChevronRight } from "lucide-react";
+import { X, Users, Calendar, ChevronRight, Flag } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { fetchLinkedEvents, type LinkedEvent } from "@/app/lib/linked-events";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
+import ReportModal from "@/components/report/ReportModal";
+import { useMe } from "@/app/hooks/useAuth";
 
 type ViewEventModalEvent = NonNullable<
   React.ComponentProps<typeof ViewEventModal>["event"]
@@ -14,6 +16,7 @@ type ViewEventModalEvent = NonNullable<
 export type GroupViewModalGroup = {
   _id: string;
   name: string;
+  owner?: string;
   description?: string;
   clubId?: string;
   clubName?: string;
@@ -39,8 +42,17 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
   const [eventsTotal, setEventsTotal] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<LinkedEvent | null>(null);
   const [isEventViewOpen, setIsEventViewOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const { data: currentUser } = useMe();
 
   const groupId = group?._id ? String(group._id) : "";
+
+  const ownsCommunity =
+    group?.owner &&
+    currentUser?.coach &&
+    String(group.owner) === String(currentUser.coach);
+
+  const canReport = Boolean(currentUser && groupId && !ownsCommunity);
 
   const loadGroupEvents = useCallback(async () => {
     if (!groupId) return;
@@ -238,7 +250,17 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end">
+          <div className="p-6 border-t border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end gap-2">
+            {canReport && (
+              <button
+                type="button"
+                onClick={() => setShowReportModal(true)}
+                className="px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <Flag className="w-4 h-4" />
+                Report
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -266,6 +288,16 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
             } as ViewEventModalEvent
           }
           onCoachClick={() => {}}
+        />
+      )}
+
+      {canReport && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          targetType="community"
+          targetId={groupId}
+          targetLabel={group.name}
         />
       )}
     </>
