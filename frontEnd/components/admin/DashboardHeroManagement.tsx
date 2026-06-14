@@ -1,10 +1,87 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Cropper from "react-easy-crop";
+import type { Area } from "react-easy-crop";
 import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
-import { Plus, Trash2, Edit2, Save, X, Layers, ImageIcon, BarChart3 } from "lucide-react";
+import { Plus, Trash2, Edit2, Save, X, Layers, ImageIcon, BarChart3, Crop } from "lucide-react";
 import DashboardHeroStatistics from "./DashboardHeroStatistics";
+import DashboardHeaderLogoManagement from "./DashboardHeaderLogoManagement";
+
+/** Hero banner output — matches DashboardHeroSlider locked height */
+export const BANNER_OUTPUT_WIDTH = 1200;
+export const BANNER_OUTPUT_HEIGHT = 350;
+const BANNER_ASPECT = BANNER_OUTPUT_WIDTH / BANNER_OUTPUT_HEIGHT;
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Image load failed"));
+    image.src = src;
+  });
+}
+
+function canvasToJpegFile(canvas: HTMLCanvasElement, filename = "banner.jpg"): Promise<File> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error("Canvas toBlob failed"));
+        resolve(new File([blob], filename, { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      0.88,
+    );
+  });
+}
+
+/** object-fit: contain — entire image inside banner (logos / vertical art) */
+async function resizeImageContainToBanner(imageSrc: string): Promise<File> {
+  const image = await loadImageElement(imageSrc);
+  const tw = BANNER_OUTPUT_WIDTH;
+  const th = BANNER_OUTPUT_HEIGHT;
+  const sw = image.naturalWidth;
+  const sh = image.naturalHeight;
+  const scale = Math.min(tw / sw, th / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  const dx = (tw - dw) / 2;
+  const dy = (th - dh) / 2;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(0, 0, tw, th);
+  ctx.drawImage(image, dx, dy, dw, dh);
+  return canvasToJpegFile(canvas);
+}
+
+/** Canvas output from manual crop selection (still normalized to banner size) */
+async function cropImageToBlob(imageSrc: string, pixelCrop: Area): Promise<File> {
+  const image = await loadImageElement(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = BANNER_OUTPUT_WIDTH;
+  canvas.height = BANNER_OUTPUT_HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    BANNER_OUTPUT_WIDTH,
+    BANNER_OUTPUT_HEIGHT,
+  );
+  return canvasToJpegFile(canvas);
+}
 
 interface HeroSlide {
   _id: string;
@@ -56,7 +133,50 @@ function formatSlideDate(iso?: string): string {
   }
 }
 
-type HeroSection = "slides" | "statistics";
+type HeroSection = "slides" | "statistics" | "logo";
+
+function HeroSectionNav({
+  section,
+  onSectionChange,
+}: {
+  section: HeroSection;
+  onSectionChange: (s: HeroSection) => void;
+}) {
+  const tabClass = (active: boolean) =>
+    `inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg ${
+      active
+        ? "bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200"
+        : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+    }`;
+
+  return (
+    <nav className="flex gap-2 border-b border-gray-200 dark:border-slate-700 pb-3">
+      <button
+        type="button"
+        onClick={() => onSectionChange("slides")}
+        className={tabClass(section === "slides")}
+      >
+        Slides
+      </button>
+      <button
+        type="button"
+        onClick={() => onSectionChange("statistics")}
+        className={tabClass(section === "statistics")}
+      >
+        <BarChart3 className="w-4 h-4" />
+        Statistics
+      </button>
+      <button
+        type="button"
+        onClick={() => onSectionChange("logo")}
+        className={tabClass(section === "logo")}
+      >
+        <ImageIcon className="w-4 h-4" />
+        Logo
+      </button>
+    </nav>
+  );
+}
 
 export default function DashboardHeroManagement() {
   const [section, setSection] = useState<HeroSection>("slides");
@@ -69,17 +189,90 @@ export default function DashboardHeroManagement() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
 
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  /** Kırpılmış nihai dosya — backend'e bu gönderilir */
+  const [croppedFile, setCroppedFile] = useState<File | null>(null);
+  /** Kırpılmış dosyanın önizleme URL'i */
+  const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!imageFile) {
-      setPreviewBlobUrl(null);
-      return;
+  /** Crop modal durumu */
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [cropLoading, setCropLoading] = useState(false);
+  const [imageProcessing, setImageProcessing] = useState(false);
+
+  const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
+    setCroppedAreaPixels(areaPixels);
+  }, []);
+
+  const applyCrop = async () => {
+    if (!cropSrc || !croppedAreaPixels) return;
+    try {
+      setCropLoading(true);
+      const file = await cropImageToBlob(cropSrc, croppedAreaPixels);
+      setProcessedBannerFile(file);
+      setShowCropModal(false);
+    } catch (e) {
+      console.error("Crop failed:", e);
+    } finally {
+      setCropLoading(false);
     }
-    const u = URL.createObjectURL(imageFile);
-    setPreviewBlobUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [imageFile]);
+  };
+
+  const resetCrop = () => {
+    setCroppedFile(null);
+    if (croppedPreviewUrl) { URL.revokeObjectURL(croppedPreviewUrl); setCroppedPreviewUrl(null); }
+    if (cropSrc) { URL.revokeObjectURL(cropSrc); setCropSrc(null); }
+    setImageFile(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+  };
+
+  const setProcessedBannerFile = (file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    setCroppedFile(file);
+    setCroppedPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return previewUrl;
+    });
+  };
+
+  const handleBannerFileSelect = (file: File) => {
+    setImageFile(file);
+    setRemoveImage(false);
+    setError("");
+    setCroppedFile(null);
+    if (croppedPreviewUrl) {
+      URL.revokeObjectURL(croppedPreviewUrl);
+      setCroppedPreviewUrl(null);
+    }
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    const originalUrl = URL.createObjectURL(file);
+    setCropSrc(originalUrl);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+    setShowCropModal(true);
+  };
+
+  const handleFitEntireImage = async () => {
+    if (!cropSrc) return;
+    try {
+      setImageProcessing(true);
+      setError("");
+      const file = await resizeImageContainToBanner(cropSrc);
+      setProcessedBannerFile(file);
+      setShowCropModal(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fit image");
+    } finally {
+      setImageProcessing(false);
+    }
+  };
+
+  const previewBlobUrl = croppedPreviewUrl;
 
   const load = async () => {
     try {
@@ -107,6 +300,9 @@ export default function DashboardHeroManagement() {
   const openCreate = () => {
     setEditing(null);
     setImageFile(null);
+    setCroppedFile(null);
+    if (croppedPreviewUrl) { URL.revokeObjectURL(croppedPreviewUrl); setCroppedPreviewUrl(null); }
+    if (cropSrc) { URL.revokeObjectURL(cropSrc); setCropSrc(null); }
     setRemoveImage(false);
     setForm({
       ...emptyForm,
@@ -118,6 +314,9 @@ export default function DashboardHeroManagement() {
   const openEdit = (s: HeroSlide) => {
     setEditing(s);
     setImageFile(null);
+    setCroppedFile(null);
+    if (croppedPreviewUrl) { URL.revokeObjectURL(croppedPreviewUrl); setCroppedPreviewUrl(null); }
+    if (cropSrc) { URL.revokeObjectURL(cropSrc); setCropSrc(null); }
     setRemoveImage(false);
     setForm({
       badgeLabel: s.badgeLabel || "",
@@ -156,11 +355,16 @@ export default function DashboardHeroManagement() {
       const hasContent =
         form.title.trim() ||
         form.subtitle.trim() ||
-        imageFile ||
+        croppedFile ||
         hasExistingImage;
 
       if (!hasContent) {
         setError("Add an image and/or title or subtitle (at least one).");
+        return;
+      }
+
+      if (imageFile && !croppedFile) {
+        setError("Apply crop or use “Fit entire image” before saving.");
         return;
       }
 
@@ -182,8 +386,8 @@ export default function DashboardHeroManagement() {
 
       const fd = new FormData();
       fd.append("data", JSON.stringify(payload));
-      if (imageFile) {
-        fd.append("hero-slide-image", imageFile);
+      if (croppedFile) {
+        fd.append("hero-slide-image", croppedFile);
       }
 
       const url = editing
@@ -200,6 +404,9 @@ export default function DashboardHeroManagement() {
       if (res.ok && data?.success) {
         setShowModal(false);
         setImageFile(null);
+        setCroppedFile(null);
+        if (croppedPreviewUrl) { URL.revokeObjectURL(croppedPreviewUrl); setCroppedPreviewUrl(null); }
+        if (cropSrc) { URL.revokeObjectURL(cropSrc); setCropSrc(null); }
         setRemoveImage(false);
         await load();
       } else {
@@ -213,44 +420,24 @@ export default function DashboardHeroManagement() {
   if (section === "statistics") {
     return (
       <div className="space-y-4">
-        <nav className="flex gap-2 border-b border-gray-200 dark:border-slate-700 pb-3">
-          <button
-            type="button"
-            onClick={() => setSection("slides")}
-            className="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
-          >
-            Slides
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200"
-          >
-            Statistics
-          </button>
-        </nav>
+        <HeroSectionNav section={section} onSectionChange={setSection} />
         <DashboardHeroStatistics />
+      </div>
+    );
+  }
+
+  if (section === "logo") {
+    return (
+      <div className="space-y-4">
+        <HeroSectionNav section={section} onSectionChange={setSection} />
+        <DashboardHeaderLogoManagement />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <nav className="flex gap-2 border-b border-gray-200 dark:border-slate-700 pb-3">
-        <button
-          type="button"
-          className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200"
-        >
-          Slides
-        </button>
-        <button
-          type="button"
-          onClick={() => setSection("statistics")}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
-        >
-          <BarChart3 className="w-4 h-4" />
-          Statistics
-        </button>
-      </nav>
+      <HeroSectionNav section={section} onSectionChange={setSection} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
           <Layers className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
@@ -386,6 +573,90 @@ export default function DashboardHeroManagement() {
         </div>
       )}
 
+      {/* ── Crop Modal ── */}
+      {showCropModal && cropSrc ? (
+        <div className="fixed inset-0 z-[90] flex flex-col bg-black/95">
+          <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-700 shrink-0">
+            <div>
+              <p className="text-sm font-semibold text-white">Crop banner</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Drag to reposition · Pinch/scroll to zoom · Output {BANNER_OUTPUT_WIDTH}×
+                {BANNER_OUTPUT_HEIGHT}px
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCropModal(false)}
+              className="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Cropper area */}
+          <div className="relative flex-1 min-h-0">
+            <Cropper
+              image={cropSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={BANNER_ASPECT}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+              objectFit="contain"
+              style={{
+                containerStyle: { background: "#0f172a" },
+              }}
+            />
+          </div>
+
+          {/* Zoom + actions */}
+          <div className="shrink-0 bg-slate-900 border-t border-slate-700 px-5 py-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400 w-10 shrink-0">Zoom</span>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.05}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="flex-1 accent-cyan-500"
+              />
+              <span className="text-xs text-slate-400 w-10 text-right shrink-0">
+                {zoom.toFixed(2)}×
+              </span>
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => void handleFitEntireImage()}
+                disabled={imageProcessing || cropLoading}
+                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:bg-slate-800 disabled:opacity-60"
+              >
+                Fit entire image
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCropModal(false)}
+                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void applyCrop()}
+                disabled={cropLoading}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white text-sm font-medium"
+              >
+                <Crop className="w-4 h-4" />
+                {cropLoading ? "Processing…" : "Apply crop"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showModal ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-slate-700">
@@ -402,43 +673,98 @@ export default function DashboardHeroManagement() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                  Banner image (JPEG / PNG / WebP)
+              {/* ── Banner image / crop ── */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                  Banner image&nbsp;
+                  <span className="text-xs font-normal text-gray-500 dark:text-slate-400">
+                    (output {BANNER_OUTPUT_WIDTH}×{BANNER_OUTPUT_HEIGHT}px — crop for photos, fit
+                    entire for logos)
+                  </span>
                 </label>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="w-full text-sm text-gray-600 dark:text-slate-400"
-                  onChange={(e) => {
-                    setImageFile(e.target.files?.[0] ?? null);
-                    setRemoveImage(false);
-                  }}
-                />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label
+                    className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 px-4 py-2.5 text-sm text-gray-600 dark:text-slate-400 hover:border-cyan-400 hover:bg-cyan-50/50 dark:hover:bg-cyan-950/30 transition-colors"
+                  >
+                    <Crop className="w-4 h-4 text-cyan-600" />
+                    {croppedFile ? "Change image" : "Choose file & crop"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        e.target.value = "";
+                        handleBannerFileSelect(file);
+                      }}
+                    />
+                  </label>
+
+                  {cropSrc ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCropModal(true);
+                          setCrop({ x: 0, y: 0 });
+                          setZoom(1);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-slate-600 px-3 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800"
+                      >
+                        <Crop className="w-4 h-4" />
+                        {croppedFile ? "Adjust crop" : "Open crop"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleFitEntireImage()}
+                        disabled={imageProcessing}
+                        className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 px-3 py-2 text-sm text-cyan-800 dark:text-cyan-200 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 disabled:opacity-60"
+                      >
+                        {imageProcessing ? "Processing…" : "Fit entire image"}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+
+                {imageFile && !croppedFile ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Crop the photo or click “Fit entire image” for logos before saving.
+                  </p>
+                ) : null}
+
+                {/* Remove existing image */}
                 {editing?.image?.path && (
-                  <label className="flex items-center gap-2 mt-2 text-sm text-gray-600 dark:text-slate-400">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
                     <input
                       type="checkbox"
                       checked={removeImage}
                       onChange={(e) => {
                         setRemoveImage(e.target.checked);
-                        if (e.target.checked) setImageFile(null);
+                        if (e.target.checked) resetCrop();
                       }}
                     />
                     Remove current image
                   </label>
                 )}
-                {(previewBlobUrl || (editing?.image?.path && !removeImage)) && (
-                  <div className="mt-3 rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-900">
+
+                {/* Preview: cropped or existing */}
+                {(croppedPreviewUrl || (editing?.image?.path && !removeImage && !croppedPreviewUrl)) && (
+                  <div className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={
-                        previewBlobUrl ||
-                        EP.assetUrl(editing!.image!.path)
-                      }
+                      src={croppedPreviewUrl || EP.assetUrl(editing!.image!.path)}
                       alt=""
-                      className="w-full max-h-48 object-contain"
+                      className="w-full h-[140px] object-contain object-center bg-slate-900"
                     />
+                    {croppedPreviewUrl && (
+                      <div className="absolute inset-0 flex items-end justify-end p-2 pointer-events-none">
+                        <span className="bg-green-600/90 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                          {BANNER_OUTPUT_WIDTH}×{BANNER_OUTPUT_HEIGHT} ✓
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

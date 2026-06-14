@@ -69,6 +69,8 @@ const Header: React.FC<HeaderProps> = ({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+  const [headerLogoAlt, setHeaderLogoAlt] = useState("EventSport");
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.isRead) {
@@ -182,6 +184,22 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void fetchJSON(
+      EP.PUBLIC.dashboardHeaderLogo,
+      { method: "GET" },
+      { skipAuth: true }
+    ).then((res) => {
+      if (cancelled || !res?.success || !res.data?.image?.path) return;
+      setHeaderLogoUrl(EP.assetUrl(res.data.image.path));
+      setHeaderLogoAlt(res.data.imageAlt || "EventSport");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (isNotificationsOpen) {
       fetchNotifications();
     }
@@ -209,18 +227,31 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-4 md:px-6 py-4 flex items-center justify-between transition-colors duration-300">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onLeftSidebarToggle}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-700 dark:text-slate-300 hidden md:block transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
+      <header className="site-header shrink-0 border-b border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900 transition-colors duration-300">
+        <div className="flex h-full items-center justify-between px-4 md:px-6">
+          <div className="flex flex-1 items-center justify-start min-w-0">
+            <button
+              type="button"
+              onClick={onLeftSidebarToggle}
+              className="hidden md:inline-flex items-center justify-center p-2 -ml-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+            </button>
+          </div>
 
-        {/* Calendar, Theme Toggle, and Notification buttons */}
-        <div className="flex items-center gap-1 md:gap-2">
+          <div className="header-logo-wrap flex-1 min-w-0 px-2">
+            {headerLogoUrl ? (
+              <img
+                src={headerLogoUrl}
+                alt={headerLogoAlt}
+                decoding="async"
+                className="header-logo-img select-none pointer-events-none"
+              />
+            ) : null}
+          </div>
+
+          <div className="flex flex-1 items-center justify-end gap-0.5 md:gap-1 min-w-0">
           {/* Theme Toggle */}
           <ThemeToggle variant="icon" />
 
@@ -336,12 +367,14 @@ const Header: React.FC<HeaderProps> = ({
           {/* Calendar Toggle */}
           <button
             onClick={onRightSidebarToggle}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-700 dark:text-slate-300 transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 transition-colors"
+            aria-label="Open calendar"
           >
-            <Calendar className="w-5 h-5" />
+            <Calendar className="w-5 h-5" strokeWidth={1.75} />
           </button>
+          </div>
         </div>
-      </div>
+      </header>
     </>
   );
 };

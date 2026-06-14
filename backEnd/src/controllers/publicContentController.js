@@ -3,6 +3,7 @@ import StaticPage from '../models/staticPageModel.js';
 import Suggestion from '../models/suggestionModel.js';
 import DashboardHeroSlide from '../models/dashboardHeroSlideModel.js';
 import DashboardHeroClick from '../models/dashboardHeroClickModel.js';
+import DashboardHeaderLogo, { HEADER_LOGO_KEY } from '../models/dashboardHeaderLogoModel.js';
 import * as zodValidation from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
 import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
@@ -56,6 +57,36 @@ export const getPublicStaticPageByName = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: page,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/** Active site header logo (public read). */
+export const getPublicDashboardHeaderLogo = async (req, res, next) => {
+    try {
+        const row = await DashboardHeaderLogo.findOne({
+            key: HEADER_LOGO_KEY,
+            isActive: true,
+        })
+            .select('image imageAlt updatedAt')
+            .lean();
+
+        if (!row?.image?.path) {
+            return res.status(200).json({ success: true, data: null });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                imageAlt: row.imageAlt || '',
+                image: {
+                    path: uploadsRelativePath(row.image.path),
+                    mimeType: row.image.mimeType,
+                },
+                updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
+            },
         });
     } catch (err) {
         next(err);

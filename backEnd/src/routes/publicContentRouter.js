@@ -14,6 +14,7 @@ router.get(
     publicContentController.getPublicActiveStaticPages
 );
 router.get('/public/static-page/:name', publicContentController.getPublicStaticPageByName);
+router.get('/public/dashboard-header-logo', publicContentController.getPublicDashboardHeaderLogo);
 router.get('/public/dashboard-hero-slides', publicContentController.getPublicDashboardHeroSlides);
 router.get(
     '/public/hero-click/:slideId',

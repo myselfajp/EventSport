@@ -804,3 +804,43 @@
 .dark .static-page-content hr {
   border-top-color: rgb(51, 65, 85);
 }
+
+.site-header {
+  height: 4rem;
+  overflow: hidden;
+}
+
+.header-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.header-logo-img {
+  height: 80%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  block-size: -webkit-fill-available;
+  max-block-size: 80%;
+  transform-origin: center center;
+  animation: logoBounce 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes logoBounce {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

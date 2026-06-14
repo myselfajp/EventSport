@@ -203,4 +203,21 @@ router.delete(
     adminController.deleteDashboardHeroSlide
 );
 
+router.get(
+    '/dashboard-header-logo',
+    requireAdminPermission('admin.dashboard_hero'),
+    adminController.getDashboardHeaderLogo
+);
+router.put(
+    '/dashboard-header-logo',
+    requireAdminPermission('admin.dashboard_hero'),
+    uploadFile({ fieldName: 'header-logo-image', optional: true }),
+    adminController.updateDashboardHeaderLogo
+);
+router.delete(
+    '/dashboard-header-logo',
+    requireAdminPermission('admin.dashboard_hero'),
+    adminController.deleteDashboardHeaderLogo
+);
+
 export default router;
