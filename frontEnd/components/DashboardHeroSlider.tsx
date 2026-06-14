@@ -68,6 +68,28 @@ function SlideContent({
   userRole: number | null;
 }) {
   const imgUrl = slideImageUrl(slide);
+
+  if (imgUrl) {
+    return (
+      <div
+        className="relative w-full h-[320px] md:h-[360px] overflow-hidden rounded-xl bg-[#0b1329] flex items-center justify-center"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imgUrl}
+          alt="bg-blur"
+          className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-30 select-none pointer-events-none"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imgUrl}
+          alt="main-banner"
+          className="relative z-10 max-w-full max-h-full w-auto h-auto object-contain"
+        />
+      </div>
+    );
+  }
+
   const showBadge = !!(slide.badgeLabel && slide.badgeLabel.trim());
   const showTitle = !!(slide.title && slide.title.trim());
   const showSubtitle = !!(slide.subtitle && slide.subtitle.trim());
@@ -76,45 +98,9 @@ function SlideContent({
     !!slide.ctaHref?.trim() &&
     (!slide.ctaRequiresAdminRole || userRole === 0);
   const showCta = !!(slide.ctaLabel?.trim() && canUseLink);
-  const imageOnly =
-    !!imgUrl && !showTitle && !showSubtitle && !showBadge && !showCta;
-
-  const imageBlock = imgUrl ? (
-    <div
-      className={`flex items-center justify-center overflow-hidden rounded-xl bg-slate-800/80 shrink-0 ${
-        imageOnly ? "w-full min-h-[120px]" : "w-full md:w-[46%] md:max-w-xl min-h-48 py-2"
-      } ${
-        imageOnly && canUseLink
-          ? "cursor-pointer ring-0 focus-within:ring-2 focus-within:ring-cyan-400/50"
-          : ""
-      }`}
-      role={imageOnly && canUseLink ? "button" : undefined}
-      tabIndex={imageOnly && canUseLink ? 0 : undefined}
-      onClick={imageOnly && canUseLink ? () => navigateTracked(slide) : undefined}
-      onKeyDown={
-        imageOnly && canUseLink
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                navigateTracked(slide);
-              }
-            }
-          : undefined
-      }
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={imgUrl}
-        alt={slide.imageAlt || slide.title || "Banner"}
-        className={`w-full object-contain object-center ${
-          imageOnly ? "max-h-[min(52vw,420px)]" : "max-h-48 md:max-h-64"
-        }`}
-      />
-    </div>
-  ) : null;
 
   return (
-    <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-2xl overflow-hidden min-h-[180px]">
+    <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-2xl overflow-hidden h-[320px] md:h-[360px]">
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-orange-500/10 to-pink-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />
       <div
@@ -124,17 +110,9 @@ function SlideContent({
         }}
       />
 
-      <div
-        className={`relative z-10 p-6 sm:p-8 ${
-          imgUrl && !imageOnly
-            ? "flex flex-col md:flex-row gap-6 md:items-center"
-            : ""
-        }`}
-      >
-        {imageBlock}
-
+      <div className="relative z-10 h-full p-6 sm:p-8 flex flex-col md:flex-row gap-6 md:items-center">
         {(showBadge || showTitle || showSubtitle || showCta) && (
-          <div className={imgUrl && !imageOnly ? "flex-1 min-w-0" : ""}>
+          <div className="flex-1 min-w-0">
             {showBadge ? (
               <div className="flex items-center gap-2 mb-3">
                 <div className="px-3 py-1 bg-cyan-500/20 rounded-full">

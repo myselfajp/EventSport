@@ -16,6 +16,7 @@ import StaticPage from '../models/staticPageModel.js';
 import Suggestion from '../models/suggestionModel.js';
 import DashboardHeroSlide from '../models/dashboardHeroSlideModel.js';
 import DashboardHeroClick from '../models/dashboardHeroClickModel.js';
+import DashboardHeaderLogo, { HEADER_LOGO_KEY } from '../models/dashboardHeaderLogoModel.js';
 import { parseHeroAnalyticsQuery, fillDailySeries } from '../utils/heroClickAnalytics.js';
 import { AppError } from '../utils/appError.js';
 import {
@@ -1847,3 +1848,100 @@ export const deleteDashboardHeroSlide = async (req, res, next) => {
 function heroSlideHasContent({ title, subtitle, image }) {
     return !!(image?.path || String(title || '').trim() || String(subtitle || '').trim());
 }
+
+function formatDashboardHeaderLogo(row) {
+    if (!row) return null;
+    return {
+        _id: row._id,
+        imageAlt: row.imageAlt || '',
+        isActive: row.isActive !== false,
+        image: row.image?.path
+            ? {
+                  ...row.image,
+                  path: uploadsRelativePath(row.image.path),
+              }
+            : undefined,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
+    };
+}
+
+export const getDashboardHeaderLogo = async (req, res, next) => {
+    try {
+        const row = await DashboardHeaderLogo.findOne({ key: HEADER_LOGO_KEY }).lean();
+        res.status(200).json({
+            success: true,
+            data: formatDashboardHeaderLogo(row),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateDashboardHeaderLogo = async (req, res, next) => {
+    try {
+        const raw = parseDashboardHeroData(req);
+        const body = raw && typeof raw === 'object' ? raw : {};
+
+        let logo = await DashboardHeaderLogo.findOne({ key: HEADER_LOGO_KEY });
+        if (!logo) {
+            logo = new DashboardHeaderLogo({ key: HEADER_LOGO_KEY });
+        }
+
+        if (body.imageAlt !== undefined) {
+            logo.imageAlt =
+                typeof body.imageAlt === 'string'
+                    ? body.imageAlt.trim().slice(0, 120)
+                    : 'EventSport';
+        }
+        if (body.isActive !== undefined) {
+            logo.isActive = body.isActive !== false;
+        }
+        const removingImage = !!body.removeImage && !req.fileMeta;
+
+        if (body.removeImage) {
+            await safeUnlinkHeroImage(logo.image);
+            logo.image = undefined;
+        }
+        if (req.fileMeta) {
+            await safeUnlinkHeroImage(logo.image);
+            logo.image = req.fileMeta;
+        }
+
+        if (!logo.image?.path && !req.fileMeta) {
+            if (removingImage || logo.isNew) {
+                if (!logo.isNew) {
+                    await logo.deleteOne();
+                }
+                return res.status(200).json({ success: true, data: null });
+            }
+            throw new AppError(400, 'Upload a logo image');
+        }
+
+        await logo.save();
+
+        res.status(200).json({
+            success: true,
+            data: formatDashboardHeaderLogo(logo.toObject()),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const deleteDashboardHeaderLogo = async (req, res, next) => {
+    try {
+        const logo = await DashboardHeaderLogo.findOne({ key: HEADER_LOGO_KEY });
+        if (!logo) {
+            return res.status(200).json({ success: true, data: null });
+        }
+        await safeUnlinkHeroImage(logo.image);
+        await logo.deleteOne();
+        res.status(200).json({
+            success: true,
+            data: null,
+            message: 'Logo removed',
+        });
+    } catch (err) {
+        next(err);
+    }
+};

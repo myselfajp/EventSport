@@ -69,6 +69,7 @@ export const EP = {
     activeStaticPages: `${API_V1_BASE}/public/static-pages/active`,
     contractsCatalog: `${API_V1_BASE}/public/contracts`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
+    dashboardHeaderLogo: `${API_V1_BASE}/public/dashboard-header-logo`,
     dashboardHeroSlides: `${API_V1_BASE}/public/dashboard-hero-slides`,
     heroClick: (slideId: string) =>
       `${API_V1_BASE}/public/hero-click/${encodeURIComponent(slideId)}`,
@@ -179,6 +180,11 @@ export const EP = {
         `${ADMIN_API}/users/${userId}/contract-acceptances`,
     },
     suggestions: `${ADMIN_API}/suggestions`,
+    dashboardHeaderLogo: {
+      get: `${ADMIN_API}/dashboard-header-logo`,
+      update: `${ADMIN_API}/dashboard-header-logo`,
+      delete: `${ADMIN_API}/dashboard-header-logo`,
+    },
     dashboardHeroSlides: {
       list: `${ADMIN_API}/dashboard-hero-slides`,
       create: `${ADMIN_API}/dashboard-hero-slides`,

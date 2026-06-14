@@ -17,7 +17,7 @@ const ActivityPage = () => {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden transition-colors duration-300">
       <LeftSidebar isOpen={leftSidebarOpen} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
         <Header
           onLeftSidebarToggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
           onRightSidebarToggle={() => setRightSidebarOpen(!rightSidebarOpen)}
