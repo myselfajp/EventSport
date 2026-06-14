@@ -6,6 +6,7 @@ import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
 import { District } from '../models/locationModel.js';
 import { AppError } from '../utils/appError.js';
+import { buildLocationKey, resolveIstanbulDistrictId } from './locationHelper.js';
 import {
     notifyNearbyEventCreated,
     notifyCoachFollowersOfEvent,
@@ -49,18 +50,92 @@ export async function resolveEventDistrict({ type, district, facility, salon }) 
     );
 }
 
+/**
+ * Resolve the full location of an event (multi-country aware).
+ * Returns { district (Istanbul ObjectId|null), country, state, city, districtName, locationKey }.
+ *
+ * Priority:
+ *  1) Online → empty.
+ *  2) Manual Istanbul district / facility / salon → Istanbul ObjectId + tr:istanbul key.
+ *  3) Explicit country/state/city/districtName (multi-country, no facility) → key from those.
+ */
+export async function resolveEventLocation({
+    type,
+    district,
+    facility,
+    salon,
+    country,
+    state,
+    city,
+    districtName,
+}) {
+    const empty = {
+        district: null,
+        country: '',
+        state: '',
+        city: '',
+        districtName: '',
+        locationKey: '',
+    };
+    if (type === 'Online') return empty;
+
+    // 1) Istanbul District ObjectId from manual district / facility / salon.
+    let istanbulDistrictId = null;
+    if (district) {
+        const exists = await District.exists({ _id: district });
+        if (!exists) throw new AppError(400, 'Invalid district.');
+        istanbulDistrictId = district;
+    } else if (facility) {
+        const doc = await Facility.findById(facility).select('location.district').lean();
+        if (doc?.location?.district) istanbulDistrictId = doc.location.district;
+    } else if (salon) {
+        const doc = await Salon.findById(salon)
+            .select('facility')
+            .populate({ path: 'facility', select: 'location.district' })
+            .lean();
+        if (doc?.facility?.location?.district) istanbulDistrictId = doc.facility.location.district;
+    }
+
+    if (istanbulDistrictId) {
+        const dDoc = await District.findById(istanbulDistrictId).select('name').lean();
+        const loc = { country: 'TR', state: '', city: 'İstanbul', districtName: dDoc?.name || '' };
+        return { district: istanbulDistrictId, ...loc, locationKey: buildLocationKey(loc) };
+    }
+
+    // 2) Explicit multi-country location fields (no facility/salon).
+    const ctry = String(country || '').toUpperCase() === 'US' ? 'US' : country ? 'TR' : '';
+    if (ctry) {
+        const loc = {
+            country: ctry,
+            state: state || '',
+            city: city || '',
+            districtName: districtName || '',
+        };
+        const key = buildLocationKey(loc);
+        if (key) {
+            const linkedId =
+                ctry === 'TR' ? await resolveIstanbulDistrictId(loc.city, loc.districtName) : null;
+            return { district: linkedId, ...loc, locationKey: key };
+        }
+    }
+
+    throw new AppError(
+        400,
+        'A location is required for non-online events. Select a facility/salon, or provide country, city and district.'
+    );
+}
+
 const NOTIFY_BATCH_SIZE = 200;
 
-/** Notify users in the same Istanbul district when a new physical event is created. */
+/** Notify users in the same locality (locationKey) when a new physical event is created. */
 export async function notifyUsersInEventDistrict(event, ownerUserId, coachName) {
-    if (!event?.district || event.type === 'Online' || event.private) return;
+    if (!event?.locationKey || event.type === 'Online' || event.private) return;
 
     try {
-        const districtDoc = await District.findById(event.district).select('name').lean();
-        const districtName = districtDoc?.name || 'your district';
+        const districtName = event.districtName || event.city || 'your area';
 
         const users = await User.find({
-            'location.district': event.district,
+            'location.locationKey': event.locationKey,
             isActive: { $ne: false },
             _id: { $ne: ownerUserId },
         })

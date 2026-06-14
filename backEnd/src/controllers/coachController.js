@@ -24,7 +24,7 @@ import {
 } from '../utils/contractAcceptanceHelper.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import {
-    resolveEventDistrict,
+    resolveEventLocation,
     notifyUsersInEventDistrict,
     notifyCoachFollowersOfNewEvent,
     notifyAffinityFollowersOfNewEvent,
@@ -402,13 +402,22 @@ export const createEvent = async (req, res, next) => {
         eventFields.banner = req.fileMeta['event-banner'][0];
         eventFields.photo = req.fileMeta['event-photo'][0];
 
-        const resolvedDistrict = await resolveEventDistrict({
+        const resolvedLoc = await resolveEventLocation({
             type: eventFields.type,
             district: eventFields.district,
             facility: eventFields.facility,
             salon: eventFields.salon,
+            country: eventFields.country,
+            state: eventFields.state,
+            city: eventFields.city,
+            districtName: eventFields.districtName,
         });
-        eventFields.district = resolvedDistrict;
+        eventFields.district = resolvedLoc.district;
+        eventFields.country = resolvedLoc.country;
+        eventFields.state = resolvedLoc.state;
+        eventFields.city = resolvedLoc.city;
+        eventFields.districtName = resolvedLoc.districtName;
+        eventFields.locationKey = resolvedLoc.locationKey;
 
         if (eventFields.isRecurring && recurrence) {
             const seriesResult = await createRecurringEventSeries({
@@ -580,17 +589,36 @@ export const editEvent = async (req, res, next) => {
             result.type !== undefined ||
             result.district !== undefined ||
             result.facility !== undefined ||
-            result.salon !== undefined
+            result.salon !== undefined ||
+            result.country !== undefined ||
+            result.state !== undefined ||
+            result.city !== undefined ||
+            result.districtName !== undefined
         ) {
             if (effectiveType === 'Online') {
                 updateData.district = null;
+                updateData.country = '';
+                updateData.state = '';
+                updateData.city = '';
+                updateData.districtName = '';
+                updateData.locationKey = '';
             } else {
-                updateData.district = await resolveEventDistrict({
+                const resolvedLoc = await resolveEventLocation({
                     type: effectiveType,
                     district: result.district ?? eventExists.district,
                     facility: effectiveFacility || undefined,
                     salon: effectiveSalon || undefined,
+                    country: result.country ?? eventExists.country,
+                    state: result.state ?? eventExists.state,
+                    city: result.city ?? eventExists.city,
+                    districtName: result.districtName ?? eventExists.districtName,
                 });
+                updateData.district = resolvedLoc.district;
+                updateData.country = resolvedLoc.country;
+                updateData.state = resolvedLoc.state;
+                updateData.city = resolvedLoc.city;
+                updateData.districtName = resolvedLoc.districtName;
+                updateData.locationKey = resolvedLoc.locationKey;
             }
         }
 

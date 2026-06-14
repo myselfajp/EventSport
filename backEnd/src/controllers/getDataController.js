@@ -37,12 +37,16 @@ export const createSearchController = (model, config = {}) => {
                 sortBy,
                 sortType = 'asc',
                 district,
+                locationKey,
                 ...filters
             } = parsed;
 
             const skip = (pageNumber - 1) * perPage;
             const filter = {};
             applyLocationFilter(filter, { district }, districtFilterField);
+            if (locationKey) {
+                filter.locationKey = locationKey;
+            }
 
             const trimmedSearch = typeof search === 'string' ? search.trim() : '';
             const orParts = [];

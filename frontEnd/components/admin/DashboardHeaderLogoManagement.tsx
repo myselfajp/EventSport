@@ -5,6 +5,11 @@ import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import { ImageIcon, Save, Trash2, Upload } from "lucide-react";
 
+const LOGO_RECOMMENDED_WIDTH = 300;
+const LOGO_RECOMMENDED_HEIGHT = 64;
+const LOGO_MAX_FILE_SIZE_MB = 10;
+const LOGO_MAX_FILE_SIZE_BYTES = LOGO_MAX_FILE_SIZE_MB * 1024 * 1024;
+
 interface HeaderLogo {
   _id?: string;
   imageAlt?: string;
@@ -65,6 +70,21 @@ export default function DashboardHeaderLogoManagement() {
 
   const existingImageUrl = logo?.image?.path ? EP.assetUrl(logo.image.path) : null;
   const previewUrl = previewBlobUrl || existingImageUrl;
+
+  const handleFileSelect = (file?: File) => {
+    setError("");
+    if (!file) {
+      setImageFile(null);
+      return;
+    }
+    if (file.size > LOGO_MAX_FILE_SIZE_BYTES) {
+      setImageFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setError(`Logo image must be ${LOGO_MAX_FILE_SIZE_MB} MB or smaller.`);
+      return;
+    }
+    setImageFile(file);
+  };
 
   const handleDelete = async () => {
     if (!logo?.image?.path) return;
@@ -140,8 +160,9 @@ export default function DashboardHeaderLogoManagement() {
         <div>
           <h2 className="text-lg font-semibold">Site header logo</h2>
           <p className="text-sm text-gray-500 dark:text-slate-400">
-            Upload a transparent PNG or SVG for the center of the site header. On page load the logo
-            animates from 75% to 110%, then settles at 100%.
+            Upload a transparent logo for the center of the site header. Recommended size:{" "}
+            {LOGO_RECOMMENDED_WIDTH}x{LOGO_RECOMMENDED_HEIGHT}px. Max file size:{" "}
+            {LOGO_MAX_FILE_SIZE_MB} MB.
           </p>
         </div>
       </div>
@@ -163,6 +184,10 @@ export default function DashboardHeaderLogoManagement() {
             <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
               Logo image
             </label>
+            <div className="rounded-lg border border-cyan-200 bg-cyan-50/70 px-3 py-2 text-xs text-cyan-950 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-cyan-100">
+              Recommended canvas: {LOGO_RECOMMENDED_WIDTH}x{LOGO_RECOMMENDED_HEIGHT}px. Accepted
+              formats: PNG, JPG, WebP, SVG. Maximum upload: {LOGO_MAX_FILE_SIZE_MB} MB.
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
@@ -181,14 +206,14 @@ export default function DashboardHeaderLogoManagement() {
                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  setImageFile(file ?? null);
+                  handleFileSelect(file);
                 }}
                 className="hidden"
               />
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Required: transparent background (PNG or SVG). Do not upload JPEG photos or images with
-              a solid or textured backdrop — only the mark and wordmark should be visible.
+              Use a transparent background when possible. Keep the mark and wordmark inside the
+              recommended area so the header animation does not crop or crowd the logo.
             </p>
 
             {previewUrl ? (

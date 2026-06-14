@@ -68,24 +68,40 @@ function SlideContent({
   userRole: number | null;
 }) {
   const imgUrl = slideImageUrl(slide);
+  const canUseLink =
+    !!slide.ctaHref?.trim() &&
+    (!slide.ctaRequiresAdminRole || userRole === 0);
 
   if (imgUrl) {
+    const image = (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imgUrl}
+          alt={slide.imageAlt || slide.title || "Dashboard banner"}
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-fill select-none pointer-events-none"
+        />
+      </>
+    );
+
+    if (canUseLink) {
+      return (
+        <a
+          href={trackedClickUrl(slide)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={slide.ctaLabel || slide.title || "Open banner link"}
+          className="relative block w-full h-[320px] md:h-[360px] overflow-hidden rounded-xl bg-[#0b1329] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-slate-900"
+        >
+          {image}
+        </a>
+      );
+    }
+
     return (
-      <div
-        className="relative w-full h-[320px] md:h-[360px] overflow-hidden rounded-xl bg-[#0b1329] flex items-center justify-center"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imgUrl}
-          alt="bg-blur"
-          className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-30 select-none pointer-events-none"
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imgUrl}
-          alt="main-banner"
-          className="relative z-10 max-w-full max-h-full w-auto h-auto object-contain"
-        />
+      <div className="relative w-full h-[320px] md:h-[360px] overflow-hidden rounded-xl bg-[#0b1329]">
+        {image}
       </div>
     );
   }
@@ -94,9 +110,6 @@ function SlideContent({
   const showTitle = !!(slide.title && slide.title.trim());
   const showSubtitle = !!(slide.subtitle && slide.subtitle.trim());
   const titleText = interpolateTitle(slide.title || "", firstName);
-  const canUseLink =
-    !!slide.ctaHref?.trim() &&
-    (!slide.ctaRequiresAdminRole || userRole === 0);
   const showCta = !!(slide.ctaLabel?.trim() && canUseLink);
 
   return (
@@ -209,7 +222,7 @@ export default function DashboardHeroSlider({ slides, firstName, userRole }: Pro
         className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth gap-0 rounded-2xl touch-pan-x cursor-grab active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none"
         style={{ WebkitOverflowScrolling: "touch" }}
         onPointerDown={(e) => {
-          if ((e.target as HTMLElement).closest("button")) return;
+          if ((e.target as HTMLElement).closest("button, a")) return;
           const el = scrollerRef.current;
           if (!el) return;
           el.setPointerCapture(e.pointerId);

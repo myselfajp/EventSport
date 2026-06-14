@@ -75,7 +75,15 @@ export const EP = {
       `${API_V1_BASE}/public/hero-click/${encodeURIComponent(slideId)}`,
   },
   LOCATION: {
+    detect: `${LOCATION_API}/detect`,
     districts: `${LOCATION_API}/districts`,
+    countries: `${LOCATION_API}/countries`,
+    trProvinces: `${LOCATION_API}/tr/provinces`,
+    trDistricts: (province: string) =>
+      `${LOCATION_API}/tr/districts?province=${encodeURIComponent(province)}`,
+    usStates: `${LOCATION_API}/us/states`,
+    usCities: (state: string) =>
+      `${LOCATION_API}/us/cities?state=${encodeURIComponent(state)}`,
   },
   AUTH: {
     signIn: `${AUTH_API}/sign-in`,

@@ -12,8 +12,10 @@ import {
   normalizePhoneForDisplay,
   isPhoneComplete,
 } from "@/app/lib/phone-utils";
-import LocationFields, { emptyLocationValue } from "@/components/location/LocationFields";
-import type { LocationValue } from "@/app/lib/location-api";
+import CascadingLocationFields, {
+  normalizeCountry,
+} from "@/components/location/CascadingLocationFields";
+import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
 
 interface UserEditModalProps {
   isOpen: boolean;
@@ -31,18 +33,39 @@ interface UserFormData {
 }
 
 function locationFromUser(user: {
-  location?: { district?: string | { _id?: string }; addressLine?: string };
+  location?: {
+    country?: string;
+    state?: string;
+    city?: string;
+    district?: string | { _id?: string; name?: string };
+    districtName?: string;
+    postalCode?: string;
+    addressLine?: string;
+  };
 }): LocationValue {
-  const district = user.location?.district;
-  const districtId =
-    typeof district === "object" && district?._id
-      ? String(district._id)
-      : typeof district === "string"
-        ? district
-        : "";
+  const loc = user.location || {};
+  const country = normalizeCountry(loc.country);
+  const districtDocName =
+    typeof loc.district === "object" && loc.district?.name
+      ? String(loc.district.name)
+      : "";
+
+  // Legacy Istanbul users: only the district ObjectId is set.
+  const city =
+    loc.city || (country === "TR" && districtDocName ? "İstanbul" : "");
+  const districtName = loc.districtName || districtDocName || "";
+
   return {
-    district: districtId,
-    addressLine: user.location?.addressLine?.trim() || "",
+    ...emptyLocationValue(),
+    country,
+    state: loc.state || "",
+    stateCode: "",
+    city,
+    provinceSlug: "",
+    district: "",
+    districtName,
+    postalCode: loc.postalCode || "",
+    addressLine: loc.addressLine?.trim() || "",
   };
 }
 
@@ -113,9 +136,33 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    if (!locationValue.district) {
-      setError("Please select your Istanbul district.");
-      return;
+    const country = normalizeCountry(locationValue.country);
+    if (country === "TR") {
+      if (!locationValue.city) {
+        setError("Lütfen şehir (il) seçin.");
+        return;
+      }
+      if (!locationValue.districtName) {
+        setError("Lütfen ilçe seçin.");
+        return;
+      }
+      if (!locationValue.postalCode?.trim()) {
+        setError("Lütfen posta kodunu girin.");
+        return;
+      }
+    } else {
+      if (!locationValue.state) {
+        setError("Please select your state.");
+        return;
+      }
+      if (!locationValue.city?.trim()) {
+        setError("Please enter your city.");
+        return;
+      }
+      if (!locationValue.postalCode?.trim()) {
+        setError("Please enter your ZIP code.");
+        return;
+      }
     }
 
     if (changePassword) {
@@ -144,9 +191,16 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        district: locationValue.district,
+        country,
+        city: (locationValue.city || "").trim(),
+        postalCode: (locationValue.postalCode || "").trim(),
       };
-      const addressLine = locationValue.addressLine.trim();
+      if (country === "TR") {
+        payload.districtName = (locationValue.districtName || "").trim();
+      } else {
+        payload.state = (locationValue.state || "").trim();
+      }
+      const addressLine = (locationValue.addressLine || "").trim();
       if (addressLine) payload.addressLine = addressLine;
 
       if (changePassword) {
@@ -272,10 +326,10 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
               Location
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              If you move within Istanbul, update your district so nearby events and
+              If you move, update your location so nearby events and
               recommendations stay accurate.
             </p>
-            <LocationFields
+            <CascadingLocationFields
               value={locationValue}
               onChange={setLocationValue}
               disabled={loading}

@@ -273,7 +273,7 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Notifications Dropdown */}
             {isNotificationsOpen && (
-              <div className="absolute right-0 top-12 w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg dark:shadow-xl z-50 max-h-96 overflow-y-auto">
+              <div className="absolute right-0 top-12 z-[120] w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg dark:shadow-xl max-h-96 overflow-y-auto">
                 <div className="p-3 border-b border-gray-200 dark:border-slate-700">
                   <h3 className="font-medium text-gray-800 dark:text-slate-100 text-sm">
                     Notifications

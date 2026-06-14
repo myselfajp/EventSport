@@ -51,17 +51,34 @@ const EventsDashboard = () => {
   const isCoach = user?.coach != null;
   const canManageEvents = isCoach || user?.role === 0;
 
-  const userDistrict = user?.location?.district;
-  const userDistrictId =
-    typeof userDistrict === "object" && userDistrict?._id
-      ? String(userDistrict._id)
-      : typeof userDistrict === "string"
-        ? userDistrict
-        : null;
-  const userDistrictName =
+  const userLocation = user?.location as
+    | {
+        country?: string;
+        state?: string;
+        city?: string;
+        district?: string | { _id?: string; name?: string };
+        districtName?: string;
+        locationKey?: string;
+      }
+    | undefined;
+  const userDistrict = userLocation?.district;
+  const userDistrictDocName =
     typeof userDistrict === "object" && userDistrict?.name
       ? String(userDistrict.name)
       : null;
+  const userLocationKey = userLocation?.locationKey || null;
+  const userLocationLabel = (() => {
+    if (!userLocation) return null;
+    const country = String(userLocation.country || "TR").toUpperCase();
+    if (country === "US") {
+      return (
+        [userLocation.city, userLocation.state].filter(Boolean).join(", ") ||
+        null
+      );
+    }
+    const district = userLocation.districtName || userDistrictDocName;
+    return [district, userLocation.city].filter(Boolean).join(", ") || district;
+  })();
 
   useEffect(() => {
     let cancelled = false;
@@ -326,8 +343,8 @@ const EventsDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
                     <YourNextEventSection />
                     <NearbyEventsSection
-                      districtId={userDistrictId}
-                      districtName={userDistrictName}
+                      locationKey={userLocationKey}
+                      locationLabel={userLocationLabel}
                     />
                     <HotUpcomingSection />
                     <CheckInTimesSection />

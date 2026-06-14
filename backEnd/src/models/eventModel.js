@@ -144,6 +144,13 @@ const eventSchema = new mongoose.Schema(
             ref: 'District',
             index: true,
         },
+        /** Country-agnostic location fields (mirror of user location for nearby matching). */
+        country: { type: String, trim: true, uppercase: true, maxlength: 2 },
+        state: { type: String, trim: true, maxlength: 120 },
+        city: { type: String, trim: true, maxlength: 120 },
+        districtName: { type: String, trim: true, maxlength: 120 },
+        /** Normalized locality key (e.g. `tr:van:edremit`, `us:hawaii:hilo`). */
+        locationKey: { type: String, trim: true, maxlength: 160, index: true },
         location: {
             type: String,
         },

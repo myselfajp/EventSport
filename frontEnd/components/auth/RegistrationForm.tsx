@@ -13,7 +13,8 @@ import {
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import LegalContentModal from "./LegalContentModal";
-import LocationFields, { emptyLocationValue } from "@/components/location/LocationFields";
+import { emptyLocationValue } from "@/components/location/LocationFields";
+import RegistrationLocationFields from "@/components/location/RegistrationLocationFields";
 import type { LocationValue } from "@/app/lib/location-api";
 
 interface RegistrationFormProps {
@@ -143,9 +144,39 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
-    if (!locationValue.district) {
-      setValidationError("Please select your Istanbul district.");
-      return;
+    const country = (locationValue.country || "TR").toUpperCase() === "US" ? "US" : "TR";
+    const city = (locationValue.city || "").trim();
+    const postalCode = (locationValue.postalCode || "").trim();
+    const state = (locationValue.state || "").trim();
+    const districtName = (locationValue.districtName || "").trim();
+    const isTurkey = country === "TR";
+
+    if (isTurkey) {
+      if (!city) {
+        setValidationError("Lütfen şehir (il) seçin.");
+        return;
+      }
+      if (!districtName) {
+        setValidationError("Lütfen ilçe seçin.");
+        return;
+      }
+      if (!postalCode) {
+        setValidationError("Lütfen posta kodunu girin.");
+        return;
+      }
+    } else {
+      if (!state) {
+        setValidationError("Please select your state.");
+        return;
+      }
+      if (!city) {
+        setValidationError("Please enter your city.");
+        return;
+      }
+      if (!postalCode) {
+        setValidationError("Please enter your ZIP code.");
+        return;
+      }
     }
 
     signUp({
@@ -156,7 +187,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       email: email.trim().toLowerCase(),
       password,
       otp: otpDigits,
-      district: locationValue.district,
+      country,
+      state,
+      city,
+      postalCode,
+      districtName: districtName || undefined,
       agreeTerms: true,
       agreeKvkk: true,
       termsVersionId: activeTerms._id,
@@ -329,12 +364,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              District (Istanbul) <span className="text-red-500">*</span>
+              Location <span className="text-red-500">*</span>
             </label>
-            <LocationFields
+            <RegistrationLocationFields
               value={locationValue}
               onChange={setLocationValue}
-              showAddressLine={false}
             />
           </div>
 

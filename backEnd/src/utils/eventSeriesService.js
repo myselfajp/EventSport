@@ -11,7 +11,6 @@ import {
     getListingPricePerSlot,
     frequencyLabel,
 } from './recurrenceHelper.js';
-import { resolveEventDistrict } from './eventDistrictHelper.js';
 import {
     notifyUsersInEventDistrict,
     notifyCoachFollowersOfNewEvent,

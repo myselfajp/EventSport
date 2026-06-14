@@ -27,7 +27,7 @@ import {
     verifyAndConsumeRegistrationOtp,
 } from '../utils/registrationOtp.js';
 import { assertNotBlacklisted } from '../utils/blacklistHelper.js';
-import { District } from '../models/locationModel.js';
+import { resolveIstanbulDistrictId, buildLocationKey } from '../utils/locationHelper.js';
 
 export const sendRegistrationOtp = async (req, res, next) => {
     try {
@@ -103,10 +103,6 @@ export const signUp = async (req, res, next) => {
 
         await verifyAndConsumeRegistrationOtp(email, result.otp);
 
-        const districtExists = await District.exists({ _id: result.district });
-        if (!districtExists) {
-            throw new AppError(400, 'Invalid district.');
-        }
 
         if (result.marketingConsent) {
             const cmDoc = await LegalDocument.findById(result.commercialMessagesVersionId).lean();
@@ -125,15 +121,36 @@ export const signUp = async (req, res, next) => {
             otp: _otp,
             marketingConsent,
             commercialMessagesVersionId,
-            district,
+            country,
+            state,
+            city,
+            district: _ignoredDistrict,
+            districtName,
+            postalCode,
             ...userData
         } = result;
+
+        // For Istanbul, link to the stored District document so district-based
+        // features (nearby events, notifications) keep working.
+        const istanbulDistrictId =
+            country === 'TR' ? await resolveIstanbulDistrictId(city, districtName) : null;
+
+        const location = {
+            country,
+            ...(state ? { state } : {}),
+            ...(city ? { city } : {}),
+            ...(istanbulDistrictId ? { district: istanbulDistrictId } : {}),
+            ...(districtName ? { districtName } : {}),
+            ...(postalCode ? { postalCode } : {}),
+        };
+        const locationKey = buildLocationKey({ country, state, city, districtName });
+        if (locationKey) location.locationKey = locationKey;
 
         const user = await User.create({
             ...userData,
             email,
             password: hashedPassword,
-            location: { district },
+            location,
             isEmailVerified: true,
             termsAccepted: {
                 versionId: new Types.ObjectId(termsVersionId),
@@ -466,7 +483,46 @@ export const editUser = async (req, res, next) => {
             delete result.newPassword;
         }
 
-        const userUpdate = await mergeLocationIntoPayload(result);
+        const hasStructuredLocation = ['country', 'state', 'city', 'districtName', 'postalCode'].some(
+            (k) => result[k] !== undefined
+        );
+
+        let userUpdate;
+        if (hasStructuredLocation) {
+            const country = String(result.country || 'TR').toUpperCase() === 'US' ? 'US' : 'TR';
+            const state = result.state || '';
+            const city = result.city || '';
+            const districtName = result.districtName || '';
+            const postalCode = result.postalCode || '';
+            const istanbulDistrictId =
+                country === 'TR' ? await resolveIstanbulDistrictId(city, districtName) : null;
+
+            const location = {
+                country,
+                ...(state ? { state } : {}),
+                ...(city ? { city } : {}),
+                ...(istanbulDistrictId ? { district: istanbulDistrictId } : {}),
+                ...(districtName ? { districtName } : {}),
+                ...(postalCode ? { postalCode } : {}),
+            };
+            const locationKey = buildLocationKey({ country, state, city, districtName });
+            if (locationKey) location.locationKey = locationKey;
+
+            const {
+                country: _c,
+                state: _s,
+                city: _ci,
+                districtName: _d,
+                postalCode: _p,
+                district: _di,
+                addressLine: _a,
+                ...rest
+            } = result;
+            userUpdate = { ...rest, location };
+        } else {
+            userUpdate = await mergeLocationIntoPayload(result);
+        }
+
         const editUser = await User.findByIdAndUpdate(req.user._id, { $set: userUpdate }, { new: true })
             .populate({ path: 'location.district', select: 'name' });
 
@@ -578,4 +634,3 @@ export const saveCookieConsent = async (req, res, next) => {
         next(err);
     }
 };
-

@@ -9,6 +9,13 @@ const PASSWORD_RULE_MESSAGE =
     'Şifre en az 8 karakter olmalı ve en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir.';
 const hexRegex = /^#([0-9A-F]{6}|[0-9A-F]{3})$/i;
 const MongoObjectIdRegex = /^[a-fA-F\d]{24}$/;
+const CountryCodeRegex = /^[A-Z]{2}$/;
+
+const optionalTrimmedText = (max = 120) => z.string().trim().max(max).optional().default('');
+const countryCodeInput = z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim().toUpperCase() : value),
+    z.string().regex(CountryCodeRegex, 'Provide a valid 2-letter country code.').default('TR')
+);
 
 export const name = z.string({
     error: (iss) => (iss.input === undefined ? 'name is required.' : 'Invalid name.'),
@@ -163,15 +170,12 @@ export const signupSchema = z.object({
         .regex(MongoObjectIdRegex, 'Invalid commercial messages version ID.')
         .optional(),
 
-    /** Required Istanbul district at registration. */
-    district: z
-        .string({
-            error: (iss) =>
-                iss.input === undefined
-                    ? { message: 'District is required.' }
-                    : { message: 'Invalid district.' },
-        })
-        .regex(MongoObjectIdRegex, 'Provide a valid district ID.'),
+    country: countryCodeInput,
+    state: optionalTrimmedText(),
+    city: optionalTrimmedText(),
+    districtName: optionalTrimmedText(),
+    postalCode: optionalTrimmedText(24),
+    district: mongoObjectId.optional(),
 }).superRefine((data, ctx) => {
     if (data.marketingConsent && !data.commercialMessagesVersionId) {
         ctx.addIssue({
@@ -179,6 +183,48 @@ export const signupSchema = z.object({
             message: 'Commercial messages consent version is required when opting in.',
             path: ['commercialMessagesVersionId'],
         });
+    }
+
+    // The product only supports Turkey and the United States.
+    if (data.country !== 'TR' && data.country !== 'US') {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Registration is only available for Turkey and the United States.',
+            path: ['country'],
+        });
+        return;
+    }
+
+    if (data.country === 'TR') {
+        if (!data.city) {
+            ctx.addIssue({ code: 'custom', message: 'City (province) is required.', path: ['city'] });
+        }
+        if (!data.districtName) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'District is required.',
+                path: ['districtName'],
+            });
+        }
+        if (!data.postalCode) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Postal code is required.',
+                path: ['postalCode'],
+            });
+        }
+        return;
+    }
+
+    // US
+    if (!data.state) {
+        ctx.addIssue({ code: 'custom', message: 'State is required.', path: ['state'] });
+    }
+    if (!data.city) {
+        ctx.addIssue({ code: 'custom', message: 'City is required.', path: ['city'] });
+    }
+    if (!data.postalCode) {
+        ctx.addIssue({ code: 'custom', message: 'ZIP code is required.', path: ['postalCode'] });
     }
 });
 
@@ -325,6 +371,11 @@ export const editUserSchema = z
             .optional(),
         district: mongoObjectId.optional(),
         addressLine: z.string().trim().optional(),
+        country: countryCodeInput.optional(),
+        state: optionalTrimmedText().optional(),
+        city: optionalTrimmedText().optional(),
+        districtName: optionalTrimmedText().optional(),
+        postalCode: optionalTrimmedText(24).optional(),
     })
     .refine(
         (data) =>
@@ -338,7 +389,12 @@ export const editUserSchema = z
             data.oldPassword !== undefined ||
             data.deletePhoto !== undefined ||
             data.district !== undefined ||
-            data.addressLine !== undefined,
+            data.addressLine !== undefined ||
+            data.country !== undefined ||
+            data.state !== undefined ||
+            data.city !== undefined ||
+            data.districtName !== undefined ||
+            data.postalCode !== undefined,
         {
             message:
                 'At least one of first name, last name, phone, email, age, photo, password, location, or deletePhoto must be provided.',
@@ -580,6 +636,8 @@ export const SearchQuerySchema = z
         startTime: z.string().optional(),
         endTime: z.string().optional(),
         district: z.string().regex(MongoObjectIdRegex, 'DistrictId must be a valid ID').optional(),
+        /** Country-agnostic locality key for nearby matching (e.g. tr:van:edremit). */
+        locationKey: z.string().trim().max(160).optional(),
     })
     .strict();
 
@@ -873,6 +931,10 @@ export const createEventSchema = z
             .string()
             .regex(MongoObjectIdRegex, 'Provide a valid district ID.')
             .optional(),
+        country: countryCodeInput.optional(),
+        state: optionalTrimmedText().optional(),
+        city: optionalTrimmedText().optional(),
+        districtName: optionalTrimmedText().optional(),
         equipment: z.string({
             error: (iss) =>
                 iss.input === undefined
@@ -916,12 +978,18 @@ export const createEventSchema = z
                 });
             }
 
-            const hasDistrictSource = Boolean(data.district || data.facility || data.salon);
+            const hasExplicitLocation =
+                data.country === 'US'
+                    ? Boolean(data.state && data.city)
+                    : Boolean(data.country && data.city && data.districtName);
+            const hasDistrictSource = Boolean(
+                data.district || data.facility || data.salon || hasExplicitLocation
+            );
             if (!hasDistrictSource) {
                 ctx.addIssue({
                     code: 'custom',
                     message:
-                        'District is required for non-online events. Select a district or a facility/salon with a district.',
+                        'Location is required for non-online events. Select a facility/salon, or choose country, city and district.',
                     path: ['district'],
                 });
             }
@@ -947,12 +1015,18 @@ export const createEventPayloadSchema = createEventSchema
                 });
             }
 
-            const hasDistrictSource = Boolean(data.district || data.facility || data.salon);
+            const hasExplicitLocation =
+                data.country === 'US'
+                    ? Boolean(data.state && data.city)
+                    : Boolean(data.country && data.city && data.districtName);
+            const hasDistrictSource = Boolean(
+                data.district || data.facility || data.salon || hasExplicitLocation
+            );
             if (!hasDistrictSource) {
                 ctx.addIssue({
                     code: 'custom',
                     message:
-                        'District is required for non-online events. Select a district or a facility/salon with a district.',
+                        'Location is required for non-online events. Select a facility/salon, or choose country, city and district.',
                     path: ['district'],
                 });
             }

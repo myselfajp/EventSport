@@ -239,7 +239,7 @@ export default function DashboardHeroManagement() {
     });
   };
 
-  const handleBannerFileSelect = (file: File) => {
+  const handleBannerFileSelect = async (file: File) => {
     setImageFile(file);
     setRemoveImage(false);
     setError("");
@@ -254,7 +254,18 @@ export default function DashboardHeroManagement() {
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
-    setShowCropModal(true);
+    setShowCropModal(false);
+
+    try {
+      setImageProcessing(true);
+      const fittedFile = await resizeImageContainToBanner(originalUrl);
+      setProcessedBannerFile(fittedFile);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fit image");
+      setShowCropModal(true);
+    } finally {
+      setImageProcessing(false);
+    }
   };
 
   const handleFitEntireImage = async () => {
@@ -271,8 +282,6 @@ export default function DashboardHeroManagement() {
       setImageProcessing(false);
     }
   };
-
-  const previewBlobUrl = croppedPreviewUrl;
 
   const load = async () => {
     try {
@@ -364,7 +373,7 @@ export default function DashboardHeroManagement() {
       }
 
       if (imageFile && !croppedFile) {
-        setError("Apply crop or use “Fit entire image” before saving.");
+        setError("Wait for the banner image to finish fitting before saving.");
         return;
       }
 
@@ -678,8 +687,8 @@ export default function DashboardHeroManagement() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
                   Banner image&nbsp;
                   <span className="text-xs font-normal text-gray-500 dark:text-slate-400">
-                    (output {BANNER_OUTPUT_WIDTH}×{BANNER_OUTPUT_HEIGHT}px — crop for photos, fit
-                    entire for logos)
+                    (output {BANNER_OUTPUT_WIDTH}×{BANNER_OUTPUT_HEIGHT}px — fitted by default,
+                    crop optional)
                   </span>
                 </label>
 
@@ -688,7 +697,7 @@ export default function DashboardHeroManagement() {
                     className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 px-4 py-2.5 text-sm text-gray-600 dark:text-slate-400 hover:border-cyan-400 hover:bg-cyan-50/50 dark:hover:bg-cyan-950/30 transition-colors"
                   >
                     <Crop className="w-4 h-4 text-cyan-600" />
-                    {croppedFile ? "Change image" : "Choose file & crop"}
+                    {croppedFile ? "Change image" : "Choose file"}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -697,7 +706,7 @@ export default function DashboardHeroManagement() {
                         const file = e.target.files?.[0];
                         if (!file) return;
                         e.target.value = "";
-                        handleBannerFileSelect(file);
+                        void handleBannerFileSelect(file);
                       }}
                     />
                   </label>
@@ -730,7 +739,7 @@ export default function DashboardHeroManagement() {
 
                 {imageFile && !croppedFile ? (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Crop the photo or click “Fit entire image” for logos before saving.
+                    Preparing the banner-sized image. You can still adjust the crop if needed.
                   </p>
                 ) : null}
 
