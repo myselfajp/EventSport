@@ -807,7 +807,9 @@
 
 .site-header {
   height: 4rem;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 100;
 }
 
 .header-logo-wrap {

@@ -28,8 +28,8 @@ type NearbyEvent = CheckInEventRef & {
 };
 
 type NearbyEventsSectionProps = {
-  districtId?: string | null;
-  districtName?: string | null;
+  locationKey?: string | null;
+  locationLabel?: string | null;
   onEventClick?: (eventId: string) => void;
   className?: string;
 };
@@ -38,8 +38,8 @@ const COLUMN_CARD_CLASS =
   "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all group flex flex-row gap-3 items-start";
 
 const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
-  districtId,
-  districtName,
+  locationKey,
+  locationLabel,
   onEventClick,
   className = "",
 }) => {
@@ -49,7 +49,7 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
   const { onCoachClick, coachProfileModal } = useCoachProfileModal();
 
   useEffect(() => {
-    if (!districtId) {
+    if (!locationKey) {
       setEvents([]);
       setLoading(false);
       return;
@@ -62,7 +62,7 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
         const res = await fetchJSON(EP.EVENTS.getEvents, {
           method: "POST",
           body: {
-            district: districtId,
+            locationKey,
             perPage: 20,
             pageNumber: 1,
             sortBy: "startTime",
@@ -91,7 +91,7 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [districtId]);
+  }, [locationKey]);
 
   const openEvent = (event: NearbyEvent) => {
     if (onEventClick) {
@@ -114,19 +114,19 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
                 Events Near You
               </h2>
               <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
-                {districtName
-                  ? `${districtName}, Istanbul${events.length > 1 ? " · swipe to see more" : ""}`
-                  : "Set your district in profile"}
+                {locationLabel
+                  ? `${locationLabel}${events.length > 1 ? " · swipe to see more" : ""}`
+                  : "Set your location in profile"}
               </p>
             </div>
           </div>
         </div>
 
         <div className="p-4 flex-1 flex flex-col min-h-0">
-          {!districtId ? (
+          {!locationKey ? (
             <div className="flex-1 flex items-center justify-center min-h-[140px] rounded-xl border border-dashed border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/30 px-4">
               <p className="text-sm text-gray-500 dark:text-slate-400 text-center">
-                Add your district in profile to see nearby events.
+                Add your location in profile to see nearby events.
               </p>
             </div>
           ) : loading ? (
@@ -134,7 +134,7 @@ const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
           ) : events.length === 0 ? (
             <div className="flex-1 flex items-center justify-center min-h-[140px] rounded-xl border border-dashed border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/30 px-4">
               <p className="text-sm text-gray-500 dark:text-slate-400 text-center">
-                No upcoming events in your district yet.
+                No upcoming events in your area yet.
               </p>
             </div>
           ) : (

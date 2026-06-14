@@ -2,10 +2,15 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
-const allowedSize = 5 * 1024 * 1024;
-const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+const DEFAULT_ALLOWED_SIZE = 5 * 1024 * 1024;
+const DEFAULT_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-export const createMulter = () => {
+export const createMulter = (options = {}) => {
+    const {
+        maxFileSize = DEFAULT_ALLOWED_SIZE,
+        allowedMimeTypes = DEFAULT_ALLOWED_MIME_TYPES,
+    } = options;
+
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
             const uploadPath = path.join('uploads', file.fieldname);
@@ -24,9 +29,9 @@ export const createMulter = () => {
 
     return multer({
         storage,
-        limits: { fileSize: allowedSize },
+        limits: { fileSize: maxFileSize },
         fileFilter: (req, file, cb) => {
-            if (!allowed.includes(file.mimetype)) {
+            if (!allowedMimeTypes.includes(file.mimetype)) {
                 return cb(new multer.MulterError('UNEXPECTED_FILE'), false);
             }
             cb(null, true);

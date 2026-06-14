@@ -3,17 +3,25 @@ import { createMulter } from '../utils/multerConfig.js';
 const uploadTimeout = 30000;
 
 export const uploadFile = (options) => {
-    const { fieldName, mode = 'single', maxCount = 5, fields = [], optional = false } = options;
+    const {
+        fieldName,
+        mode = 'single',
+        maxCount = 5,
+        fields = [],
+        optional = false,
+        maxFileSize,
+        allowedMimeTypes,
+    } = options;
 
     let handler;
     if (mode === 'single') {
-        const upload = createMulter();
+        const upload = createMulter({ maxFileSize, allowedMimeTypes });
         handler = upload.single(fieldName);
     } else if (mode === 'array') {
-        const upload = createMulter();
+        const upload = createMulter({ maxFileSize, allowedMimeTypes });
         handler = upload.array(fieldName, maxCount);
     } else if (mode === 'fields') {
-        const upload = createMulter();
+        const upload = createMulter({ maxFileSize, allowedMimeTypes });
         handler = upload.fields(fields);
     }
 

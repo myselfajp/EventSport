@@ -9,7 +9,10 @@ import {
   getEventLinkSecurityHint,
   parseSecureEventLink,
 } from "@/app/lib/event-link-security";
-import LocationFields from "@/components/location/LocationFields";
+import CascadingLocationFields, {
+  normalizeCountry,
+} from "@/components/location/CascadingLocationFields";
+import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
 import LevelDefinitions from "@/components/LevelDefinitions";
 
 // Custom hook for debounce
@@ -182,6 +185,10 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     listingPurchaseConfirmed: false,
     editScope: "single" as "single" | "following",
   });
+
+  const [locationValue, setLocationValue] = useState<LocationValue>(
+    emptyLocationValue()
+  );
 
   const [listingQuote, setListingQuote] = useState<{
     unitPrice: number;
@@ -469,6 +476,22 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         recurrenceSessionCount: "4",
         listingPurchaseConfirmed: false,
         editScope: "single",
+      });
+
+      const initCountry = normalizeCountry(initialData.country);
+      const initDistrictName =
+        initialData.districtName ||
+        (typeof initialData.district === "object" && initialData.district?.name
+          ? String(initialData.district.name)
+          : "");
+      setLocationValue({
+        ...emptyLocationValue(),
+        country: initCountry,
+        state: initialData.state || "",
+        city:
+          initialData.city ||
+          (initCountry === "TR" && initDistrictName ? "İstanbul" : ""),
+        districtName: initDistrictName,
       });
 
       if (initialData.photo?.path) {
@@ -867,16 +890,19 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         return;
       }
 
-      const needsDistrict =
+      const needsLocation =
         (!formData.facility && !formData.salon) ||
         Boolean(formData.facility && !selectedFacilityDistrictId);
-      if (needsDistrict && !formData.district) {
-        setError(
-          formData.facility
-            ? "Selected facility has no district — select an Istanbul district below"
-            : "Select an Istanbul district when no facility is chosen"
-        );
-        return;
+      if (needsLocation) {
+        const c = normalizeCountry(locationValue.country);
+        if (c === "TR" && (!locationValue.city || !locationValue.districtName)) {
+          setError("Etkinlik konumu için şehir ve ilçe seçin");
+          return;
+        }
+        if (c === "US" && (!locationValue.state || !locationValue.city)) {
+          setError("Select a state and city for the event location");
+          return;
+        }
       }
     }
 
@@ -971,8 +997,22 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       if (formData.location) {
         (eventData as any).location = formData.location;
       }
-      if (formData.type !== "Online" && formData.district) {
-        (eventData as any).district = formData.district;
+      const needsLocation =
+        formData.type !== "Online" &&
+        ((!formData.facility && !formData.salon) ||
+          Boolean(formData.facility && !selectedFacilityDistrictId));
+      if (needsLocation) {
+        const c = normalizeCountry(locationValue.country);
+        (eventData as any).country = c;
+        if (c === "TR") {
+          (eventData as any).city = (locationValue.city || "").trim();
+          (eventData as any).districtName = (
+            locationValue.districtName || ""
+          ).trim();
+        } else {
+          (eventData as any).state = (locationValue.state || "").trim();
+          (eventData as any).city = (locationValue.city || "").trim();
+        }
       }
 
       if (formData.isRecurring && !isEditMode) {
@@ -1086,6 +1126,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       listingPurchaseConfirmed: false,
       editScope: "single",
     });
+    setLocationValue(emptyLocationValue());
     setListingQuote(null);
     setBannerFile(null);
     setPhotoFile(null);
@@ -1840,20 +1881,17 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               {showDistrictField && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Istanbul District <span className="text-red-500">*</span>
+                    Event Location <span className="text-red-500">*</span>
                   </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     {formData.facility
-                      ? "This facility has no district on file. Select one for this event, or edit the facility to add a district permanently."
+                      ? "This facility has no district on file. Choose the event location, or edit the facility to add a district permanently."
                       : "Required when no facility is selected. If you pick a facility with a district, it is used automatically."}
                   </p>
-                  <LocationFields
-                    value={{
-                      district: formData.district,
-                      addressLine: "",
-                    }}
-                    onChange={(loc) => handleInputChange("district", loc.district)}
-                    showAddressLine={false}
+                  <CascadingLocationFields
+                    value={locationValue}
+                    onChange={setLocationValue}
+                    showPostalCode={false}
                   />
                 </div>
               )}

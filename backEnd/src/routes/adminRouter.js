@@ -8,6 +8,14 @@ import * as adminPermissionGroupController from '../controllers/adminPermissionG
 import * as blacklistController from '../controllers/blacklistController.js';
 import { requireAdminPermission, requireFullAdmin } from '../middleware/requireAdminPermission.js';
 
+const HEADER_LOGO_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const HEADER_LOGO_ALLOWED_MIME_TYPES = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/svg+xml',
+];
+
 router.get('/panel', adminController.getAdminPanel);
 
 // Permission groups (tam yetki)
@@ -211,7 +219,12 @@ router.get(
 router.put(
     '/dashboard-header-logo',
     requireAdminPermission('admin.dashboard_hero'),
-    uploadFile({ fieldName: 'header-logo-image', optional: true }),
+    uploadFile({
+        fieldName: 'header-logo-image',
+        optional: true,
+        maxFileSize: HEADER_LOGO_MAX_FILE_SIZE,
+        allowedMimeTypes: HEADER_LOGO_ALLOWED_MIME_TYPES,
+    }),
     adminController.updateDashboardHeaderLogo
 );
 router.delete(
