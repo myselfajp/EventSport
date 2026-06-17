@@ -334,7 +334,8 @@ const EventsDashboard = () => {
               userRole={user?.role ?? null}
             />
 
-            {!showCoachCalendar &&
+            {user &&
+              !showCoachCalendar &&
               !showFollowings &&
               !showFavorites &&
               !showActivity &&

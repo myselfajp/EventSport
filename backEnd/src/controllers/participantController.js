@@ -1431,28 +1431,51 @@ export const getFollows = async (req, res, next) => {
         const follows = await Follow.find(query)
             .populate({
                 path: 'followingCoach',
-                select: 'name membershipLevel point isVerified about'
+                select: 'name membershipLevel point isVerified about',
             })
             .populate({
                 path: 'followingFacility',
-                select: 'name address photo'
+                select: 'name address photo',
             })
             .populate({
                 path: 'followingCompany',
-                select: 'name photo'
+                select: 'name photo',
             })
             .populate({
                 path: 'followingClub',
-                select: 'name photo'
+                select: 'name photo vision',
             })
             .populate({
                 path: 'followingClubGroup',
-                select: 'name photo clubName'
+                select: 'name photo clubName',
             })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
             .lean();
+
+        const coachIds = follows
+            .map((row) => row.followingCoach?._id)
+            .filter(Boolean);
+
+        if (coachIds.length > 0) {
+            const coachUsers = await User.find({ coach: { $in: coachIds } })
+                .select('coach photo firstName lastName')
+                .lean();
+
+            const photoByCoachId = new Map(
+                coachUsers
+                    .filter((u) => u.coach && u.photo?.path)
+                    .map((u) => [u.coach.toString(), u.photo])
+            );
+
+            for (const row of follows) {
+                const coachId = row.followingCoach?._id?.toString();
+                if (coachId && photoByCoachId.has(coachId)) {
+                    row.followingCoach.photo = photoByCoachId.get(coachId);
+                }
+            }
+        }
 
         res.status(200).json({
             success: true,
