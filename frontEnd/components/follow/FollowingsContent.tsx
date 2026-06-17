@@ -82,6 +82,32 @@ type FollowCardInfo = {
   entity?: any;
 };
 
+const pickPhotoPath = (entity: unknown): string | undefined => {
+  if (!entity || typeof entity !== "object") return undefined;
+  const record = entity as Record<string, unknown>;
+  const photo = record.photo;
+  if (photo && typeof photo === "object" && "path" in photo) {
+    const path = (photo as { path?: string }).path;
+    if (path) return path;
+  }
+  if (typeof photo === "string" && photo.trim()) return photo.trim();
+  const user = record.user;
+  if (user && typeof user === "object" && "photo" in user) {
+    const userPhoto = (user as { photo?: { path?: string } | string }).photo;
+    if (userPhoto && typeof userPhoto === "object" && userPhoto.path) {
+      return userPhoto.path;
+    }
+    if (typeof userPhoto === "string" && userPhoto.trim()) return userPhoto.trim();
+  }
+  const image = record.image;
+  if (typeof image === "string" && image.trim()) return image.trim();
+  if (image && typeof image === "object" && "path" in image) {
+    const path = (image as { path?: string }).path;
+    if (path) return path;
+  }
+  return undefined;
+};
+
 const getFollowCardInfo = (
   follow: any,
   fallbackType: FollowType
@@ -129,7 +155,7 @@ const getFollowCardInfo = (
         ) || "",
       name: pickName(entity, "Coach"),
       subtitle: entity?.specialty || "Coach",
-      photoPath: entity?.photo?.path,
+      photoPath: pickPhotoPath(entity),
       type,
       createdAt,
       entity,
@@ -153,7 +179,7 @@ const getFollowCardInfo = (
         ) || "",
       name: pickName(entity, "Facility"),
       subtitle: entity?.location || entity?.address || "Facility",
-      photoPath: entity?.photo?.path || entity?.image,
+      photoPath: pickPhotoPath(entity),
       type,
       createdAt,
       entity,
@@ -177,7 +203,7 @@ const getFollowCardInfo = (
         ) || "",
       name: pickName(entity, "Company"),
       subtitle: entity?.location || entity?.address || "Company",
-      photoPath: entity?.photo?.path || entity?.image,
+      photoPath: pickPhotoPath(entity),
       type,
       createdAt,
       entity,
@@ -201,7 +227,7 @@ const getFollowCardInfo = (
         ) || "",
       name: pickName(entity, "Club"),
       subtitle: entity?.vision || "Club",
-      photoPath: entity?.photo?.path || entity?.image,
+      photoPath: pickPhotoPath(entity),
       type,
       createdAt,
       entity,
@@ -224,7 +250,7 @@ const getFollowCardInfo = (
       ) || "",
     name: pickName(entity, "Group"),
     subtitle: entity?.clubName ? `Club: ${entity.clubName}` : "Group",
-    photoPath: entity?.photo?.path || entity?.image,
+    photoPath: pickPhotoPath(entity),
     type,
     createdAt,
     entity,
