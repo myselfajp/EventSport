@@ -11,6 +11,7 @@ import {
     sendRegistrationOtpSchema,
     editUserSchema,
     accountSettingsSchema,
+    requestAccountDeletionSchema,
     cookieConsentSchema,
 } from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
@@ -601,6 +602,43 @@ export const updateAccountSettings = async (req, res, next) => {
             success: true,
             message: 'Settings updated',
             data: updatedUser,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const requestAccountDeletion = async (req, res, next) => {
+    try {
+        if (!req.user) throw new AppError(401);
+
+        requestAccountDeletionSchema.parse(req.body);
+
+        const user = await User.findById(req.user._id).select(
+            'role accountDeletionRequestedAt isActive'
+        );
+        if (!user) throw new AppError(404, 'User not found');
+
+        if (user.accountDeletionRequestedAt) {
+            throw new AppError(400, 'Account deletion has already been requested.');
+        }
+
+        if (user.role === 0) {
+            throw new AppError(400, 'Admin accounts cannot be deleted this way.');
+        }
+
+        await User.findByIdAndUpdate(req.user._id, {
+            $set: {
+                isActive: false,
+                accountDeletionRequestedAt: new Date(),
+                marketingConsent: { agreed: false, consentedAt: null },
+            },
+        });
+
+        res.status(200).json({
+            success: true,
+            message:
+                'Your account has been deactivated. Personal data will be anonymized after the legal retention period.',
         });
     } catch (err) {
         next(err);

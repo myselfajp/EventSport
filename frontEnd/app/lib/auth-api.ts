@@ -143,3 +143,21 @@ export async function signOut() {
     tokenStore.clear();
   }
 }
+
+export async function requestAccountDeletion(confirmation: string) {
+  const res = await apiFetch(EP.AUTH.requestAccountDeletion, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json; charset=UTF-8",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ confirmation }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.success === false) {
+    throw new Error(
+      body?.error || body?.message || "Account deletion failed."
+    );
+  }
+  return body;
+}

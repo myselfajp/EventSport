@@ -128,8 +128,22 @@ const userSchema = new mongoose.Schema(
             agreed: { type: Boolean, default: false },
             consentedAt: { type: Date, default: null },
         },
+        /** Set when the user requests account deletion; anonymization job runs after retention. */
+        accountDeletionRequestedAt: {
+            type: Date,
+            default: null,
+        },
+        accountAnonymizedAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true }
+);
+
+userSchema.index(
+    { accountDeletionRequestedAt: 1, accountAnonymizedAt: 1 },
+    { partialFilterExpression: { accountDeletionRequestedAt: { $type: 'date' } } }
 );
 
 export default mongoose.model('User', userSchema);

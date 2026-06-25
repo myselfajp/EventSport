@@ -96,6 +96,7 @@ export const EP = {
     me: `${AUTH_API}/get-current-user`,
     editUser: `${AUTH_API}/edit-user`,
     accountSettings: `${AUTH_API}/account-settings`,
+    requestAccountDeletion: `${AUTH_API}/request-account-deletion`,
     cookieConsent: `${AUTH_API}/cookie-consent`,
     getUsers: `${AUTH_API}/get-user`,
     getUserById: (userId: string) => `${AUTH_API}/get-user/${userId}`,

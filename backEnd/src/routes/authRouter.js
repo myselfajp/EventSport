@@ -9,5 +9,6 @@ router.post('/get-user', authController.getUser);
 router.get('/get-current-user', authController.getCurrentUser);
 router.post('/edit-user', uploadFile({ fieldName: 'user-photo', optional: true }), authController.editUser);
 router.post('/account-settings', authController.updateAccountSettings);
+router.post('/request-account-deletion', authController.requestAccountDeletion);
 router.post('/cookie-consent', authController.saveCookieConsent);
 export default router;
