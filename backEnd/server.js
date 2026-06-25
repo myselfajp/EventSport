@@ -5,6 +5,7 @@ import { initAdminPermissionGroups } from './src/utils/initAdminPermissionGroups
 import { initLegal } from './src/utils/initLegal.js';
 import { initLocations } from './src/utils/initLocations.js';
 import { startCheckInReminderScheduler } from './src/utils/checkInReminderJob.js';
+import { startAccountAnonymizationScheduler } from './src/utils/accountAnonymizationJob.js';
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -30,6 +31,7 @@ const connectDB = async () => {
         await initLegal();
         await initLocations();
         startCheckInReminderScheduler();
+        startAccountAnonymizationScheduler();
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1); // stop app if DB fails

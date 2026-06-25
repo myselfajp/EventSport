@@ -2,10 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, FileText, Loader2, Mail, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, FileText, Loader2, Mail, Trash2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "@/app/hooks/useAuth";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
+import { requestAccountDeletion, signOut } from "@/app/lib/auth-api";
 import { EP } from "@/app/lib/endpoints";
 import {
   CATEGORY_LABELS_TR,
@@ -41,13 +43,19 @@ type CatalogData = {
 const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach"];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  const router = useRouter();
   const { data: user } = useMe();
   const queryClient = useQueryClient();
   const hasCoachProfile = !!user?.coach;
+  const isAdmin = user?.role === 0;
 
   const [promotionalEmails, setPromotionalEmails] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showDeleteSection, setShowDeleteSection] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [activeCommercialMessages, setActiveCommercialMessages] =
     useState<CommercialDoc | null>(null);
   const [loadingCommercial, setLoadingCommercial] = useState(false);
@@ -59,6 +67,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen) return;
     setPromotionalEmails(Boolean(user?.marketingConsent?.agreed));
     setError("");
+    setShowDeleteSection(false);
+    setDeleteConfirmation("");
+    setDeleteError("");
   }, [isOpen, user?.marketingConsent?.agreed]);
 
   useEffect(() => {
@@ -175,6 +186,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== "delete") return;
+
+    setDeletingAccount(true);
+    setDeleteError("");
+
+    try {
+      await requestAccountDeletion("delete");
+      await signOut();
+      queryClient.removeQueries({ queryKey: ["auth", "me"], exact: true });
+      onClose();
+      router.push("/");
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Account deletion failed."
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -329,6 +361,94 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
+              Account
+            </p>
+
+            <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 overflow-hidden">
+              {!showDeleteSection ? (
+                <div className="p-4">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Delete my account
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Your account will be deactivated immediately. Personal data
+                    will be anonymized after the legal retention period (24
+                    months).
+                  </p>
+                  {isAdmin ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                      Admin accounts cannot be deleted this way.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteSection(true)}
+                      className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete my account
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 space-y-3">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    This action cannot be undone. Type{" "}
+                    <span className="font-mono font-semibold">delete</span> below
+                    to confirm.
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    placeholder="delete"
+                    autoComplete="off"
+                    disabled={deletingAccount}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                  />
+                  {deleteError ? (
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      {deleteError}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDeleteSection(false);
+                        setDeleteConfirmation("");
+                        setDeleteError("");
+                      }}
+                      disabled={deletingAccount}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteAccount()}
+                      disabled={
+                        deletingAccount || deleteConfirmation !== "delete"
+                      }
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingAccount ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Deleting…
+                        </>
+                      ) : (
+                        "Permanently deactivate account"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

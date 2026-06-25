@@ -427,6 +427,12 @@ export const cookieConsentSchema = z.object({
     consentedAt: z.string().datetime().optional(),
 });
 
+export const requestAccountDeletionSchema = z.object({
+    confirmation: z.literal('delete', {
+        errorMap: () => ({ message: 'Type "delete" to confirm account deletion.' }),
+    }),
+});
+
 /** Admin-only user updates (includes role, active flag, permission groups). */
 export const adminEditUserSchema = z
     .object({
