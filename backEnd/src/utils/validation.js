@@ -95,6 +95,25 @@ export const point = z
     .number({ error: (iss) => (iss.input === undefined ? 'point is required.' : 'Invalid point.') })
     .min(1, 'point must be at least 1')
     .max(10, 'point must be at most 10');
+
+/** Coach star rating (1–5). */
+export const coachStarRating = z
+    .number({
+        error: (iss) =>
+            iss.input === undefined ? 'Rating is required.' : 'Invalid rating.',
+    })
+    .int('Rating must be a whole number.')
+    .min(1, 'Rating must be at least 1 star.')
+    .max(5, 'Rating must be at most 5 stars.');
+
+export const coachReviewComment = z
+    .string({
+        error: (iss) =>
+            iss.input === undefined ? 'Comment is required.' : 'Invalid comment.',
+    })
+    .trim()
+    .min(1, 'Comment cannot be empty.')
+    .max(2000, 'Comment must be at most 2000 characters.');
 // Objects
 
 export const signupSchema = z.object({
@@ -1007,6 +1026,7 @@ export const createEventPayloadSchema = createEventSchema
     .extend({
         recurrence: recurrenceInputSchema.optional(),
         listingPurchaseConfirmed: z.boolean().optional().default(false),
+        invitedUserIds: z.array(mongoObjectId).max(100).optional().default([]),
     })
     .superRefine((data, ctx) => {
         const isOnline = data.type === 'Online';
@@ -1063,6 +1083,11 @@ export const createEventPayloadSchema = createEventSchema
     });
 
 export const editEventSchema = createEventSchema.partial();
+
+export const inviteCandidateSearchSchema = z.object({
+    search: z.string().trim().max(120).optional().default(''),
+    limit: z.coerce.number().int().min(1).max(20).optional().default(10),
+});
 
 // clubGroup
 export const createGroupSchema = z.object({

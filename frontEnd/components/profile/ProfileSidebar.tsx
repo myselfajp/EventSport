@@ -20,6 +20,7 @@ import {
   Shield,
   Layers,
   Heart,
+  BookOpen,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -64,6 +65,7 @@ import { primaryBranchCoachBadgeUrl } from "@/app/lib/coach-badge-utils";
 import { useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
 import { fetchJSON } from "@/app/lib/api";
+import BlogManagement from "@/components/blog/BlogManagement";
 
 interface ProfileSidebarProps {
   onLogout: () => void;
@@ -97,6 +99,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isClubsListOpen, setIsClubsListOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isGroupsListOpen, setIsGroupsListOpen] = useState(false);
+  const [isBlogsListOpen, setIsBlogsListOpen] = useState(false);
   const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
@@ -1095,6 +1098,27 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             </button>
           )}
         </div>
+
+        {hasCoachProfile && (
+          <button
+            type="button"
+            onClick={() => setIsBlogsListOpen(true)}
+            className="mt-2 w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left"
+          >
+            <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50">
+              <BookOpen className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-800 dark:text-white text-sm">
+                My Blogs
+              </div>
+              <div className="text-xs text-cyan-700 dark:text-cyan-300">
+                Create and manage blog posts
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* Coach Modal */}
@@ -1824,6 +1848,34 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         isOpen={isUserEditModalOpen}
         onClose={() => setIsUserEditModalOpen(false)}
       />
+
+      {isBlogsListOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  My Blogs
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Manage the blog posts shown on the public blog page.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBlogsListOpen(false)}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                aria-label="Close blogs"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[calc(90vh-73px)]">
+              <BlogManagement mode="coach" embedded />
+            </div>
+          </div>
+        </div>
+      )}
 
       <SettingsModal
         isOpen={isSettingsModalOpen}

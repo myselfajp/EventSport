@@ -21,6 +21,7 @@ import ClubViewModal, { type ClubViewModalClub } from "@/components/ClubViewModa
 import GroupViewModal, { type GroupViewModalGroup } from "@/components/GroupViewModal";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
 import ReportModal from "@/components/report/ReportModal";
+import CoachCalendar from "@/components/CoachCalendar";
 import { useMe } from "@/app/hooks/useAuth";
 
 type ViewEventModalEvent = NonNullable<
@@ -64,6 +65,7 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
   const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showFacilityCalendar, setShowFacilityCalendar] = useState(false);
   const { data: currentUser } = useMe();
 
   const facilityId = facility?._id ? String(facility._id) : "";
@@ -93,6 +95,7 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
       setIsClubModalOpen(false);
       setSelectedGroup(null);
       setIsGroupModalOpen(false);
+      setShowFacilityCalendar(false);
     }
   }, [isOpen, facility?.mainSport]);
 
@@ -253,6 +256,14 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
                       Added {formatDate(facility.createdAt)}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowFacilityCalendar(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Show Calendar
+                      </button>
                       <EntityFollowButton type="facility" entityId={facilityId} />
                       {canReport && (
                         <button
@@ -476,6 +487,19 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
           targetId={facilityId}
           targetLabel={facility?.name}
         />
+      )}
+
+      {showFacilityCalendar && facilityId && (
+        <div className="fixed inset-0 z-[60] bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 overflow-auto">
+          <div className="max-w-6xl mx-auto h-full min-h-0">
+            <CoachCalendar
+              facilityId={facilityId}
+              facilityDisplayName={facility?.name}
+              readOnly
+              onBack={() => setShowFacilityCalendar(false)}
+            />
+          </div>
+        </div>
       )}
     </>
   );

@@ -2,6 +2,8 @@ import express from 'express';
 const router = express.Router();
 import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 import * as adminController from '../controllers/adminController.js';
+import * as blogController from '../controllers/blogController.js';
+import * as newsController from '../controllers/newsController.js';
 import * as legalController from '../controllers/legalController.js';
 import * as contractAcceptanceController from '../controllers/contractAcceptanceController.js';
 import * as adminPermissionGroupController from '../controllers/adminPermissionGroupController.js';
@@ -187,6 +189,46 @@ router.delete(
     '/static-pages/:pageId',
     requireAdminPermission('admin.static_pages'),
     adminController.deleteStaticPage
+);
+
+// Blogs
+router.get('/blogs', requireAdminPermission('admin.blogs'), blogController.listAdminBlogs);
+router.post(
+    '/blogs',
+    requireAdminPermission('admin.blogs'),
+    uploadFile({ fieldName: 'blog-cover-image' }),
+    blogController.createAdminBlog
+);
+router.put(
+    '/blogs/:blogId',
+    requireAdminPermission('admin.blogs'),
+    uploadFile({ fieldName: 'blog-cover-image', optional: true }),
+    blogController.updateAdminBlog
+);
+router.delete(
+    '/blogs/:blogId',
+    requireAdminPermission('admin.blogs'),
+    blogController.deleteAdminBlog
+);
+
+// News
+router.get('/news', requireAdminPermission('admin.news'), newsController.listAdminNews);
+router.post(
+    '/news',
+    requireAdminPermission('admin.news'),
+    uploadFile({ fieldName: 'news-cover-image' }),
+    newsController.createAdminNews
+);
+router.put(
+    '/news/:newsId',
+    requireAdminPermission('admin.news'),
+    uploadFile({ fieldName: 'news-cover-image', optional: true }),
+    newsController.updateAdminNews
+);
+router.delete(
+    '/news/:newsId',
+    requireAdminPermission('admin.news'),
+    newsController.deleteAdminNews
 );
 
 router.get('/suggestions', requireAdminPermission('admin.suggestions'), adminController.listSuggestions);

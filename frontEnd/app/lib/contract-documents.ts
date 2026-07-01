@@ -41,15 +41,15 @@ export const ALL_CONTRACT_DOC_TYPES: LegalDocType[] = [
 
 export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
   kvkk: "KVKK",
-  terms: "Terms of Use",
-  commercial_messages: "Commercial messages (IYS)",
+  terms: "Terms & Conditions",
+  commercial_messages: "Commercial Electronic Messages Consent (IYS)",
   cookie_policy: "Cookie Policy",
-  distance_selling: "Distance selling agreement",
-  event_contract: "Event agreement",
-  coach_agreement: "Coach agreement",
-  coach_penalties: "Penalty terms",
-  coach_equipment: "Coach equipment",
-  coach_privacy: "Coach privacy agreement",
+  distance_selling: "Distance Selling Agreement",
+  event_contract: "Event Agreement",
+  coach_agreement: "Coach Agreement",
+  coach_penalties: "Penalty Terms",
+  coach_equipment: "Coach Equipment",
+  coach_privacy: "Coach Privacy Agreement",
 };
 
 /** Turkish titles shown on site when admin title is empty. */
@@ -67,8 +67,8 @@ export const DEFAULT_TITLES_TR: Record<LegalDocType, string> = {
 };
 
 export const CATEGORY_LABELS: Record<ContractCategory, string> = {
-  legal: "Legal",
-  gamer: "Gamer agreements",
+  legal: "Legal documents",
+  gamer: "Player and event agreements",
   coach: "Coach agreements",
 };
 

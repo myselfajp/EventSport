@@ -18,6 +18,9 @@ interface CoachCalendarProps {
   /** View another user's schedule (e.g. gamer viewing a coach). */
   viewUserId?: string;
   coachDisplayName?: string;
+  /** View events scheduled at a facility. */
+  facilityId?: string;
+  facilityDisplayName?: string;
   readOnly?: boolean;
 }
 
@@ -63,15 +66,21 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
   onBack,
   viewUserId,
   coachDisplayName,
+  facilityId,
+  facilityDisplayName,
   readOnly = false,
 }) => {
   const { data: user, isLoading: userLoading } = useMe();
-  const coachId = viewUserId ?? user?._id;
-  const isViewingOtherCoach = Boolean(viewUserId);
-  const isAdmin = !isViewingOtherCoach && user?.role === 0;
-  const calendarReady = isViewingOtherCoach
-    ? Boolean(coachId)
-    : Boolean(coachId && !userLoading);
+  const isFacilityMode = Boolean(facilityId);
+  const coachId = isFacilityMode ? undefined : (viewUserId ?? user?._id);
+  const isViewingOtherCoach = Boolean(viewUserId) && !isFacilityMode;
+  const isAdmin = !isFacilityMode && !isViewingOtherCoach && user?.role === 0;
+  const effectiveReadOnly = readOnly || isFacilityMode;
+  const calendarReady = isFacilityMode
+    ? Boolean(facilityId)
+    : isViewingOtherCoach
+      ? Boolean(coachId)
+      : Boolean(coachId && !userLoading);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -124,14 +133,38 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
   }, []);
 
   // Fetch events for the current month (for highlighting)
-  const eventMatchesCoachFilter = useCallback(
+  const buildEventsRequestBody = useCallback(
+    (page: number) => {
+      const body: Record<string, unknown> = {
+        perPage: 100,
+        pageNumber: page,
+        sortBy: "startTime",
+        sortType: "asc",
+      };
+      if (isFacilityMode && facilityId) {
+        body.facility = facilityId;
+      }
+      return body;
+    },
+    [isFacilityMode, facilityId]
+  );
+
+  const eventMatchesFilter = useCallback(
     (event: Event) => {
+      if (!event?.startTime) return false;
+      if (isFacilityMode) {
+        const evFacilityId =
+          typeof event.facility === "object" && event.facility !== null
+            ? (event.facility as { _id?: string })._id
+            : event.facility;
+        return !facilityId || String(evFacilityId) === String(facilityId);
+      }
       if (!coachId) return false;
-      if (isViewingOtherCoach || readOnly) return eventBelongsToUser(event, coachId);
+      if (isViewingOtherCoach || effectiveReadOnly) return eventBelongsToUser(event, coachId);
       if (isAdmin) return true;
       return eventBelongsToUser(event, coachId);
     },
-    [coachId, isViewingOtherCoach, readOnly, isAdmin]
+    [coachId, isFacilityMode, facilityId, isViewingOtherCoach, effectiveReadOnly, isAdmin]
   );
 
   const fetchMonthEvents = useCallback(async () => {
@@ -143,20 +176,14 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
       
       const response = await fetchJSON(EP.EVENTS.getEvents, {
         method: "POST",
-        body: {
-          perPage: 100,
-          pageNumber: 1,
-          sortBy: "startTime",
-          sortType: "asc",
-          // Don't filter by owner here, we'll filter in frontend to include backupCoach
-        },
+        body: buildEventsRequestBody(1),
       });
 
       if (response?.success && response?.data) {
-        // Filter events that belong to this coach (owner or backupCoach) and fall within the month range
+        // Filter events that match the view and fall within the month range
         let allFilteredEvents = response.data.filter((event: Event) => {
           if (!event || !event.startTime) return false;
-          if (!eventMatchesCoachFilter(event)) return false;
+          if (!eventMatchesFilter(event)) return false;
 
           const eventStart = new Date(event.startTime);
           const eventDate = new Date(
@@ -183,18 +210,13 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
             try {
               const nextResponse = await fetchJSON(EP.EVENTS.getEvents, {
                 method: "POST",
-                body: {
-                  perPage: 100,
-                  pageNumber: page,
-                  sortBy: "startTime",
-                  sortType: "asc",
-                },
+                body: buildEventsRequestBody(page),
               });
               
               if (nextResponse?.success && nextResponse?.data) {
                 const nextFiltered = nextResponse.data.filter((event: Event) => {
                   if (!event || !event.startTime) return false;
-                  if (!eventMatchesCoachFilter(event)) return false;
+                  if (!eventMatchesFilter(event)) return false;
 
                   const eventStart = new Date(event.startTime);
                   const eventDate = new Date(
@@ -233,30 +255,23 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
     } finally {
       setIsLoadingMonthEvents(false);
     }
-  }, [currentDate, calendarReady, getMonthStartEnd, eventMatchesCoachFilter]);
+  }, [currentDate, calendarReady, getMonthStartEnd, eventMatchesFilter, buildEventsRequestBody]);
 
   // Fetch events for a specific date
   const fetchDateEvents = useCallback(async (date: Date) => {
-    if (!coachId) return;
+    if (!calendarReady) return;
     
     setIsLoadingDateEvents(true);
     try {
       const response = await fetchJSON(EP.EVENTS.getEvents, {
         method: "POST",
-        body: {
-          perPage: 100,
-          pageNumber: 1,
-          sortBy: "startTime",
-          sortType: "asc",
-          // Don't filter by owner here, we'll filter in frontend to include backupCoach
-        },
+        body: buildEventsRequestBody(1),
       });
 
       if (response?.success && response?.data) {
-        // Filter events that belong to this coach (owner or backupCoach) and match the specific date
         const filteredEvents = response.data.filter((event: Event) => {
           if (!event || !event.startTime) return false;
-          if (!eventMatchesCoachFilter(event)) return false;
+          if (!eventMatchesFilter(event)) return false;
 
           const eventStart = new Date(event.startTime);
           return (
@@ -272,18 +287,13 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
             try {
               const nextResponse = await fetchJSON(EP.EVENTS.getEvents, {
                 method: "POST",
-                body: {
-                  perPage: 100,
-                  pageNumber: page,
-                  sortBy: "startTime",
-                  sortType: "asc",
-                },
+                body: buildEventsRequestBody(page),
               });
               
               if (nextResponse?.success && nextResponse?.data) {
                 const nextFiltered = nextResponse.data.filter((event: Event) => {
                   if (!event || !event.startTime) return false;
-                  if (!eventMatchesCoachFilter(event)) return false;
+                  if (!eventMatchesFilter(event)) return false;
 
                   const eventStart = new Date(event.startTime);
                   return (
@@ -311,7 +321,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
     } finally {
       setIsLoadingDateEvents(false);
     }
-  }, [coachId, eventMatchesCoachFilter]);
+  }, [calendarReady, eventMatchesFilter, buildEventsRequestBody]);
   useEffect(() => {
     if (calendarReady) {
       fetchMonthEvents();
@@ -517,9 +527,11 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
           <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-slate-300" />
         </button>
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-          {isViewingOtherCoach && coachDisplayName
-            ? `${coachDisplayName}'s Calendar`
-            : "My Calendar"}
+          {isFacilityMode && facilityDisplayName
+            ? `${facilityDisplayName} — Event Calendar`
+            : isViewingOtherCoach && coachDisplayName
+              ? `${coachDisplayName}'s Calendar`
+              : "My Calendar"}
         </h2>
       </div>
 
@@ -715,8 +727,8 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
                       typeof event.owner === "object" && event.owner !== null
                         ? event.owner._id
                         : event.owner;
-                    const isOwner = ownerId === coachId;
-                    const canEditEvent = !readOnly && isOwner;
+                    const isOwner = !isFacilityMode && ownerId === coachId;
+                    const canEditEvent = !effectiveReadOnly && isOwner;
                     
                     return (
                       <div
@@ -769,7 +781,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
                                     {event.eventStyle.name}
                                   </span>
                                 )}
-                                {!readOnly && (
+                                {!effectiveReadOnly && (
                                   <button
                                     onClick={(e) => handleShowParticipants(e, event)}
                                     className="px-3 py-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
@@ -850,7 +862,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
         />
       )}
 
-      {!readOnly && (
+      {!effectiveReadOnly && (
       <AddEventModal
         isOpen={showEditEventModal}
         onClose={() => {

@@ -18,6 +18,8 @@ import ReportsManagement from "../../components/admin/ReportsManagement";
 import DashboardHeroManagement from "../../components/admin/DashboardHeroManagement";
 import AdminPermissionGroupsManagement from "../../components/admin/AdminPermissionGroupsManagement";
 import BlacklistManagement from "../../components/admin/BlacklistManagement";
+import BlogManagement from "../../components/blog/BlogManagement";
+import NewsManagement from "../../components/news/NewsManagement";
 
 type TabType =
   | "users"
@@ -25,6 +27,8 @@ type TabType =
   | "coaches"
   | "enums"
   | "events"
+  | "blogs"
+  | "news"
   | "notifications"
   | "contracts"
   | "site-pages"
@@ -39,6 +43,8 @@ const TAB_ORDER: TabType[] = [
   "coaches",
   "enums",
   "events",
+  "blogs",
+  "news",
   "notifications",
   "contracts",
   "site-pages",
@@ -54,14 +60,18 @@ const TAB_LABEL: Record<TabType, string> = {
   coaches: "Coach Certificates",
   enums: "Enum Management",
   events: "Events",
+  blogs: "Blogs",
+  news: "News",
   notifications: "Notifications",
   contracts: "Contracts",
-  "site-pages": "Site pages",
-  "dashboard-hero": "Dashboard hero",
+  "site-pages": "Site Pages",
+  "dashboard-hero": "Dashboard Hero",
   suggestions: "Suggestions",
   reports: "Reports",
   "permission-groups": "İzin grupları",
 };
+
+TAB_LABEL["permission-groups"] = "Permission Groups";
 
 /** Admin API permission slug per tab (UI-only tabs use same keys as backend constants). */
 const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
@@ -70,6 +80,8 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   coaches: "admin.coaches",
   enums: "admin.enums",
   events: "admin.events",
+  blogs: "admin.blogs",
+  news: "admin.news",
   notifications: "admin.notifications",
   contracts: ["admin.legal", "admin.contract_acceptances"],
   "site-pages": "admin.static_pages",
@@ -125,6 +137,18 @@ export default function AdminPanelPage() {
 
   useEffect(() => {
     if (!adminData?.permissions) return;
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab") as TabType;
+      if (tabParam && TAB_ORDER.includes(tabParam) && canTab(tabParam)) {
+        if (activeTab !== tabParam) {
+          setActiveTab(tabParam);
+        }
+        return;
+      }
+    }
+
     if (canTab(activeTab)) return;
     const first = TAB_ORDER.find((t) => canTab(t));
     if (first) setActiveTab(first);
@@ -180,7 +204,10 @@ export default function AdminPanelPage() {
 
           {visibleTabs.length === 0 && (
             <p className="text-amber-800 dark:text-amber-200 text-sm mb-4">
+              Your account does not have any assigned admin permissions. Ask a full admin to assign a permission group.
+              {/*
               Hesabınıza atanmış bir admin izni yok. Tam yetkili yöneticiden izin grubu isteyin.
+              */}
             </p>
           )}
 
@@ -209,6 +236,8 @@ export default function AdminPanelPage() {
             {activeTab === "coaches" && <CoachCertificateApproval />}
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
+            {activeTab === "blogs" && <BlogManagement mode="admin" />}
+            {activeTab === "news" && <NewsManagement />}
             {activeTab === "notifications" && <NotificationManagement />}
             {activeTab === "contracts" && (
               <ContractsManagement

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { X, Upload, ImageIcon, ChevronDown, Search } from "lucide-react";
+import { X, Upload, ImageIcon, ChevronDown, Search, Mail, UserPlus } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { LEVEL_DEFINITIONS } from "@/app/lib/level-definitions";
@@ -146,6 +146,16 @@ interface Salon {
   facility: string;
 }
 
+interface InviteCandidate {
+  _id: string;
+  name: string;
+  email: string;
+  photo?: {
+    path: string;
+  } | null;
+  participantId?: string;
+}
+
 const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
   onClose,
@@ -234,6 +244,12 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const [sportSearchQuery, setSportSearchQuery] = useState("");
   const [facilitySearchQuery, setFacilitySearchQuery] = useState("");
   const [salonSearchQuery, setSalonSearchQuery] = useState("");
+  const [inviteSearchQuery, setInviteSearchQuery] = useState("");
+  const [inviteCandidates, setInviteCandidates] = useState<InviteCandidate[]>([]);
+  const [selectedInvitees, setSelectedInvitees] = useState<InviteCandidate[]>([]);
+  const [loadingInviteCandidates, setLoadingInviteCandidates] = useState(false);
+  const [inviteSearchError, setInviteSearchError] = useState("");
+  const [showInviteSuggestions, setShowInviteSuggestions] = useState(false);
 
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -321,6 +337,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const debouncedSportSearch = useDebounce(sportSearchQuery, 300);
   const debouncedFacilitySearch = useDebounce(facilitySearchQuery, 300);
   const debouncedSalonSearch = useDebounce(salonSearchQuery, 300);
+  const debouncedInviteSearch = useDebounce(inviteSearchQuery, 300);
 
   // Maintain focus on search inputs when data changes
   useEffect(() => {
@@ -430,6 +447,60 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       }
     }
   }, [formData.facility, showSalonDropdown, debouncedSalonSearch]);
+
+  useEffect(() => {
+    if (isEditMode) return;
+
+    const search = debouncedInviteSearch.trim();
+    if (!showInviteSuggestions || search.length < 2) {
+      setInviteCandidates([]);
+      setInviteSearchError("");
+      setLoadingInviteCandidates(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadInviteCandidates = async () => {
+      setLoadingInviteCandidates(true);
+      setInviteSearchError("");
+      try {
+        const res = await fetchJSON(EP.COACH.inviteCandidates, {
+          method: "POST",
+          body: { search, limit: 10 },
+        });
+        if (cancelled) return;
+        if (res?.success && Array.isArray(res.data)) {
+          const selectedIds = new Set(selectedInvitees.map((item) => item._id));
+          setInviteCandidates(
+            (res.data as InviteCandidate[]).filter(
+              (candidate) => !selectedIds.has(candidate._id)
+            )
+          );
+        } else {
+          setInviteCandidates([]);
+          setInviteSearchError(res?.message || "Could not search gamers.");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Error searching invite candidates:", err);
+          setInviteCandidates([]);
+          setInviteSearchError("Could not search gamers.");
+        }
+      } finally {
+        if (!cancelled) setLoadingInviteCandidates(false);
+      }
+    };
+
+    void loadInviteCandidates();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    debouncedInviteSearch,
+    isEditMode,
+    selectedInvitees,
+    showInviteSuggestions,
+  ]);
 
   useEffect(() => {
     if (initialData && isOpen) {
@@ -809,6 +880,20 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     }
   };
 
+  const handleSelectInvitee = (candidate: InviteCandidate) => {
+    setSelectedInvitees((prev) => {
+      if (prev.some((item) => item._id === candidate._id)) return prev;
+      return [...prev, candidate];
+    });
+    setInviteSearchQuery("");
+    setInviteCandidates([]);
+    setShowInviteSuggestions(false);
+  };
+
+  const handleRemoveInvitee = (userId: string) => {
+    setSelectedInvitees((prev) => prev.filter((item) => item._id !== userId));
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -896,7 +981,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       if (needsLocation) {
         const c = normalizeCountry(locationValue.country);
         if (c === "TR" && (!locationValue.city || !locationValue.districtName)) {
-          setError("Etkinlik konumu için şehir ve ilçe seçin");
+          setError("Select a city and district for the event location");
           return;
         }
         if (c === "US" && (!locationValue.state || !locationValue.city)) {
@@ -1046,6 +1131,10 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         (eventData as any).scope = formData.editScope;
       }
 
+      if (!isEditMode && selectedInvitees.length > 0) {
+        (eventData as any).invitedUserIds = selectedInvitees.map((user) => user._id);
+      }
+
       formDataToSend.append("data", JSON.stringify(eventData));
 
       console.log(
@@ -1143,6 +1232,11 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     setSportSearchQuery("");
     setFacilitySearchQuery("");
     setSalonSearchQuery("");
+    setInviteSearchQuery("");
+    setInviteCandidates([]);
+    setSelectedInvitees([]);
+    setInviteSearchError("");
+    setShowInviteSuggestions(false);
     prevSportGroupRef.current = "";
   };
 
@@ -2320,6 +2414,127 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       />
                       This and following sessions
                     </label>
+                  </div>
+                </div>
+              )}
+
+              {!isEditMode && (
+                <div className="pt-2">
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300">
+                        <UserPlus className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Invite Gamers
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Search gamers by name or email. Selected gamers will receive an event invitation notification after the event is created.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Find gamers
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={inviteSearchQuery}
+                          onChange={(e) => {
+                            setInviteSearchQuery(e.target.value);
+                            setShowInviteSuggestions(true);
+                          }}
+                          onFocus={() => setShowInviteSuggestions(true)}
+                          placeholder="Type at least 2 characters"
+                          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                        />
+                      </div>
+
+                      {showInviteSuggestions && inviteSearchQuery.trim().length >= 2 && (
+                        <div className="absolute z-20 mt-2 w-full max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                          {loadingInviteCandidates ? (
+                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              Searching gamers...
+                            </div>
+                          ) : inviteSearchError ? (
+                            <div className="px-4 py-3 text-sm text-red-600 dark:text-red-400">
+                              {inviteSearchError}
+                            </div>
+                          ) : inviteCandidates.length > 0 ? (
+                            inviteCandidates.map((candidate) => (
+                              <button
+                                key={candidate._id}
+                                type="button"
+                                onClick={() => handleSelectInvitee(candidate)}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-colors"
+                              >
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-600 dark:text-gray-200">
+                                  {candidate.photo?.path ? (
+                                    <img
+                                      src={EP.assetUrl(candidate.photo.path)}
+                                      alt={candidate.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    candidate.name.charAt(0).toUpperCase()
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    {candidate.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
+                                    <Mail className="w-3 h-3" />
+                                    {candidate.email}
+                                  </p>
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              No matching gamers found.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedInvitees.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                          Selected invitees
+                        </p>
+                        <div className="space-y-2">
+                          {selectedInvitees.map((invitee) => (
+                            <div
+                              key={invitee._id}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  {invitee.name}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  {invitee.email}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInvitee(invitee._id)}
+                                className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                aria-label={`Remove ${invitee.name}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

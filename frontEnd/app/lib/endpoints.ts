@@ -56,6 +56,7 @@ const COACH_DATA_API = `${API_V1_BASE}/coach`;
 const FACILITY_API = `${API_V1_BASE}/facility`;
 const COMPANY_API = `${API_V1_BASE}/company`;
 const LOCATION_API = `${API_V1_BASE}/location`;
+const MESSAGES_API = `${API_V1_BASE}/messages`;
 
 export const EP = {
   API_BASE: API_V1_BASE,
@@ -71,6 +72,64 @@ export const EP = {
     suggestion: `${API_V1_BASE}/public/suggestion`,
     dashboardHeaderLogo: `${API_V1_BASE}/public/dashboard-header-logo`,
     dashboardHeroSlides: `${API_V1_BASE}/public/dashboard-hero-slides`,
+    sportGroups: (params?: { page?: number; limit?: number; search?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set("page", String(params.page));
+      if (params?.limit) q.set("limit", String(params.limit));
+      if (params?.search) q.set("search", params.search);
+      const qs = q.toString();
+      return `${API_V1_BASE}/public/sport-groups${qs ? `?${qs}` : ""}`;
+    },
+    sports: (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sportGroup?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set("page", String(params.page));
+      if (params?.limit) q.set("limit", String(params.limit));
+      if (params?.search) q.set("search", params.search);
+      if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+      const qs = q.toString();
+      return `${API_V1_BASE}/public/sports${qs ? `?${qs}` : ""}`;
+    },
+    blogs: (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sportGroup?: string;
+      sport?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set("page", String(params.page));
+      if (params?.limit) q.set("limit", String(params.limit));
+      if (params?.search) q.set("search", params.search);
+      if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+      if (params?.sport) q.set("sport", params.sport);
+      const qs = q.toString();
+      return `${API_V1_BASE}/public/blogs${qs ? `?${qs}` : ""}`;
+    },
+    blogBySlug: (slug: string) =>
+      `${API_V1_BASE}/public/blogs/${encodeURIComponent(slug)}`,
+    news: (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sportGroup?: string;
+      sport?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set("page", String(params.page));
+      if (params?.limit) q.set("limit", String(params.limit));
+      if (params?.search) q.set("search", params.search);
+      if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+      if (params?.sport) q.set("sport", params.sport);
+      const qs = q.toString();
+      return `${API_V1_BASE}/public/news${qs ? `?${qs}` : ""}`;
+    },
+    newsBySlug: (slug: string) =>
+      `${API_V1_BASE}/public/news/${encodeURIComponent(slug)}`,
     heroClick: (slideId: string) =>
       `${API_V1_BASE}/public/hero-click/${encodeURIComponent(slideId)}`,
   },
@@ -166,6 +225,52 @@ export const EP = {
       create: `${ADMIN_API}/static-pages`,
       update: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
       delete: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
+    },
+    blogs: {
+      list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sportGroup?: string;
+        sport?: string;
+        status?: "draft" | "published" | "all";
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (params?.search) q.set("search", params.search);
+        if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+        if (params?.sport) q.set("sport", params.sport);
+        if (params?.status) q.set("status", params.status);
+        const qs = q.toString();
+        return `${ADMIN_API}/blogs${qs ? `?${qs}` : ""}`;
+      },
+      create: `${ADMIN_API}/blogs`,
+      update: (blogId: string) => `${ADMIN_API}/blogs/${blogId}`,
+      delete: (blogId: string) => `${ADMIN_API}/blogs/${blogId}`,
+    },
+    news: {
+      list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sportGroup?: string;
+        sport?: string;
+        status?: "draft" | "published" | "all";
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (params?.search) q.set("search", params.search);
+        if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+        if (params?.sport) q.set("sport", params.sport);
+        if (params?.status) q.set("status", params.status);
+        const qs = q.toString();
+        return `${ADMIN_API}/news${qs ? `?${qs}` : ""}`;
+      },
+      create: `${ADMIN_API}/news`,
+      update: (newsId: string) => `${ADMIN_API}/news/${newsId}`,
+      delete: (newsId: string) => `${ADMIN_API}/news/${newsId}`,
     },
     contractAcceptances: {
       list: (params?: {
@@ -274,6 +379,8 @@ export const EP = {
     addEndPhoto: `${PARTICIPANT_DATA_API}/add-end-photo`,
     eventEndPhotos: `${PARTICIPANT_DATA_API}/event-end-photos`,
     myReservations: `${PARTICIPANT_DATA_API}/my-reservations`,
+    pointToCoach: `${PARTICIPANT_DATA_API}/point-to-coach`,
+    commentToCoach: `${PARTICIPANT_DATA_API}/comment-to-coach`,
     unfavorite: (type: "coach" | "facility" | "event") =>
       `${PARTICIPANT_DATA_API}/favorite/${type}`,
     follow: {
@@ -296,6 +403,7 @@ export const EP = {
     editProfileAndBranch: `${COACH_DATA_API}/edit-branch`,
     editCoach: `${COACH_DATA_API}/edit-coach`,
     createEvent: `${COACH_DATA_API}/create-event`,
+    inviteCandidates: `${COACH_DATA_API}/invite-candidates`,
     editEvent: (eventId: string) => `${COACH_DATA_API}/edit-event/${eventId}`,
     cancelEvent: (eventId: string) => `${COACH_DATA_API}/cancel-event/${eventId}`,
     listingQuote: (sessionCount: number) =>
@@ -313,6 +421,30 @@ export const EP = {
       `${COACH_DATA_API}/${coachId}/follow-stats`,
     followers: (coachId: string, page = 1, limit = 20) =>
       `${COACH_DATA_API}/${coachId}/followers?page=${page}&limit=${limit}`,
+    reviews: (coachId: string) => `${COACH_DATA_API}/${coachId}/reviews`,
+    blogs: {
+      list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sportGroup?: string;
+        sport?: string;
+        status?: "draft" | "published" | "all";
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (params?.search) q.set("search", params.search);
+        if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+        if (params?.sport) q.set("sport", params.sport);
+        if (params?.status) q.set("status", params.status);
+        const qs = q.toString();
+        return `${COACH_DATA_API}/blogs${qs ? `?${qs}` : ""}`;
+      },
+      create: `${COACH_DATA_API}/blogs`,
+      update: (blogId: string) => `${COACH_DATA_API}/blogs/${blogId}`,
+      delete: (blogId: string) => `${COACH_DATA_API}/blogs/${blogId}`,
+    },
   },
   PARTICIPANT_LIST: {
     getParticipantList: `${API_V1_BASE}/get-participant-list`,
@@ -361,6 +493,11 @@ export const EP = {
       `${API_V1_BASE}/get-event-series/${encodeURIComponent(seriesId)}`,
     eventEndPhotos: (eventId: string) =>
       `${API_V1_BASE}/get-event/${eventId}/end-photos`,
+  },
+  MESSAGES: {
+    CONVERSATIONS: `${MESSAGES_API}/conversations`,
+    CONVERSATION_MESSAGES: (id: string) =>
+      `${MESSAGES_API}/conversations/${id}`,
   },
   NOTIFICATIONS: {
     getAll: `${API_V1_BASE}/notifications`,

@@ -1,6 +1,7 @@
 import express from 'express';
 import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 import * as coachController from '../controllers/coachController.js';
+import * as blogController from '../controllers/blogController.js';
 const router = express.Router();
 
 // branch
@@ -22,6 +23,8 @@ router.post(
     coachController.createEvent
 );
 
+router.post('/invite-candidates', coachController.searchInviteCandidates);
+
 router.post(
     '/edit-event/:eventId',
     uploadFile({
@@ -34,6 +37,20 @@ router.post(
 router.post('/cancel-event/:eventId', coachController.cancelEvent);
 router.get('/listing-quote', coachController.getListingQuote);
 router.delete('/delete-event/:eventId', coachController.deleteEvent);
+
+// blogs
+router.get('/blogs', blogController.listCoachBlogs);
+router.post(
+    '/blogs',
+    uploadFile({ fieldName: 'blog-cover-image' }),
+    blogController.createCoachBlog
+);
+router.put(
+    '/blogs/:blogId',
+    uploadFile({ fieldName: 'blog-cover-image', optional: true }),
+    blogController.updateCoachBlog
+);
+router.delete('/blogs/:blogId', blogController.deleteCoachBlog);
 
 router.post('/join-backup-coach/:eventId', coachController.joinBackupCoach);
 
@@ -91,6 +108,8 @@ router.post('/my-events', coachController.getMyCreatedEvents);
 router.post('/approve-reservation/:requestId', coachController.approveReservation);
 
 router.get('/get-by-detail/:coachId', coachController.getCoachDetails);
+
+router.get('/:coachId/reviews', coachController.getCoachReviews);
 
 // Public follow stats / followers list for a coach profile.
 router.get('/:coachId/follow-stats', coachController.getCoachFollowStats);

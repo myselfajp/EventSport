@@ -7,6 +7,7 @@ import Reservation from '../models/reservationModel.js';
 import Coach from '../models/coachModel.js';
 import Facility from '../models/facilityModel.js';
 import Point from '../models/pointModel.js';
+import Comment from '../models/commentModel.js';
 import Company from '../models/companyModel.js';
 import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
@@ -30,6 +31,10 @@ import {
     notifyCoachEventCapacityFull,
     notifyCoachEventMinReached,
 } from '../utils/notificationHelper.js';
+import {
+    assertGamerCanReviewCoach,
+    refreshCoachRatingSummary,
+} from '../utils/coachReviewHelper.js';
 
 /**
  * After a successful reservation, check whether this signup just hit the
@@ -276,7 +281,7 @@ export const pointToCoach = async (req, res, next) => {
         const user = req.user;
         const schema = z.object({
             coachId: zodValidation.coachId,
-            point: zodValidation.point,
+            point: zodValidation.coachStarRating,
         });
 
         const result = schema.parse({
@@ -284,21 +289,62 @@ export const pointToCoach = async (req, res, next) => {
             point: req.body?.point,
         });
 
-        // check if coach exists
-        const coachExists = await Coach.findById(result.coachId);
-        if (!coachExists) throw new AppError(404);
+        const eligibility = await assertGamerCanReviewCoach(user, result.coachId);
+        if (!eligibility.ok) {
+            throw new AppError(eligibility.status, eligibility.message);
+        }
 
-        const givePoint = await Point.findOneAndUpdate(
+        await Point.findOneAndUpdate(
             { fromUser: user._id, toCoach: result.coachId },
             { point: result.point },
-            { upsert: true, new: true }
+            { upsert: true, new: true, runValidators: true }
         );
 
-        if (!givePoint) throw new AppError(404);
+        const summary = await refreshCoachRatingSummary(result.coachId);
 
         res.status(201).json({
             success: true,
-            data: 'saved',
+            data: summary,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const commentToCoach = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const schema = z.object({
+            coachId: zodValidation.coachId,
+            content: zodValidation.coachReviewComment,
+        });
+
+        const result = schema.parse({
+            coachId: req.body?.coachId,
+            content: req.body?.content,
+        });
+
+        const eligibility = await assertGamerCanReviewCoach(user, result.coachId);
+        if (!eligibility.ok) {
+            throw new AppError(eligibility.status, eligibility.message);
+        }
+
+        const comment = await Comment.findOneAndUpdate(
+            { fromUser: user._id, toCoach: result.coachId },
+            { content: result.content, isActive: true },
+            { upsert: true, new: true, runValidators: true }
+        );
+
+        res.status(201).json({
+            success: true,
+            data: {
+                content: comment.content,
+                updatedAt: comment.updatedAt,
+            },
         });
     } catch (err) {
         next(err);

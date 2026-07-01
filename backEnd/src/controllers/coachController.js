@@ -14,6 +14,7 @@ import { Sport, EventStyle, SportGroup } from '../models/referenceDataModel.js';
 import { JoinPrivateEvent, JoinClub, JoinGroup } from '../models/joinRequestModel.js';
 import EventEndPhoto from '../models/eventEndPhotoModel.js';
 import Follow from '../models/followModel.js';
+import { buildCoachReviewsPayload } from '../utils/coachReviewHelper.js';
 import { genSecret } from '../utils/secretIdGen.js';
 import * as zodValidation from '../utils/validation.js';
 import { unlink } from 'fs/promises';
@@ -95,6 +96,147 @@ function buildEditNotificationSummary(prev, updateData) {
         'The organizer updated this event. Please review the latest details.'
     );
 }
+
+function escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function coachDisplayName(user) {
+    return user?.firstName && user?.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : 'A coach';
+}
+
+async function createEventInvites({
+    inviterCoachId,
+    invitedUserIds = [],
+    events = [],
+    notificationEvent,
+    inviterName,
+}) {
+    const uniqueInviteeIds = [
+        ...new Set(invitedUserIds.map((id) => String(id)).filter(Boolean)),
+    ];
+    const eventDocs = events.filter(Boolean);
+    const eventIds = eventDocs.map((eventDoc) => String(eventDoc._id)).filter(Boolean);
+
+    if (!inviterCoachId || uniqueInviteeIds.length === 0 || eventIds.length === 0) {
+        return { invitedUserCount: 0, inviteRecordCount: 0 };
+    }
+
+    const invitees = await User.find({
+        _id: { $in: uniqueInviteeIds },
+        participant: { $ne: null },
+        isActive: { $ne: false },
+    })
+        .select('_id')
+        .lean();
+    const inviteeIds = invitees.map((invitee) => String(invitee._id));
+    if (inviteeIds.length === 0) {
+        return { invitedUserCount: 0, inviteRecordCount: 0 };
+    }
+
+    const existingInvites = await Invite.find({
+        invitee: { $in: inviteeIds },
+        event: { $in: eventIds },
+    })
+        .select('invitee event')
+        .lean();
+    const existingKeys = new Set(
+        existingInvites.map((invite) => `${invite.invitee}:${invite.event}`)
+    );
+
+    const inviteDocs = [];
+    for (const inviteeId of inviteeIds) {
+        for (const eventId of eventIds) {
+            const key = `${inviteeId}:${eventId}`;
+            if (!existingKeys.has(key)) {
+                inviteDocs.push({
+                    inviter: inviterCoachId,
+                    invitee: inviteeId,
+                    event: eventId,
+                });
+            }
+        }
+    }
+
+    if (inviteDocs.length === 0) {
+        return { invitedUserCount: 0, inviteRecordCount: 0 };
+    }
+
+    await Invite.insertMany(inviteDocs, { ordered: false });
+
+    const notifiedInviteeIds = [...new Set(inviteDocs.map((invite) => String(invite.invitee)))];
+    const targetEvent = notificationEvent || eventDocs[0];
+    for (const userId of notifiedInviteeIds) {
+        void notifyEventInvite({
+            userId,
+            eventId: String(targetEvent._id),
+            eventName: targetEvent.name,
+            inviterName,
+        }).catch((err) => console.error('notifyEventInvite failed:', err));
+    }
+
+    return {
+        invitedUserCount: notifiedInviteeIds.length,
+        inviteRecordCount: inviteDocs.length,
+    };
+}
+
+export const searchInviteCandidates = async (req, res, next) => {
+    try {
+        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const { search, limit } = zodValidation.inviteCandidateSearchSchema.parse(req.body);
+        const trimmed = search.trim();
+        if (trimmed.length < 2) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        const regex = new RegExp(escapeRegex(trimmed), 'i');
+        const query = {
+            _id: { $ne: req.user._id },
+            participant: { $ne: null },
+            isActive: { $ne: false },
+            $or: [
+                { firstName: regex },
+                { lastName: regex },
+                { email: regex },
+            ],
+        };
+
+        const tokens = trimmed.split(/\s+/).filter(Boolean);
+        if (tokens.length >= 2) {
+            query.$or.push({
+                $and: [
+                    { firstName: new RegExp(escapeRegex(tokens[0]), 'i') },
+                    { lastName: new RegExp(escapeRegex(tokens.slice(1).join(' ')), 'i') },
+                ],
+            });
+        }
+
+        const users = await User.find(query)
+            .select('firstName lastName email photo participant')
+            .sort({ firstName: 1, lastName: 1 })
+            .limit(limit)
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: users.map((user) => ({
+                _id: user._id,
+                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Gamer',
+                email: user.email,
+                photo: user.photo ?? null,
+                participantId: user.participant,
+            })),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
 
 export const createBranch = async (req, res, next) => {
     try {
@@ -350,7 +492,19 @@ export const createEvent = async (req, res, next) => {
 
         const result = zodValidation.createEventPayloadSchema.parse(data ?? {});
 
-        const { recurrence, listingPurchaseConfirmed, ...eventFields } = result;
+        const {
+            recurrence,
+            listingPurchaseConfirmed,
+            invitedUserIds = [],
+            ...eventFields
+        } = result;
+
+        if (invitedUserIds.length > 0 && !user.coach) {
+            throw new AppError(
+                400,
+                'A coach profile is required to invite gamers while creating an event.'
+            );
+        }
 
         // Convert empty strings to undefined for optional fields
         if (eventFields.club === '') eventFields.club = undefined;
@@ -419,6 +573,8 @@ export const createEvent = async (req, res, next) => {
         eventFields.districtName = resolvedLoc.districtName;
         eventFields.locationKey = resolvedLoc.locationKey;
 
+        const coachName = coachDisplayName(user);
+
         if (eventFields.isRecurring && recurrence) {
             const seriesResult = await createRecurringEventSeries({
                 user,
@@ -429,6 +585,13 @@ export const createEvent = async (req, res, next) => {
 
             const firstEvent = seriesResult.events[0]?.toObject?.() ?? seriesResult.events[0];
             if (firstEvent?.secretId) delete firstEvent.secretId;
+            const inviteSummary = await createEventInvites({
+                inviterCoachId: user.coach,
+                invitedUserIds,
+                events: seriesResult.events,
+                notificationEvent: firstEvent,
+                inviterName: coachName,
+            });
 
             return res.status(201).json({
                 success: true,
@@ -441,6 +604,7 @@ export const createEvent = async (req, res, next) => {
                     return o;
                 }),
                 listing: seriesResult.listingSummary,
+                invites: inviteSummary,
             });
         }
 
@@ -448,10 +612,14 @@ export const createEvent = async (req, res, next) => {
         if (!createEvent) throw new AppError(500);
         const { secretId, ...event } = createEvent.toObject();
 
-        const coachName =
-            user.firstName && user.lastName
-                ? `${user.firstName} ${user.lastName}`
-                : 'A coach';
+        const inviteSummary = await createEventInvites({
+            inviterCoachId: user.coach,
+            invitedUserIds,
+            events: [createEvent],
+            notificationEvent: createEvent,
+            inviterName: coachName,
+        });
+
         void notifyUsersInEventDistrict(createEvent, user._id, coachName);
         void notifyCoachFollowersOfNewEvent(createEvent, user, coachName);
         void notifyAffinityFollowersOfNewEvent(createEvent, user._id);
@@ -461,6 +629,7 @@ export const createEvent = async (req, res, next) => {
             success: true,
             message: 'Event created successfully',
             data: event,
+            invites: inviteSummary,
         });
     } catch (err) {
         next(err);
@@ -1645,6 +1814,23 @@ export const getListingQuote = async (req, res, next) => {
                 totalAmount,
                 currency: 'TRY',
             },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * Coach star ratings and reviews (public to authenticated users).
+ */
+export const getCoachReviews = async (req, res, next) => {
+    try {
+        const { coach } = await resolveCoachProfileContext(req.params.coachId);
+        const payload = await buildCoachReviewsPayload(coach._id, req.user ?? null);
+
+        res.status(200).json({
+            success: true,
+            data: payload,
         });
     } catch (err) {
         next(err);

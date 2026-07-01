@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sözleşmeler | Events Dashboard",
-  description: "Antrenör sözleşmesi ve ekleri",
+  title: "Agreements | Events Dashboard",
+  description: "Legal agreements, terms, and policies",
 };
 
 export default function SozlesmelerLayout({
