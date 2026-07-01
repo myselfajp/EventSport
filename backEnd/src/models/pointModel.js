@@ -4,7 +4,7 @@ const pointSchema = new mongoose.Schema(
     {
         fromUser: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'user',
+            ref: 'User',
             required: true,
         },
         toCoach: {
@@ -31,5 +31,11 @@ const pointSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+pointSchema.index(
+    { fromUser: 1, toCoach: 1 },
+    { unique: true, partialFilterExpression: { toCoach: { $type: 'objectId' } } }
+);
+pointSchema.index({ toCoach: 1, updatedAt: -1 });
 
 export default mongoose.model('Point', pointSchema);

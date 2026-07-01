@@ -18,10 +18,14 @@ import {
   AlertTriangle,
   Info,
   User,
+  MessageSquare,
+  BookOpen,
+  Newspaper,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { fetchJSON } from "../app/lib/api";
 import { EP } from "../app/lib/endpoints";
+import { getConversations } from "../app/lib/messages-api";
 import { useRouter } from "next/navigation";
 
 interface HeaderProps {
@@ -68,6 +72,7 @@ const Header: React.FC<HeaderProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
   const [headerLogoAlt, setHeaderLogoAlt] = useState("EventSport");
@@ -142,6 +147,19 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const fetchMessageUnreadCount = async () => {
+    try {
+      const conversations = await getConversations();
+      const total = conversations.reduce(
+        (sum, conv) => sum + (conv.unreadCount || 0),
+        0
+      );
+      setMessageUnreadCount(total);
+    } catch (err) {
+      console.error("Failed to fetch message unread count:", err);
+    }
+  };
+
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await fetchJSON(EP.NOTIFICATIONS.markAsRead(notificationId), {
@@ -174,10 +192,12 @@ const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     fetchNotifications();
     fetchUnreadCount();
+    fetchMessageUnreadCount();
 
-    // Poll for new notifications every 30 seconds
+    // Poll for new notifications and unread messages every 30 seconds
     const interval = setInterval(() => {
       fetchUnreadCount();
+      fetchMessageUnreadCount();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -238,6 +258,24 @@ const Header: React.FC<HeaderProps> = ({
             >
               <Menu className="w-5 h-5 shrink-0" strokeWidth={1.75} />
             </button>
+            <button
+              type="button"
+              onClick={() => router.push("/blogs")}
+              className="inline-flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Open blogs"
+            >
+              <BookOpen className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+              <span className="hidden sm:inline text-sm font-medium">Blogs</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/news")}
+              className="inline-flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Open news"
+            >
+              <Newspaper className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+              <span className="hidden sm:inline text-sm font-medium">News</span>
+            </button>
           </div>
 
           <div className="header-logo-wrap flex-1 min-w-0 px-2">
@@ -254,6 +292,22 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex flex-1 items-center justify-end gap-0.5 md:gap-1 min-w-0">
           {/* Theme Toggle */}
           <ThemeToggle variant="icon" />
+
+          {/* Messages */}
+          <button
+            onClick={() => router.push("/messaging")}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded relative text-gray-700 dark:text-slate-300 transition-colors"
+            aria-label="Messages"
+          >
+            <MessageSquare className="w-5 h-5" />
+            {messageUnreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center">
+                <span className="text-xs text-white font-medium">
+                  {messageUnreadCount > 9 ? "9+" : messageUnreadCount}
+                </span>
+              </div>
+            )}
+          </button>
 
           {/* Notifications */}
           <div className="relative" ref={dropdownRef}>

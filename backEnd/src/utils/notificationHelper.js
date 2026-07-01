@@ -530,7 +530,7 @@ export const notifyEventInvite = async ({
         scope: 'user',
         type: 'invite_event_received',
         title: 'You have been invited to an event',
-        message: `${inviterName} invited you to "${eventName}".`,
+        message: `${inviterName} invited you to "${eventName}". Open the invitation to view and accept it.`,
         data: { eventId, eventName, inviterName },
         userId,
         priority: 'high',

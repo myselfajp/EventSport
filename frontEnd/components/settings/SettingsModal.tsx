@@ -1,20 +1,13 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, FileText, Loader2, Mail, Trash2, X } from "lucide-react";
+import { Loader2, Mail, Trash2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "@/app/hooks/useAuth";
-import { apiFetch, fetchJSON } from "@/app/lib/api";
+import { apiFetch } from "@/app/lib/api";
 import { requestAccountDeletion, signOut } from "@/app/lib/auth-api";
 import { EP } from "@/app/lib/endpoints";
-import {
-  CATEGORY_LABELS_TR,
-  DEFAULT_TITLES_TR,
-  type ContractCategory,
-  type LegalDocType,
-} from "@/app/lib/contract-documents";
 import LegalContentModal from "@/components/auth/LegalContentModal";
 
 interface SettingsModalProps {
@@ -28,25 +21,10 @@ type CommercialDoc = {
   content: string;
 };
 
-type CatalogDoc = {
-  docType: LegalDocType;
-  category: ContractCategory;
-  title: string;
-};
-
-type CatalogData = {
-  legal: CatalogDoc[];
-  gamer: CatalogDoc[];
-  coach: CatalogDoc[];
-};
-
-const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach"];
-
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const router = useRouter();
   const { data: user } = useMe();
   const queryClient = useQueryClient();
-  const hasCoachProfile = !!user?.coach;
   const isAdmin = user?.role === 0;
 
   const [promotionalEmails, setPromotionalEmails] = useState(false);
@@ -60,8 +38,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     useState<CommercialDoc | null>(null);
   const [loadingCommercial, setLoadingCommercial] = useState(false);
   const [legalModal, setLegalModal] = useState<CommercialDoc | null>(null);
-  const [catalog, setCatalog] = useState<CatalogData | null>(null);
-  const [loadingCatalog, setLoadingCatalog] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -99,48 +75,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       cancelled = true;
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    let cancelled = false;
-    const loadCatalog = async () => {
-      setLoadingCatalog(true);
-      try {
-        const res = await fetchJSON(
-          EP.PUBLIC.contractsCatalog,
-          { method: "GET" },
-          { skipAuth: true }
-        );
-        if (!cancelled && res?.success && res?.data) {
-          setCatalog(res.data as CatalogData);
-        } else if (!cancelled) {
-          setCatalog(null);
-        }
-      } catch {
-        if (!cancelled) setCatalog(null);
-      } finally {
-        if (!cancelled) setLoadingCatalog(false);
-      }
-    };
-    void loadCatalog();
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen]);
-
-  const catalogSections = useMemo(() => {
-    if (!catalog) return [];
-    const categories = hasCoachProfile
-      ? CATEGORY_ORDER
-      : CATEGORY_ORDER.filter((c) => c !== "coach");
-    return categories
-      .map((category) => ({
-        category,
-        label: CATEGORY_LABELS_TR[category],
-        docs: catalog[category] ?? [],
-      }))
-      .filter((section) => section.docs.length > 0);
-  }, [catalog, hasCoachProfile]);
 
   const persistMarketingConsent = async (nextValue: boolean) => {
     if (!user) return;
@@ -235,72 +169,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               {error}
             </div>
           ) : null}
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
-              Legal &amp; contracts
-            </p>
-
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 overflow-hidden">
-              <Link
-                href="/sozlesmeler"
-                onClick={onClose}
-                className="flex items-center gap-3 p-4 hover:bg-gray-100/80 dark:hover:bg-gray-800/60 transition-colors border-b border-gray-200 dark:border-gray-700"
-              >
-                <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-900/30 shrink-0">
-                  <FileText className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    View all agreements
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    KVKK, terms, event contracts, and other published texts
-                  </p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
-              </Link>
-
-              {loadingCatalog ? (
-                <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500 dark:text-gray-400">
-                  <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
-                  Loading agreements…
-                </div>
-              ) : catalogSections.length === 0 ? (
-                <p className="px-4 py-4 text-xs text-gray-500 dark:text-gray-400">
-                  No published agreements yet.
-                </p>
-              ) : (
-                <div className="px-2 py-2 space-y-3">
-                  {catalogSections.map((section) => (
-                    <div key={section.category}>
-                      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                        {section.label}
-                      </p>
-                      <ul className="space-y-0.5">
-                        {section.docs.map((doc) => (
-                          <li key={doc.docType}>
-                            <Link
-                              href={`/legal/${doc.docType}`}
-                              onClick={onClose}
-                              className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-slate-300 hover:bg-white dark:hover:bg-gray-800 transition-colors"
-                            >
-                              <span className="truncate">
-                                {doc.title ||
-                                  DEFAULT_TITLES_TR[doc.docType] ||
-                                  doc.docType}
-                              </span>
-                              <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">

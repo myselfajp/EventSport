@@ -9,6 +9,7 @@ router.post('/follow-coach', participantController.followCoach);
 router.post('/unfollow-coach', participantController.unfollowCoach);
 router.post('/favorite-coach', participantController.favoriteCoach);
 router.post('/point-to-coach', participantController.pointToCoach);
+router.post('/comment-to-coach', participantController.commentToCoach);
 router.post('/follow-facility', participantController.followFacility);
 router.post('/unfollow-facility', participantController.unfollowFacility);
 router.post('/favorite-facility', participantController.favoriteFacility);

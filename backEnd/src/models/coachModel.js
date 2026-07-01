@@ -27,6 +27,18 @@ const coachSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        /** Cached average from gamer star ratings (1–5). */
+        ratingAverage: {
+            type: Number,
+            default: null,
+            min: [1, 'Must be at least 1'],
+            max: [5, 'Must be at most 5'],
+        },
+        ratingCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
     },
     { timestamps: true }
 );

@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import {
-  CATEGORY_LABELS_TR,
-  DEFAULT_TITLES_TR,
+  CATEGORY_LABELS,
+  DOC_TYPE_LABELS,
   SOZLESMELER_SECTION_ANCHORS,
   type ContractCategory,
   type LegalDocType,
@@ -55,11 +55,11 @@ export default function SozlesmelerContent() {
         if (res?.success && res?.data) {
           setCatalog(res.data as CatalogData);
         } else {
-          setFatalError(res?.message || res?.error || "İçerik yüklenemedi.");
+          setFatalError(res?.message || res?.error || "Failed to load content.");
         }
       } catch (e: unknown) {
         if (!cancelled) {
-          setFatalError(e instanceof Error ? e.message : "İçerik yüklenemedi.");
+          setFatalError(e instanceof Error ? e.message : "Failed to load content.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -78,7 +78,7 @@ export default function SozlesmelerContent() {
       for (const doc of catalog[cat] ?? []) {
         tocEntries.push({
           anchor: SOZLESMELER_SECTION_ANCHORS[doc.docType],
-          label: doc.title || DEFAULT_TITLES_TR[doc.docType],
+          label: doc.title || DOC_TYPE_LABELS[doc.docType],
         });
       }
     }
@@ -88,12 +88,12 @@ export default function SozlesmelerContent() {
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
       <header className="border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Sözleşmeler</h1>
+          <h1 className="text-lg font-semibold">Agreements</h1>
           <Link
             href="/"
             className="text-sm text-cyan-600 dark:text-cyan-400 hover:underline"
           >
-            Ana sayfa
+            Home
           </Link>
         </div>
       </header>
@@ -101,7 +101,7 @@ export default function SozlesmelerContent() {
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-8 space-y-12">
         <nav className="text-sm bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4">
           <p className="font-medium text-gray-700 dark:text-slate-300 mb-2">
-            İçindekiler
+            Contents
           </p>
           {CATEGORY_ORDER.map((cat) => {
             const docs = catalog?.[cat] ?? [];
@@ -109,12 +109,12 @@ export default function SozlesmelerContent() {
             return (
               <div key={cat} className="mt-3">
                 <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">
-                  {CATEGORY_LABELS_TR[cat]}
+                  {CATEGORY_LABELS[cat]}
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-cyan-600 dark:text-cyan-400">
                   {docs.map((doc) => {
                     const anchor = SOZLESMELER_SECTION_ANCHORS[doc.docType];
-                    const label = doc.title || DEFAULT_TITLES_TR[doc.docType];
+                    const label = doc.title || DOC_TYPE_LABELS[doc.docType];
                     return (
                       <li key={doc.docType}>
                         <a href={`#${anchor}`} className="hover:underline">
@@ -128,8 +128,8 @@ export default function SozlesmelerContent() {
             );
           })}
           <p className="mt-3 text-xs text-gray-500 dark:text-slate-400">
-            Tüm metinler Admin → Contracts üzerinden yönetilir. Eski statik adresler bu sayfaya
-            yönlendirilir.
+            All texts are managed via Admin → Contracts. Legacy static URLs redirect to this
+            page.
           </p>
         </nav>
 
@@ -144,7 +144,7 @@ export default function SozlesmelerContent() {
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-500" />
               <p className="text-sm text-gray-500 dark:text-slate-400">
-                Yükleniyor…
+                Loading…
               </p>
             </div>
           </div>
@@ -158,11 +158,11 @@ export default function SozlesmelerContent() {
               return (
                 <section key={cat} className="space-y-8">
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                    {CATEGORY_LABELS_TR[cat]}
+                    {CATEGORY_LABELS[cat]}
                   </h2>
                   {docs.map((doc) => {
                     const anchor = SOZLESMELER_SECTION_ANCHORS[doc.docType];
-                    const title = doc.title || DEFAULT_TITLES_TR[doc.docType];
+                    const title = doc.title || DOC_TYPE_LABELS[doc.docType];
                     return (
                       <article
                         key={doc.docType}
@@ -175,12 +175,12 @@ export default function SozlesmelerContent() {
                             href={`/legal/${doc.docType}`}
                             className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline"
                           >
-                            Tam sayfa
+                            Full page
                           </Link>
                         </div>
                         {doc.version != null && (
                           <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
-                            Yayında sürüm: v{doc.version}
+                            Published version: v{doc.version}
                           </p>
                         )}
                         <SectionBody html={doc.content ?? ""} />
@@ -193,8 +193,8 @@ export default function SozlesmelerContent() {
 
             {tocEntries.length === 0 && !fatalError && (
               <p className="text-sm text-gray-600 dark:text-slate-400">
-                Henüz yayımlanmış sözleşme yok. Yönetici panelinden Contracts bölümünde ilgili
-                belgeleri oluşturup aktif yapın.
+                No published agreements yet. Create and activate the relevant documents in Admin
+                → Contracts.
               </p>
             )}
           </>

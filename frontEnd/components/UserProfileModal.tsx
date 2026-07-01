@@ -21,10 +21,14 @@ import {
   ShieldCheck,
   ChevronRight,
   Flag,
+  MessageCircle,
+  Loader2,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import ReportModal from "@/components/report/ReportModal";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { createConversation } from "@/app/lib/messages-api";
 import { useMe } from "@/app/hooks/useAuth";
 import {
   User as UserType,
@@ -57,6 +61,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   userId,
   context,
 }) => {
+  const router = useRouter();
   const { data: currentUser } = useMe();
   const [user, setUser] = useState<UserType | null>(null);
   const [mainSport, setMainSport] = useState<string>("");
@@ -76,6 +81,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     useState<CoachProfileEvent | null>(null);
   const [isEventViewOpen, setIsEventViewOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isStartingConversation, setIsStartingConversation] = useState(false);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -366,6 +372,24 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     userId &&
     String(currentUser._id) !== String(userId);
 
+  const canSendMessage =
+    !!currentUser?._id &&
+    !!userId &&
+    String(currentUser._id) !== String(userId);
+
+  const handleSendMessage = async () => {
+    if (!userId || isStartingConversation) return;
+    setIsStartingConversation(true);
+    try {
+      const conversation = await createConversation(userId);
+      onClose();
+      router.push(`/messaging?conversationId=${conversation._id}`);
+    } catch (err) {
+      console.error("Failed to start conversation:", err);
+      setIsStartingConversation(false);
+    }
+  };
+
   const reportTargetLabel = user
     ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email
     : undefined;
@@ -380,6 +404,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
                 User Profile
               </h2>
+              {canSendMessage && (
+                <button
+                  type="button"
+                  onClick={handleSendMessage}
+                  disabled={isStartingConversation}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg transition-colors"
+                >
+                  {isStartingConversation ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  )}
+                  Send Message
+                </button>
+              )}
               {canReportUser && (
                 <button
                   type="button"

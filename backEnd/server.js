@@ -1,4 +1,4 @@
-import app from './src/app.js';
+import { httpServer } from './src/socket/socketServer.js';
 import mongoose from 'mongoose';
 import { initAdmin } from './src/utils/initAdmin.js';
 import { initAdminPermissionGroups } from './src/utils/initAdminPermissionGroups.js';
@@ -12,7 +12,8 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 const startServer = async () => {
     try {
-        app.listen(PORT, () => {
+        // httpServer hem Express app'i hem socket.io'yu barındırır.
+        httpServer.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });
     } catch (err) {

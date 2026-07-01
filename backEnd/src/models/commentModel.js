@@ -26,13 +26,21 @@ const commentSchema = new mongoose.Schema(
         content: {
             type: String,
             required: true,
+            trim: true,
+            maxlength: 2000,
         },
         isActive: {
             type: Boolean,
-            default: false,
+            default: true,
         },
     },
     { timestamps: true }
 );
+
+commentSchema.index(
+    { fromUser: 1, toCoach: 1 },
+    { unique: true, partialFilterExpression: { toCoach: { $type: 'objectId' } } }
+);
+commentSchema.index({ toCoach: 1, createdAt: -1 });
 
 export default mongoose.model('Comment', commentSchema);

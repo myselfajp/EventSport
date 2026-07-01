@@ -4,6 +4,7 @@ import Suggestion from '../models/suggestionModel.js';
 import DashboardHeroSlide from '../models/dashboardHeroSlideModel.js';
 import DashboardHeroClick from '../models/dashboardHeroClickModel.js';
 import DashboardHeaderLogo, { HEADER_LOGO_KEY } from '../models/dashboardHeaderLogoModel.js';
+import { Sport, SportGroup } from '../models/referenceDataModel.js';
 import * as zodValidation from '../utils/validation.js';
 import { AppError } from '../utils/appError.js';
 import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
@@ -13,6 +14,82 @@ import { getActiveCatalog } from './legalController.js';
 
 /** Slug: lowercase letters, digits, hyphens only (matches StaticPage.name usage). */
 const PUBLIC_PAGE_NAME_RE = /^[a-z0-9-]{1,80}$/;
+
+function publicListPaging(query) {
+    const page = Math.max(1, Number.parseInt(String(query.page || '1'), 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(String(query.limit || '100'), 10) || 100));
+    const search = String(query.search || '').trim().slice(0, 80);
+    return { page, limit, search };
+}
+
+export const getPublicSportGroups = async (req, res, next) => {
+    try {
+        const { page, limit, search } = publicListPaging(req.query || {});
+        const filter = {};
+        if (search) filter.name = { $regex: search, $options: 'i' };
+
+        const [rows, total] = await Promise.all([
+            SportGroup.find(filter)
+                .sort({ name: 1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select('name')
+                .lean(),
+            SportGroup.countDocuments(filter),
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+                total,
+                perPage: limit,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getPublicSports = async (req, res, next) => {
+    try {
+        const { page, limit, search } = publicListPaging(req.query || {});
+        const sportGroup = String(req.query?.sportGroup || '').trim();
+        const filter = {};
+        if (search) filter.name = { $regex: search, $options: 'i' };
+        if (sportGroup) {
+            if (!mongoose.Types.ObjectId.isValid(sportGroup)) {
+                throw new AppError(400, 'Invalid sport group');
+            }
+            filter.group = sportGroup;
+        }
+
+        const [rows, total] = await Promise.all([
+            Sport.find(filter)
+                .sort({ name: 1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select('name group groupName')
+                .lean(),
+            Sport.countDocuments(filter),
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.max(1, Math.ceil(total / limit) || 1),
+                total,
+                perPage: limit,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
 
 /** Active static pages for sidebar/footer navigation (no admin auth). */
 export const getPublicActiveStaticPages = async (_req, res, next) => {

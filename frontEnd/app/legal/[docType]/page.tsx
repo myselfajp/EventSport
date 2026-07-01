@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import SitePageShell from "@/components/SitePageShell";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
-import { DEFAULT_TITLES_TR, isLegalDocType } from "@/app/lib/contract-documents";
+import { DOC_TYPE_LABELS, isLegalDocType } from "@/app/lib/contract-documents";
 
 export default function LegalPublicPage() {
   const params = useParams();
@@ -21,7 +21,7 @@ export default function LegalPublicPage() {
   useEffect(() => {
     if (!docType) {
       setLoading(false);
-      setError("Geçersiz adres.");
+      setError("Invalid URL.");
       setDoc(null);
       return;
     }
@@ -40,20 +40,20 @@ export default function LegalPublicPage() {
         if (cancelled) return;
         if (res?.success && res?.data) {
           setDoc({
-            title: String(res.data.title ?? DEFAULT_TITLES_TR[docType]),
+            title: String(res.data.title ?? DOC_TYPE_LABELS[docType]),
             content: String(res.data.content ?? ""),
           });
         } else {
           setError(
             res?.error ||
               res?.message ||
-              "Belge bulunamadı veya yayında değil."
+              "Document not found or not published."
           );
           setDoc(null);
         }
       } catch (e: unknown) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Belge yüklenemedi.");
+          setError(e instanceof Error ? e.message : "Failed to load document.");
           setDoc(null);
         }
       } finally {
@@ -73,7 +73,7 @@ export default function LegalPublicPage() {
         <div className="flex flex-col items-center justify-center min-h-[280px] gap-3">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-500" />
           <p className="text-sm text-gray-500 dark:text-slate-400">
-            Yükleniyor…
+            Loading…
           </p>
         </div>
       ) : error ? (
