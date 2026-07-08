@@ -16,9 +16,7 @@ import SportsBanner from "./SportsBanner";
 import StaticPageView from "./StaticPageView";
 import AddEventModal from "./event/AddEventModal";
 import SiteFooter from "./SiteFooter";
-import DashboardHeroSlider, {
-  type DashboardHeroSlideDTO,
-} from "./DashboardHeroSlider";
+import PageHeroBanner from "./PageHeroBanner";
 import NearbyEventsSection from "./NearbyEventsSection";
 import YourNextEventSection from "./YourNextEventSection";
 import HotUpcomingSection from "./HotUpcomingSection";
@@ -42,7 +40,6 @@ const EventsDashboard = () => {
   const [showActivity, setShowActivity] = useState(false);
   const [selectedStaticPageName, setSelectedStaticPageName] = useState<string | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
-  const [heroSlides, setHeroSlides] = useState<DashboardHeroSlideDTO[]>([]);
   const [gamerProfileOpenSignal, setGamerProfileOpenSignal] = useState(0);
   const openGamerProfile = useCallback(() => {
     setLeftSidebarOpen(true);
@@ -79,40 +76,6 @@ const EventsDashboard = () => {
     const district = userLocation.districtName || userDistrictDocName;
     return [district, userLocation.city].filter(Boolean).join(", ") || district;
   })();
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchJSON(
-      EP.PUBLIC.dashboardHeroSlides,
-      { method: "GET" },
-      { skipAuth: true }
-    ).then((res) => {
-      if (cancelled || !res?.success || !Array.isArray(res.data)) return;
-      setHeroSlides(
-        res.data.map((row: Record<string, unknown>) => {
-          const img = row.image as { path?: string; mimeType?: string } | undefined;
-          return {
-            _id: String(row._id),
-            badgeLabel: String(row.badgeLabel ?? ""),
-            title: String(row.title ?? ""),
-            subtitle: String(row.subtitle ?? ""),
-            imageAlt: row.imageAlt ? String(row.imageAlt) : undefined,
-            image:
-              img?.path != null && img.path !== ""
-                ? { path: String(img.path), mimeType: img.mimeType ? String(img.mimeType) : undefined }
-                : undefined,
-            ctaLabel: row.ctaLabel ? String(row.ctaLabel) : undefined,
-            ctaHref: row.ctaHref ? String(row.ctaHref) : undefined,
-            ctaRequiresAdminRole: !!row.ctaRequiresAdminRole,
-            order: typeof row.order === "number" ? row.order : 0,
-          };
-        })
-      );
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -328,11 +291,7 @@ const EventsDashboard = () => {
                 </button>
               </div>
             )}
-            <DashboardHeroSlider
-              slides={heroSlides}
-              firstName={user?.firstName}
-              userRole={user?.role ?? null}
-            />
+            <PageHeroBanner context="home" useFallback />
 
             {user &&
               !showCoachCalendar &&

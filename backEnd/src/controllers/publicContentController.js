@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import StaticPage from '../models/staticPageModel.js';
 import Suggestion from '../models/suggestionModel.js';
+import { parseHeroContext, buildHeroContextFilter } from '../utils/heroContext.js';
 import DashboardHeroSlide from '../models/dashboardHeroSlideModel.js';
 import DashboardHeroClick from '../models/dashboardHeroClickModel.js';
 import DashboardHeaderLogo, { HEADER_LOGO_KEY } from '../models/dashboardHeaderLogoModel.js';
@@ -170,10 +171,14 @@ export const getPublicDashboardHeaderLogo = async (req, res, next) => {
     }
 };
 
-/** Active home dashboard hero slides (public read). */
+/** Active dashboard hero slides for a public page (home, blog, news). */
 export const getPublicDashboardHeroSlides = async (req, res, next) => {
     try {
-        const slides = await DashboardHeroSlide.find({ isActive: true })
+        const context = parseHeroContext(req.query?.context);
+        const slides = await DashboardHeroSlide.find({
+            isActive: true,
+            ...buildHeroContextFilter(context),
+        })
             .sort({ order: 1, createdAt: -1 })
             .select(
                 'badgeLabel title subtitle image imageAlt ctaLabel ctaHref ctaRequiresAdminRole order createdAt'

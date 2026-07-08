@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Loader2, MessageSquare, Star } from "lucide-react";
+import { Loader2, MessageSquare, Star, X } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+
+const PREVIEW_REVIEW_LIMIT = 2;
 
 export type CoachReviewItem = {
   userId: string;
@@ -100,6 +102,80 @@ function InteractiveStars({
   );
 }
 
+function ReviewCard({ review }: { review: CoachReviewItem }) {
+  return (
+    <li className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <p className="font-semibold text-gray-900 dark:text-white text-sm">
+            {review.authorName}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {new Intl.DateTimeFormat("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }).format(new Date(review.updatedAt))}
+          </p>
+        </div>
+        {review.rating != null && <StarDisplay value={review.rating} size="md" />}
+      </div>
+      {review.comment ? (
+        <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+          {review.comment}
+        </p>
+      ) : (
+        <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+          Rated without a written comment.
+        </p>
+      )}
+    </li>
+  );
+}
+
+function AllReviewsModal({
+  reviews,
+  totalCount,
+  onClose,
+}: {
+  reviews: CoachReviewItem[];
+  totalCount: number;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+              All Reviews
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+              {totalCount} {totalCount === 1 ? "review" : "reviews"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-gray-50 dark:bg-gray-900">
+          <ul className="space-y-3">
+            {reviews.map((review) => (
+              <ReviewCard key={review.userId} review={review} />
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface CoachReviewsSectionProps {
   coachId: string | null;
   isOwnProfile: boolean;
@@ -147,6 +223,7 @@ export default function CoachReviewsSection({
   const [savingComment, setSavingComment] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const loadReviews = useCallback(async () => {
     if (!coachId) return;
@@ -231,6 +308,9 @@ export default function CoachReviewsSection({
 
   const summary = data?.summary;
   const canReview = data?.viewer.canReview && !isOwnProfile;
+  const allReviews = data?.reviews ?? [];
+  const previewReviews = allReviews.slice(0, PREVIEW_REVIEW_LIMIT);
+  const hasMoreReviews = allReviews.length > PREVIEW_REVIEW_LIMIT;
 
   return (
     <div>
@@ -318,48 +398,37 @@ export default function CoachReviewsSection({
             </p>
           )}
 
-          {data?.reviews && data.reviews.length > 0 ? (
-            <ul className="space-y-3">
-              {data.reviews.map((review) => (
-                <li
-                  key={review.userId}
-                  className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm"
+          {allReviews.length > 0 ? (
+            <>
+              <ul className="space-y-3">
+                {previewReviews.map((review) => (
+                  <ReviewCard key={review.userId} review={review} />
+                ))}
+              </ul>
+              {hasMoreReviews && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllReviews(true)}
+                  className="mt-3 w-full px-4 py-2.5 text-sm font-medium text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-900/30 border border-cyan-200 dark:border-cyan-800 rounded-lg hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {review.authorName}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Intl.DateTimeFormat("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        }).format(new Date(review.updatedAt))}
-                      </p>
-                    </div>
-                    {review.rating != null && (
-                      <StarDisplay value={review.rating} size="md" />
-                    )}
-                  </div>
-                  {review.comment ? (
-                    <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                      {review.comment}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 italic">
-                      Rated without a written comment.
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  View all reviews ({allReviews.length})
+                </button>
+              )}
+            </>
           ) : (
             <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 text-sm">
               No reviews yet.
             </div>
           )}
         </>
+      )}
+
+      {showAllReviews && (
+        <AllReviewsModal
+          reviews={allReviews}
+          totalCount={allReviews.length}
+          onClose={() => setShowAllReviews(false)}
+        />
       )}
     </div>
   );

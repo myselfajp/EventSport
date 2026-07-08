@@ -8,13 +8,18 @@ import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
 
 const BLOG_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const optionalObjectId = z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    mongoObjectId.optional()
+);
+
 const blogPayloadSchema = z.object({
     title: z.string().trim().min(3).max(180),
     slug: z.string().trim().max(220).optional().default(''),
     excerpt: z.string().trim().min(10).max(320),
     content: z.string().trim().min(30).max(20000),
-    sportGroup: mongoObjectId,
-    sport: mongoObjectId,
+    sportGroup: optionalObjectId,
+    sport: optionalObjectId,
     status: z.enum(['draft', 'published']).optional().default('published'),
     isActive: z.coerce.boolean().optional().default(true),
 });
@@ -27,8 +32,10 @@ const blogListQuerySchema = z.object({
     page: z.coerce.number().int().min(1).optional().default(1),
     limit: z.coerce.number().int().min(1).max(50).optional().default(12),
     search: z.string().trim().max(120).optional().default(''),
-    sportGroup: mongoObjectId.optional(),
-    sport: mongoObjectId.optional(),
+    sportGroup: optionalObjectId,
+    sport: optionalObjectId,
+    coachId: optionalObjectId,
+    excludeSlug: z.string().trim().max(220).optional().default(''),
     status: z.enum(['draft', 'published', 'all']).optional().default('published'),
 });
 
@@ -137,6 +144,14 @@ function formatBlog(row, { includeContent = false } = {}) {
 }
 
 async function validateSportPair(sportGroupId, sportId) {
+    if (!sportGroupId && !sportId) return;
+    if (sportGroupId && !sportId) {
+        throw new AppError(400, 'Select a sport when a sport group is chosen');
+    }
+    if (!sportGroupId && sportId) {
+        throw new AppError(400, 'Select a sport group when a sport is chosen');
+    }
+
     const [sportGroup, sport] = await Promise.all([
         SportGroup.findById(sportGroupId).select('_id').lean(),
         Sport.findById(sportId).select('_id group').lean(),
@@ -172,8 +187,10 @@ function buildListFilter(parsed, { publicOnly = false, ownerUserId = null } = {}
     if (ownerUserId) {
         filter.authorUser = ownerUserId;
     }
+    if (parsed.coachId) filter.authorCoach = parsed.coachId;
     if (parsed.sportGroup) filter.sportGroup = parsed.sportGroup;
     if (parsed.sport) filter.sport = parsed.sport;
+    if (parsed.excludeSlug) filter.slug = { $ne: parsed.excludeSlug };
 
     if (parsed.search) {
         const regex = new RegExp(String(parsed.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -265,8 +282,14 @@ async function createBlog(req, res, next, { authorType }) {
         const slug = await uniqueSlug(parsed.slug || parsed.title);
         const now = new Date();
         const row = await BlogPost.create({
-            ...parsed,
+            title: parsed.title,
             slug,
+            excerpt: parsed.excerpt,
+            content: parsed.content,
+            sportGroup: parsed.sportGroup || null,
+            sport: parsed.sport || null,
+            status: parsed.status,
+            isActive: parsed.isActive,
             coverImage: req.fileMeta || undefined,
             authorUser: req.user._id,
             authorCoach: authorType === 'coach' ? req.user.coach : null,
@@ -308,24 +331,37 @@ async function updateBlog(req, res, next, { admin = false } = {}) {
         }
 
         const parsed = blogUpdateSchema.parse(parseBlogData(req));
-        if (parsed.sportGroup || parsed.sport) {
+        if (parsed.sportGroup !== undefined || parsed.sport !== undefined) {
             await validateSportPair(
-                parsed.sportGroup || String(row.sportGroup),
-                parsed.sport || String(row.sport)
+                parsed.sportGroup !== undefined ? parsed.sportGroup : row.sportGroup,
+                parsed.sport !== undefined ? parsed.sport : row.sport
             );
         }
 
         if (parsed.title !== undefined) row.title = parsed.title;
         if (parsed.excerpt !== undefined) row.excerpt = parsed.excerpt;
         if (parsed.content !== undefined) row.content = parsed.content;
-        if (parsed.sportGroup !== undefined) row.sportGroup = parsed.sportGroup;
-        if (parsed.sport !== undefined) row.sport = parsed.sport;
-        if (parsed.isActive !== undefined) row.isActive = parsed.isActive;
-        if (parsed.status !== undefined && parsed.status !== row.status) {
+        if (parsed.sportGroup !== undefined) row.sportGroup = parsed.sportGroup || null;
+        if (parsed.sport !== undefined) row.sport = parsed.sport || null;
+        const wasPublic = row.status === 'published' && row.isActive;
+
+        if (parsed.status !== undefined) {
             row.status = parsed.status;
-            if (parsed.status === 'published' && !row.publishedAt) {
-                row.publishedAt = new Date();
-            }
+        }
+        if (parsed.isActive !== undefined) {
+            row.isActive = parsed.isActive;
+        }
+
+        // Publishing activates the post unless explicitly deactivated in the same request.
+        if (parsed.status === 'published' && parsed.isActive !== false) {
+            row.isActive = true;
+        }
+
+        const isPublic = row.status === 'published' && row.isActive;
+        if (isPublic && !wasPublic) {
+            row.publishedAt = new Date();
+        } else if (isPublic && !row.publishedAt) {
+            row.publishedAt = new Date();
         }
         if (parsed.slug !== undefined && parsed.slug.trim()) {
             row.slug = await uniqueSlug(parsed.slug, row._id);

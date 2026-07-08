@@ -71,7 +71,12 @@ export const EP = {
     contractsCatalog: `${API_V1_BASE}/public/contracts`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
     dashboardHeaderLogo: `${API_V1_BASE}/public/dashboard-header-logo`,
-    dashboardHeroSlides: `${API_V1_BASE}/public/dashboard-hero-slides`,
+    dashboardHeroSlides: (context?: "home" | "blog" | "news") => {
+      const q = new URLSearchParams();
+      if (context) q.set("context", context);
+      const qs = q.toString();
+      return `${API_V1_BASE}/public/dashboard-hero-slides${qs ? `?${qs}` : ""}`;
+    },
     sportGroups: (params?: { page?: number; limit?: number; search?: string }) => {
       const q = new URLSearchParams();
       if (params?.page) q.set("page", String(params.page));
@@ -100,6 +105,8 @@ export const EP = {
       search?: string;
       sportGroup?: string;
       sport?: string;
+      coachId?: string;
+      excludeSlug?: string;
     }) => {
       const q = new URLSearchParams();
       if (params?.page) q.set("page", String(params.page));
@@ -107,6 +114,8 @@ export const EP = {
       if (params?.search) q.set("search", params.search);
       if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
       if (params?.sport) q.set("sport", params.sport);
+      if (params?.coachId) q.set("coachId", params.coachId);
+      if (params?.excludeSlug) q.set("excludeSlug", params.excludeSlug);
       const qs = q.toString();
       return `${API_V1_BASE}/public/blogs${qs ? `?${qs}` : ""}`;
     },
@@ -307,17 +316,24 @@ export const EP = {
       delete: `${ADMIN_API}/dashboard-header-logo`,
     },
     dashboardHeroSlides: {
-      list: `${ADMIN_API}/dashboard-hero-slides`,
+      list: (context?: "home" | "blog" | "news") => {
+        const q = new URLSearchParams();
+        if (context) q.set("context", context);
+        const qs = q.toString();
+        return `${ADMIN_API}/dashboard-hero-slides${qs ? `?${qs}` : ""}`;
+      },
       create: `${ADMIN_API}/dashboard-hero-slides`,
       update: (slideId: string) => `${ADMIN_API}/dashboard-hero-slides/${slideId}`,
       delete: (slideId: string) => `${ADMIN_API}/dashboard-hero-slides/${slideId}`,
       analytics: (params?: {
+        context?: "home" | "blog" | "news";
         days?: number;
         slideId?: string;
         from?: string;
         to?: string;
       }) => {
         const q = new URLSearchParams();
+        if (params?.context) q.set("context", params.context);
         if (params?.days) q.set("days", String(params.days));
         if (params?.slideId) q.set("slideId", params.slideId);
         if (params?.from) q.set("from", params.from);

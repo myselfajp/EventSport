@@ -134,6 +134,52 @@ function formatSlideDate(iso?: string): string {
 }
 
 type HeroSection = "slides" | "statistics" | "logo";
+type HeroPageContext = "home" | "blog" | "news";
+
+const HERO_PAGE_OPTIONS: { id: HeroPageContext; label: string; description: string }[] = [
+  {
+    id: "home",
+    label: "Home",
+    description: "Carousel on the main dashboard home page.",
+  },
+  {
+    id: "blog",
+    label: "Blog",
+    description: "Banner at the top of the public blogs listing page.",
+  },
+  {
+    id: "news",
+    label: "News",
+    description: "Banner at the top of the public news listing page.",
+  },
+];
+
+function HeroPageNav({
+  pageContext,
+  onPageContextChange,
+}: {
+  pageContext: HeroPageContext;
+  onPageContextChange: (ctx: HeroPageContext) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {HERO_PAGE_OPTIONS.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => onPageContextChange(option.id)}
+          className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+            pageContext === option.id
+              ? "bg-cyan-600 text-white border-cyan-600"
+              : "bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-800"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function HeroSectionNav({
   section,
@@ -180,6 +226,7 @@ function HeroSectionNav({
 
 export default function DashboardHeroManagement() {
   const [section, setSection] = useState<HeroSection>("slides");
+  const [pageContext, setPageContext] = useState<HeroPageContext>("home");
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -287,7 +334,7 @@ export default function DashboardHeroManagement() {
     try {
       setLoading(true);
       setError("");
-      const res = await fetchJSON(EP.ADMIN.dashboardHeroSlides.list, {
+      const res = await fetchJSON(EP.ADMIN.dashboardHeroSlides.list(pageContext), {
         method: "GET",
       });
       if (res?.success && Array.isArray(res.data)) {
@@ -304,7 +351,9 @@ export default function DashboardHeroManagement() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [pageContext]);
+
+  const activePage = HERO_PAGE_OPTIONS.find((option) => option.id === pageContext)!;
 
   const openCreate = () => {
     setEditing(null);
@@ -387,6 +436,7 @@ export default function DashboardHeroManagement() {
         ctaRequiresAdminRole: form.ctaRequiresAdminRole,
         isActive: form.isActive,
         order: form.order,
+        context: pageContext,
       };
 
       if (editing && removeImage) {
@@ -430,7 +480,8 @@ export default function DashboardHeroManagement() {
     return (
       <div className="space-y-4">
         <HeroSectionNav section={section} onSectionChange={setSection} />
-        <DashboardHeroStatistics />
+        <HeroPageNav pageContext={pageContext} onPageContextChange={setPageContext} />
+        <DashboardHeroStatistics context={pageContext} />
       </div>
     );
   }
@@ -447,18 +498,19 @@ export default function DashboardHeroManagement() {
   return (
     <div className="space-y-4">
       <HeroSectionNav section={section} onSectionChange={setSection} />
+      <HeroPageNav pageContext={pageContext} onPageContextChange={setPageContext} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
           <Layers className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
           <div>
-            <h2 className="text-lg font-semibold">Home dashboard hero</h2>
+            <h2 className="text-lg font-semibold">{activePage.label} page hero</h2>
             <p className="text-sm text-gray-500 dark:text-slate-400">
-              Upload campaign banners or text-only slides. Use{" "}
+              {activePage.description} Upload campaign banners or text-only slides. Use{" "}
               <code className="text-xs bg-gray-100 dark:bg-slate-700 px-1 rounded">
                 {"{{firstName}}"}
               </code>{" "}
-              in the title. CTA links are tracked via redirect (clicks counted). Multiple slides
-              appear as a carousel on the home dashboard.
+              in the title on the home page. CTA links are tracked via redirect (clicks counted).
+              Multiple slides appear as a carousel.
             </p>
           </div>
         </div>

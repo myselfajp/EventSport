@@ -68,7 +68,17 @@ function downloadCsv(data: AnalyticsData) {
   URL.revokeObjectURL(url);
 }
 
-export default function DashboardHeroStatistics() {
+const PAGE_LABELS: Record<"home" | "blog" | "news", string> = {
+  home: "Home page",
+  blog: "Blog page",
+  news: "News page",
+};
+
+export default function DashboardHeroStatistics({
+  context = "home",
+}: {
+  context?: "home" | "blog" | "news";
+}) {
   const [days, setDays] = useState<number>(30);
   const [slideId, setSlideId] = useState("");
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -81,6 +91,7 @@ export default function DashboardHeroStatistics() {
       setError("");
       const res = await fetchJSON(
         EP.ADMIN.dashboardHeroSlides.analytics({
+          context,
           days,
           ...(slideId ? { slideId } : {}),
         }),
@@ -98,7 +109,7 @@ export default function DashboardHeroStatistics() {
     } finally {
       setLoading(false);
     }
-  }, [days, slideId]);
+  }, [context, days, slideId]);
 
   useEffect(() => {
     void load();
@@ -114,7 +125,7 @@ export default function DashboardHeroStatistics() {
           <div>
             <h2 className="text-lg font-semibold">Banner click statistics</h2>
             <p className="text-sm text-gray-500 dark:text-slate-400">
-              Tracked clicks from EventSport redirect links (home dashboard hero).
+              Tracked clicks from EventSport redirect links ({PAGE_LABELS[context]} hero).
             </p>
           </div>
         </div>

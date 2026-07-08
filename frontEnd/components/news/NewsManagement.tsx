@@ -4,8 +4,10 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 import Link from "next/link";
 import {
   CalendarDays,
+  CheckCircle2,
   Edit2,
   Eye,
+  EyeOff,
   Filter,
   ImageIcon,
   Loader2,
@@ -14,7 +16,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  Trash2,
   X,
 } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
@@ -43,8 +44,10 @@ const EMPTY_FORM: NewsForm = { title: "", slug: "", excerpt: "", content: "", sp
 function relationId(v: SportGroup | Sport | string | null | undefined) { if (!v) return ""; return typeof v === "string" ? v : v._id || ""; }
 function relationName(v: SportGroup | Sport | string | null | undefined) { if (!v) return ""; return typeof v === "string" ? "" : v.name || ""; }
 function formatDate(v?: string | null) { if (!v) return "Not published"; return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(v)); }
-function statusLabel(i: NewsItem) { if (!i.isActive) return "Inactive"; return i.status === "published" ? "Published" : "Draft"; }
+function statusLabel(i: NewsItem) { if (isPublicNews(i)) return "Published"; if (!i.isActive) return "Inactive"; return i.status === "published" ? "Published" : "Draft"; }
+function isPublicNews(i: NewsItem) { return i.status === "published" && i.isActive; }
 function statusClass(i: NewsItem) {
+  if (isPublicNews(i)) return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900";
   if (!i.isActive) return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
   if (i.status === "published") return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900";
   return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900";
@@ -71,13 +74,14 @@ export default function NewsManagement() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({ totalPages: 1, total: 0, perPage: 10 });
+  const [pagination, setPagination] = useState({ totalPages: 1, total: 0, perPage: 50 });
   const [filters, setFilters] = useState({ search: "", sportGroup: "", sport: "", status: "all" as StatusFilter });
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<NewsItem | null>(null);
   const [form, setForm] = useState<NewsForm>(EMPTY_FORM);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => { return () => { if (coverPreviewUrl.startsWith("blob:")) URL.revokeObjectURL(coverPreviewUrl); }; }, [coverPreviewUrl]);
 
@@ -109,7 +113,7 @@ export default function NewsManagement() {
       const r = await fetchJSON(newsApi.list({ page, limit: pagination.perPage, search: filters.search.trim() || undefined, sportGroup: filters.sportGroup || undefined, sport: filters.sport || undefined, status: filters.status }), { method: "GET" });
       if (r?.success && Array.isArray(r.data)) {
         setNewsItems(r.data);
-        setPagination({ totalPages: r.pagination?.totalPages || 1, total: r.pagination?.total || r.data.length, perPage: r.pagination?.perPage || 10 });
+        setPagination({ totalPages: r.pagination?.totalPages || 1, total: r.pagination?.total || r.data.length, perPage: r.pagination?.perPage || 50 });
       } else { setNewsItems([]); setError(r?.message || r?.error || "Failed to load news"); }
     } catch (e) { setNewsItems([]); setError(e instanceof Error ? e.message : "Failed to load news"); }
     finally { setLoading(false); }
@@ -130,8 +134,8 @@ export default function NewsManagement() {
     if (form.title.trim().length<3) return "Title must be at least 3 characters.";
     if (form.excerpt.trim().length<10) return "Excerpt must be at least 10 characters.";
     if (form.content.trim().length<30) return "Content must be at least 30 characters.";
-    if (!form.sportGroup) return "Sport Group is required.";
-    if (!form.sport) return "Sport is required.";
+    if (form.sportGroup && !form.sport) return "Select a sport when a sport group is chosen.";
+    if (!form.sportGroup && form.sport) return "Select a sport group when a sport is chosen.";
     if (!editing && !coverFile) return "Cover image is required.";
     if (editing && !coverFile && !editing.coverImage?.path) return "Cover image is required.";
     return "";
@@ -140,7 +144,7 @@ export default function NewsManagement() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const ve = validateForm(); if (ve) { setError(ve); return; }
-    const payload = { title: form.title.trim(), slug: form.slug.trim(), excerpt: form.excerpt.trim(), content: form.content.trim(), sportGroup: form.sportGroup, sport: form.sport, status: form.status, isActive: form.isActive };
+    const payload = { title: form.title.trim(), slug: form.slug.trim(), excerpt: form.excerpt.trim(), content: form.content.trim(), sportGroup: form.sportGroup || undefined, sport: form.sport || undefined, status: form.status, isActive: form.isActive };
     const body = new FormData(); body.append("data", JSON.stringify(payload)); if (coverFile) body.append("news-cover-image", coverFile);
     try {
       setSaving(true); setError(""); setSuccess("");
@@ -152,14 +156,32 @@ export default function NewsManagement() {
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (item: NewsItem) => {
-    if (!confirm("Unpublish this news? It will no longer be visible publicly.")) return;
+  const handleTogglePublish = async (item: NewsItem) => {
+    const currentlyPublic = isPublicNews(item);
+
+    if (currentlyPublic) {
+      if (!confirm("Unpublish this news article? It will no longer be visible publicly.")) return;
+      try {
+        setTogglingId(item._id); setError(""); setSuccess("");
+        const r = await fetchJSON(newsApi.delete(item._id), { method: "DELETE" });
+        if (r?.success) { setSuccess("News unpublished."); await loadNews(); }
+        else setError(r?.message || r?.error || "Failed to unpublish news");
+      } catch (e) { setError(e instanceof Error ? e.message : "Failed to unpublish news"); }
+      finally { setTogglingId(null); }
+      return;
+    }
+
+    if (!confirm("Publish this news article? It will be visible on public news pages.")) return;
     try {
-      setError(""); setSuccess("");
-      const r = await fetchJSON(newsApi.delete(item._id), { method:"DELETE" });
-      if (r?.success) { setSuccess("News unpublished."); await loadNews(); }
-      else setError(r?.message||r?.error||"Failed to unpublish news");
-    } catch(e) { setError(e instanceof Error?e.message:"Failed to unpublish news"); }
+      setTogglingId(item._id); setError(""); setSuccess("");
+      const body = new FormData();
+      body.append("data", JSON.stringify({ status: "published", isActive: true }));
+      const res = await apiFetch(newsApi.update(item._id), { method: "PUT", headers: { Accept: "application/json" }, body });
+      const resp = await parseResp<NewsItem>(res);
+      if (!res.ok || resp.success === false) { setError(getMsg(resp, "Failed to publish news")); return; }
+      setSuccess("News published."); await loadNews();
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed to publish news"); }
+    finally { setTogglingId(null); }
   };
 
   return (
@@ -185,34 +207,26 @@ export default function NewsManagement() {
       {(error||success) && <div className={`rounded-lg border px-4 py-3 text-sm ${error?"border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300":"border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"}`}>{error||success}</div>}
 
       <section className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2"><Filter className="w-4 h-4 text-gray-500 dark:text-slate-400" /><h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filters</h3></div>
-          <button type="button" onClick={resetFilters} className="text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:underline">Clear</button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="md:col-span-1">
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Search</label>
-            <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input value={filters.search} onChange={e=>updateFilter("search",e.target.value)} placeholder="Search title or content" className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white" /></div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex items-center gap-2 shrink-0 pb-2 mr-1">
+            <Filter className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">Filters</span>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Status</label>
-            <select value={filters.status} onChange={e=>updateFilter("status",e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white">
-              <option value="all">All Statuses</option><option value="published">Published</option><option value="draft">Draft</option>
-            </select>
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input value={filters.search} onChange={e => updateFilter("search", e.target.value)} placeholder="Search title or content" className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Sport Group</label>
-            <select value={filters.sportGroup} onChange={e=>updateFilter("sportGroup",e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white">
-              <option value="">All Sport Groups</option>{sportGroups.map(g=><option key={g._id} value={g._id}>{g.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">Sport</label>
-            <select value={filters.sport} disabled={!filters.sportGroup} onChange={e=>updateFilter("sport",e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white disabled:opacity-50">
-              <option value="">{filters.sportGroup?`All ${selGroupName||"Sports"}`:"Select Sport Group first"}</option>
-              {filterSports.map(s=><option key={s._id} value={s._id}>{s.name}</option>)}
-            </select>
-          </div>
+          <select value={filters.status} onChange={e => updateFilter("status", e.target.value)} className="min-w-[130px] px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white" aria-label="Status">
+            <option value="all">All Statuses</option><option value="published">Published</option><option value="draft">Draft</option>
+          </select>
+          <select value={filters.sportGroup} onChange={e => updateFilter("sportGroup", e.target.value)} className="min-w-[150px] px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white" aria-label="Sport Group">
+            <option value="">All Sport Groups</option>{sportGroups.map(g => <option key={g._id} value={g._id}>{g.name}</option>)}
+          </select>
+          <select value={filters.sport} disabled={!filters.sportGroup} onChange={e => updateFilter("sport", e.target.value)} className="min-w-[150px] px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white disabled:opacity-50" aria-label="Sport">
+            <option value="">{filters.sportGroup ? `All ${selGroupName || "Sports"}` : "Select Sport Group first"}</option>
+            {filterSports.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+          </select>
+          <button type="button" onClick={resetFilters} className="px-3 py-2 text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:underline shrink-0">Clear</button>
         </div>
       </section>
 
@@ -249,9 +263,12 @@ export default function NewsManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {item.status==="published"&&item.isActive&&<Link href={`/news/${item.slug}`} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm"><Eye className="w-4 h-4" />View</Link>}
+                    {isPublicNews(item) && <Link href={`/news/${item.slug}`} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm"><Eye className="w-4 h-4" />View</Link>}
                     <button type="button" onClick={()=>openEdit(item)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm"><Edit2 className="w-4 h-4" />Edit</button>
-                    <button type="button" onClick={()=>void handleDelete(item)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 text-sm"><Trash2 className="w-4 h-4" />Unpublish</button>
+                    <button type="button" onClick={()=>void handleTogglePublish(item)} disabled={togglingId===item._id} className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm disabled:opacity-50 ${isPublicNews(item) ? "border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30" : "border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"}`}>
+                      {togglingId===item._id ? <Loader2 className="w-4 h-4 animate-spin" /> : isPublicNews(item) ? <EyeOff className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                      {isPublicNews(item) ? "Unpublish" : "Publish"}
+                    </button>
                   </div>
                 </article>
               );
@@ -284,6 +301,10 @@ export default function NewsManagement() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Slug (optional)</label>
                     <input value={form.slug} onChange={e=>updateForm("slug",e.target.value)} maxLength={220} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white" placeholder="breaking-new-sports-event" />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                      Leave blank to auto-generate from the title. This becomes the URL path
+                      (e.g. /news/your-slug).
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Excerpt</label>
@@ -307,20 +328,20 @@ export default function NewsManagement() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Sport Group</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Sport Group (optional)</label>
                     <select value={form.sportGroup} onChange={e=>updateForm("sportGroup",e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
                       <option value="">Select Sport Group</option>{sportGroups.map(g=><option key={g._id} value={g._id}>{g.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Sport</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Sport (optional)</label>
                     <select value={form.sport} disabled={!form.sportGroup} onChange={e=>updateForm("sport",e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white disabled:opacity-50">
                       <option value="">Select Sport</option>{formSports.map(s=><option key={s._id} value={s._id}>{s.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Status</label>
-                    <select value={form.status} onChange={e=>updateForm("status",e.target.value as NewsStatus)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
+                    <select value={form.status} onChange={e => { const newStatus = e.target.value as NewsStatus; setForm(p => ({ ...p, status: newStatus, isActive: newStatus === "published" ? true : p.isActive })); }} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
                       <option value="published">Published</option><option value="draft">Draft</option>
                     </select>
                   </div>

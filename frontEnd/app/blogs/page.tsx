@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, Filter, Search, User, BookOpen, Plus, X } from "lucide-react";
 import Header from "@/components/Header";
 import LeftSidebar from "@/components/LeftSidebar";
@@ -9,6 +10,7 @@ import RightSidebar from "@/components/RightSidebar";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
+import PageHeroBanner from "@/components/PageHeroBanner";
 import BlogManagement from "@/components/blog/BlogManagement";
 
 type BlogPost = {
@@ -35,8 +37,11 @@ function formatDate(value?: string) {
   }).format(new Date(value));
 }
 
-export default function BlogsPage() {
+function BlogsPageContent() {
   const { data: user } = useMe();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const coachId = searchParams.get("coach") || "";
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -98,6 +103,7 @@ export default function BlogsPage() {
             search: filters.search.trim() || undefined,
             sportGroup: filters.sportGroup || undefined,
             sport: filters.sport || undefined,
+            coachId: coachId || undefined,
           }),
           { method: "GET" },
           { skipAuth: true }
@@ -127,7 +133,12 @@ export default function BlogsPage() {
     return () => {
       cancelled = true;
     };
-  }, [filters, page, pagination.perPage]);
+  }, [filters, page, pagination.perPage, coachId]);
+
+  const coachFilterName = useMemo(() => {
+    if (!coachId || blogs.length === 0) return null;
+    return blogs.find((blog) => blog.author?.coachId === coachId)?.author?.name || null;
+  }, [coachId, blogs]);
 
   const activeSportGroupName = useMemo(
     () => sportGroups.find((group) => group._id === filters.sportGroup)?.name,
@@ -159,14 +170,27 @@ export default function BlogsPage() {
 
         <main className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+            <PageHeroBanner context="blog" />
+
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Blogs
+                  {coachFilterName ? `Blogs by ${coachFilterName}` : "Blogs"}
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  Articles, training notes, and sport insights from EventSport coaches.
+                  {coachFilterName
+                    ? `Articles written by ${coachFilterName}.`
+                    : "Articles, training notes, and sport insights from EventSport coaches."}
                 </p>
+                {coachId && (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/blogs")}
+                    className="mt-2 text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:underline"
+                  >
+                    Show all blogs
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {user?.role === 0 && (
@@ -197,17 +221,15 @@ export default function BlogsPage() {
             </div>
 
             <section className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Filter className="w-5 h-5 text-gray-500 dark:text-slate-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Filters
-                </h2>
-              </div>
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0 mr-1">
+                  <Filter className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Filters</span>
+                </div>
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0 ${
                     !filters.search && !filters.sportGroup && !filters.sport
                       ? "bg-cyan-600 text-white border-cyan-600"
                       : "bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600"
@@ -215,62 +237,47 @@ export default function BlogsPage() {
                 >
                   All
                 </button>
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    value={filters.search}
+                    onChange={(e) => updateFilter("search", e.target.value)}
+                    placeholder="Search blogs"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
+                  />
+                </div>
+                <select
+                  value={filters.sportGroup}
+                  onChange={(e) => updateFilter("sportGroup", e.target.value)}
+                  className="min-w-[150px] px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
+                  aria-label="Sport Group"
+                >
+                  <option value="">All Sport Groups</option>
+                  {sportGroups.map((group) => (
+                    <option key={group._id} value={group._id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={filters.sport}
+                  disabled={!filters.sportGroup}
+                  onChange={(e) => updateFilter("sport", e.target.value)}
+                  className="min-w-[130px] px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white disabled:opacity-50"
+                  aria-label="Sport"
+                >
+                  <option value="">All Sports</option>
+                  {sports.map((sport) => (
+                    <option key={sport._id} value={sport._id}>
+                      {sport.name}
+                    </option>
+                  ))}
+                </select>
                 {activeSportGroupName && (
-                  <span className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-cyan-50 dark:bg-cyan-950/30 text-cyan-800 dark:text-cyan-200 border border-cyan-200 dark:border-cyan-800">
+                  <span className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-cyan-50 dark:bg-cyan-950/30 text-cyan-800 dark:text-cyan-200 border border-cyan-200 dark:border-cyan-800 shrink-0">
                     {activeSportGroupName}
                   </span>
                 )}
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Search
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      value={filters.search}
-                      onChange={(e) => updateFilter("search", e.target.value)}
-                      placeholder="Search blogs"
-                      className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Sport Group
-                  </label>
-                  <select
-                    value={filters.sportGroup}
-                    onChange={(e) => updateFilter("sportGroup", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="">All Sport Groups</option>
-                    {sportGroups.map((group) => (
-                      <option key={group._id} value={group._id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Sport
-                  </label>
-                  <select
-                    value={filters.sport}
-                    disabled={!filters.sportGroup}
-                    onChange={(e) => updateFilter("sport", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white disabled:opacity-50"
-                  >
-                    <option value="">All Sports</option>
-                    {sports.map((sport) => (
-                      <option key={sport._id} value={sport._id}>
-                        {sport.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
             </section>
 
@@ -406,5 +413,19 @@ export default function BlogsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function BlogsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+        </div>
+      }
+    >
+      <BlogsPageContent />
+    </Suspense>
   );
 }
