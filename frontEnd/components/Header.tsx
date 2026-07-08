@@ -21,6 +21,7 @@ import {
   MessageSquare,
   BookOpen,
   Newspaper,
+  Video,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { fetchJSON } from "../app/lib/api";
@@ -275,6 +276,15 @@ const Header: React.FC<HeaderProps> = ({
             >
               <Newspaper className="w-5 h-5 shrink-0" strokeWidth={1.75} />
               <span className="hidden sm:inline text-sm font-medium">News</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/videos")}
+              className="inline-flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Open videos"
+            >
+              <Video className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+              <span className="hidden sm:inline text-sm font-medium">Videos</span>
             </button>
           </div>
 

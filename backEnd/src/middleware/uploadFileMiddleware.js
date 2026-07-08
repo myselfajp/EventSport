@@ -11,7 +11,10 @@ export const uploadFile = (options) => {
         optional = false,
         maxFileSize,
         allowedMimeTypes,
+        uploadTimeout: customUploadTimeout,
     } = options;
+
+    const timeoutMs = customUploadTimeout ?? uploadTimeout;
 
     let handler;
     if (mode === 'single') {
@@ -30,7 +33,7 @@ export const uploadFile = (options) => {
 
         const timeoutId = setTimeout(() => {
             next(new AppError(408, 'File upload timeout'));
-        }, uploadTimeout);
+        }, timeoutMs);
 
         handler(req, res, (err) => {
             clearTimeout(timeoutId);

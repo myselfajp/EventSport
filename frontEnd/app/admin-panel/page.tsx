@@ -20,6 +20,7 @@ import AdminPermissionGroupsManagement from "../../components/admin/AdminPermiss
 import BlacklistManagement from "../../components/admin/BlacklistManagement";
 import BlogManagement from "../../components/blog/BlogManagement";
 import NewsManagement from "../../components/news/NewsManagement";
+import VideoManagement from "../../components/video/VideoManagement";
 
 type TabType =
   | "users"
@@ -29,6 +30,7 @@ type TabType =
   | "events"
   | "blogs"
   | "news"
+  | "videos"
   | "notifications"
   | "contracts"
   | "site-pages"
@@ -45,6 +47,7 @@ const TAB_ORDER: TabType[] = [
   "events",
   "blogs",
   "news",
+  "videos",
   "notifications",
   "contracts",
   "site-pages",
@@ -62,6 +65,7 @@ const TAB_LABEL: Record<TabType, string> = {
   events: "Events",
   blogs: "Blogs",
   news: "News",
+  videos: "Videos",
   notifications: "Notifications",
   contracts: "Contracts",
   "site-pages": "Site Pages",
@@ -82,6 +86,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   events: "admin.events",
   blogs: "admin.blogs",
   news: "admin.news",
+  videos: "admin.videos",
   notifications: "admin.notifications",
   contracts: ["admin.legal", "admin.contract_acceptances"],
   "site-pages": "admin.static_pages",
@@ -238,6 +243,7 @@ export default function AdminPanelPage() {
             {activeTab === "events" && <EventsManagement />}
             {activeTab === "blogs" && <BlogManagement mode="admin" />}
             {activeTab === "news" && <NewsManagement />}
+            {activeTab === "videos" && <VideoManagement mode="admin" />}
             {activeTab === "notifications" && <NotificationManagement />}
             {activeTab === "contracts" && (
               <ContractsManagement

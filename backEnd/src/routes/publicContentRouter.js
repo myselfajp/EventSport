@@ -2,6 +2,7 @@ import express from 'express';
 import * as publicContentController from '../controllers/publicContentController.js';
 import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
+import * as videoController from '../controllers/videoController.js';
 import { validateCSRFToken } from '../middleware/csrfProtection.js';
 import {
     heroClickRateLimiter,
@@ -24,6 +25,8 @@ router.get('/public/blogs', blogController.listPublicBlogs);
 router.get('/public/blogs/:slug', blogController.getPublicBlogBySlug);
 router.get('/public/news', newsController.listPublicNews);
 router.get('/public/news/:slug', newsController.getPublicNewsBySlug);
+router.get('/public/videos', videoController.listPublicVideos);
+router.get('/public/videos/:slug', videoController.getPublicVideoBySlug);
 router.get(
     '/public/hero-click/:slideId',
     heroClickRateLimiter,

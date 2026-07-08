@@ -4,6 +4,7 @@ import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 import * as adminController from '../controllers/adminController.js';
 import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
+import * as videoController from '../controllers/videoController.js';
 import * as legalController from '../controllers/legalController.js';
 import * as contractAcceptanceController from '../controllers/contractAcceptanceController.js';
 import * as adminPermissionGroupController from '../controllers/adminPermissionGroupController.js';
@@ -229,6 +230,44 @@ router.delete(
     '/news/:newsId',
     requireAdminPermission('admin.news'),
     newsController.deleteAdminNews
+);
+
+const VIDEO_UPLOAD = {
+    mode: 'fields',
+    fields: [
+        { name: 'video-thumbnail', maxCount: 1 },
+        { name: 'video-file', maxCount: 1 },
+    ],
+    optional: true,
+    maxFileSize: 100 * 1024 * 1024,
+    allowedMimeTypes: [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'video/mp4',
+        'video/webm',
+        'video/quicktime',
+    ],
+    uploadTimeout: 120000,
+};
+
+router.get('/videos', requireAdminPermission('admin.videos'), videoController.listAdminVideos);
+router.post(
+    '/videos',
+    requireAdminPermission('admin.videos'),
+    uploadFile(VIDEO_UPLOAD),
+    videoController.createAdminVideo
+);
+router.put(
+    '/videos/:videoId',
+    requireAdminPermission('admin.videos'),
+    uploadFile(VIDEO_UPLOAD),
+    videoController.updateAdminVideo
+);
+router.delete(
+    '/videos/:videoId',
+    requireAdminPermission('admin.videos'),
+    videoController.deleteAdminVideo
 );
 
 router.get('/suggestions', requireAdminPermission('admin.suggestions'), adminController.listSuggestions);
