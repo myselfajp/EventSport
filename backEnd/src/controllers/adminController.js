@@ -18,6 +18,7 @@ import DashboardHeroSlide from '../models/dashboardHeroSlideModel.js';
 import DashboardHeroClick from '../models/dashboardHeroClickModel.js';
 import DashboardHeaderLogo, { HEADER_LOGO_KEY } from '../models/dashboardHeaderLogoModel.js';
 import { parseHeroAnalyticsQuery, fillDailySeries } from '../utils/heroClickAnalytics.js';
+import { parseHeroContext, buildHeroContextFilter } from '../utils/heroContext.js';
 import { AppError } from '../utils/appError.js';
 import {
     SearchQuerySchema,
@@ -1601,12 +1602,16 @@ function sanitizeDashboardHeroPayload(body, { partial } = { partial: false }) {
         const o = Number(body.order);
         out.order = Number.isFinite(o) ? o : 0;
     }
+    if (!partial || body.context !== undefined) {
+        out.context = parseHeroContext(body.context);
+    }
     return out;
 }
 
 export const listDashboardHeroSlides = async (req, res, next) => {
     try {
-        const rows = await DashboardHeroSlide.find()
+        const context = parseHeroContext(req.query?.context);
+        const rows = await DashboardHeroSlide.find(buildHeroContextFilter(context))
             .sort({ order: 1, createdAt: -1 })
             .lean();
 
@@ -1630,6 +1635,9 @@ export const createDashboardHeroSlide = async (req, res, next) => {
     try {
         const raw = parseDashboardHeroData(req);
         const payload = sanitizeDashboardHeroPayload(raw, { partial: false });
+        if (!payload.context) {
+            payload.context = parseHeroContext(raw.context);
+        }
         if (req.fileMeta) {
             payload.image = req.fileMeta;
         }
@@ -1695,10 +1703,17 @@ export const updateDashboardHeroSlide = async (req, res, next) => {
 
 export const getDashboardHeroAnalytics = async (req, res, next) => {
     try {
+        const context = parseHeroContext(req.query?.context);
         const { from, to, days, slideId } = parseHeroAnalyticsQuery(req.query);
+
+        const contextSlides = await DashboardHeroSlide.find(buildHeroContextFilter(context))
+            .select('_id')
+            .lean();
+        const contextSlideIds = contextSlides.map((s) => s._id);
 
         const match = {
             clickedAt: { $gte: from, $lte: to },
+            slideId: { $in: contextSlideIds },
             ...(slideId ? { slideId: new mongoose.Types.ObjectId(slideId) } : {}),
         };
 
@@ -1748,7 +1763,7 @@ export const getDashboardHeroAnalytics = async (req, res, next) => {
                     ...match,
                     userId: { $ne: null },
                 }),
-                DashboardHeroSlide.find()
+                DashboardHeroSlide.find(buildHeroContextFilter(context))
                     .select('title badgeLabel ctaHref isActive order clickCount lastClickedAt')
                     .sort({ order: 1, createdAt: -1 })
                     .lean(),

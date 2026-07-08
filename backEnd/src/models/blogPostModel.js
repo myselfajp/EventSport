@@ -42,13 +42,13 @@ const blogPostSchema = new mongoose.Schema(
         sportGroup: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'SportGroup',
-            required: true,
+            default: null,
             index: true,
         },
         sport: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Sport',
-            required: true,
+            default: null,
             index: true,
         },
         authorUser: {

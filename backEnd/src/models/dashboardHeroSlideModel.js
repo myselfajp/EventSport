@@ -66,6 +66,13 @@ const dashboardHeroSlideSchema = new mongoose.Schema(
         lastClickedAt: {
             type: Date,
         },
+        /** home | blog | news — which public page shows this slide */
+        context: {
+            type: String,
+            enum: ['home', 'blog', 'news'],
+            default: 'home',
+            index: true,
+        },
     },
     { timestamps: true }
 );

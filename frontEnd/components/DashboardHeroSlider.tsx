@@ -56,6 +56,7 @@ type Props = {
   slides: DashboardHeroSlideDTO[];
   firstName?: string | null;
   userRole?: number | null;
+  useFallback?: boolean;
 };
 
 function SlideContent({
@@ -171,8 +172,15 @@ function SlideContent({
   );
 }
 
-export default function DashboardHeroSlider({ slides, firstName, userRole }: Props) {
-  const list = slides.length > 0 ? slides : FALLBACK_SLIDES;
+export default function DashboardHeroSlider({
+  slides,
+  firstName,
+  userRole,
+  useFallback = true,
+}: Props) {
+  const list =
+    slides.length > 0 ? slides : useFallback ? FALLBACK_SLIDES : [];
+  if (list.length === 0) return null;
   const scrollerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; scroll: number } | null>(null);
   const [dotIdx, setDotIdx] = useState(0);

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   X,
   Mail,
@@ -10,13 +9,10 @@ import {
   User,
   Users,
   Flag,
-  MessageCircle,
-  Loader2,
 } from "lucide-react";
 import ReportModal from "@/components/report/ReportModal";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
-import { createConversation } from "@/app/lib/messages-api";
 import { useMe } from "@/app/hooks/useAuth";
 import { useCoachFollowStats } from "@/app/hooks/useFollows";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
@@ -119,7 +115,6 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   onClose,
   coachId,
 }) => {
-  const router = useRouter();
   const { data: currentUser } = useMe();
   const [data, setData] = useState<CoachResponseData | null>(null);
   const [resolvedCoachId, setResolvedCoachId] = useState<string | null>(null);
@@ -136,7 +131,6 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const [showCoachCalendar, setShowCoachCalendar] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [isStartingConversation, setIsStartingConversation] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<
     CoachReviewsData["summary"] | null
   >(null);
@@ -272,20 +266,6 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const followerCount = followStats?.followerCount ?? 0;
   const followerLabel = followerCount === 1 ? "follower" : "followers";
   const profileDisplayName = data ? coachDisplayName(data) : undefined;
-
-  const handleSendMessage = async () => {
-    const recipientId = data?.user?._id;
-    if (!recipientId || isStartingConversation) return;
-    setIsStartingConversation(true);
-    try {
-      const conversation = await createConversation(recipientId);
-      onClose();
-      router.push(`/messaging?conversationId=${conversation._id}`);
-    } catch (err) {
-      console.error("Failed to start conversation:", err);
-      setIsStartingConversation(false);
-    }
-  };
 
   return (
     <>
@@ -426,22 +406,6 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                             type="coach"
                             entityId={resolvedCoachId}
                           />
-                        )}
-
-                        {currentUser && !isOwnProfile && data?.user?._id && (
-                          <button
-                            type="button"
-                            onClick={handleSendMessage}
-                            disabled={isStartingConversation}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            {isStartingConversation ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <MessageCircle className="w-4 h-4" />
-                            )}
-                            Send Message
-                          </button>
                         )}
 
                         <button

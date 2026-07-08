@@ -5,8 +5,10 @@ import Link from "next/link";
 import {
   BookOpen,
   CalendarDays,
+  CheckCircle2,
   Edit2,
   Eye,
+  EyeOff,
   Filter,
   ImageIcon,
   Loader2,
@@ -14,7 +16,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  Trash2,
   X,
 } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
@@ -108,11 +109,19 @@ function formatDate(value?: string | null) {
 }
 
 function statusLabel(blog: BlogPost) {
+  if (isPublicBlog(blog)) return "Published";
   if (!blog.isActive) return "Inactive";
   return blog.status === "published" ? "Published" : "Draft";
 }
 
+function isPublicBlog(blog: BlogPost) {
+  return blog.status === "published" && blog.isActive;
+}
+
 function statusClass(blog: BlogPost) {
+  if (isPublicBlog(blog)) {
+    return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900";
+  }
   if (!blog.isActive) {
     return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
   }
@@ -165,7 +174,7 @@ export default function BlogManagement({
   const [pagination, setPagination] = useState({
     totalPages: 1,
     total: 0,
-    perPage: 10,
+    perPage: 50,
   });
   const [filters, setFilters] = useState({
     search: "",
@@ -178,6 +187,7 @@ export default function BlogManagement({
   const [form, setForm] = useState<BlogForm>(EMPTY_FORM);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const title = mode === "coach" ? "My Blogs" : "Blogs";
 
@@ -270,7 +280,7 @@ export default function BlogManagement({
         setPagination({
           totalPages: response.pagination?.totalPages || 1,
           total: response.pagination?.total || response.data.length,
-          perPage: response.pagination?.perPage || 10,
+          perPage: response.pagination?.perPage || 50,
         });
       } else {
         setBlogs([]);
@@ -366,8 +376,8 @@ export default function BlogManagement({
     if (form.title.trim().length < 3) return "Title must be at least 3 characters.";
     if (form.excerpt.trim().length < 10) return "Excerpt must be at least 10 characters.";
     if (form.content.trim().length < 30) return "Content must be at least 30 characters.";
-    if (!form.sportGroup) return "Sport Group is required.";
-    if (!form.sport) return "Sport is required.";
+    if (form.sportGroup && !form.sport) return "Select a sport when a sport group is chosen.";
+    if (!form.sportGroup && form.sport) return "Select a sport group when a sport is chosen.";
     if (!editing && !coverFile) return "Cover image is required.";
     if (editing && !coverFile && !editing.coverImage?.path) return "Cover image is required.";
     return "";
@@ -386,8 +396,8 @@ export default function BlogManagement({
       slug: form.slug.trim(),
       excerpt: form.excerpt.trim(),
       content: form.content.trim(),
-      sportGroup: form.sportGroup,
-      sport: form.sport,
+      sportGroup: form.sportGroup || undefined,
+      sport: form.sport || undefined,
       status: form.status,
       isActive: form.isActive,
     };
@@ -420,22 +430,58 @@ export default function BlogManagement({
     }
   };
 
-  const handleDelete = async (blog: BlogPost) => {
-    if (!confirm("Unpublish this blog post? It will no longer be visible publicly.")) {
+  const handleTogglePublish = async (blog: BlogPost) => {
+    const currentlyPublic = isPublicBlog(blog);
+
+    if (currentlyPublic) {
+      if (!confirm("Unpublish this blog post? It will no longer be visible publicly.")) {
+        return;
+      }
+      try {
+        setTogglingId(blog._id);
+        setError("");
+        setSuccess("");
+        const response = await fetchJSON(blogApi.delete(blog._id), { method: "DELETE" });
+        if (response?.success) {
+          setSuccess("Blog unpublished.");
+          await loadBlogs();
+        } else {
+          setError(response?.message || response?.error || "Failed to unpublish blog");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to unpublish blog");
+      } finally {
+        setTogglingId(null);
+      }
       return;
     }
+
+    if (!confirm("Publish this blog post? It will be visible on public blog pages.")) {
+      return;
+    }
+
     try {
+      setTogglingId(blog._id);
       setError("");
       setSuccess("");
-      const response = await fetchJSON(blogApi.delete(blog._id), { method: "DELETE" });
-      if (response?.success) {
-        setSuccess("Blog unpublished.");
-        await loadBlogs();
-      } else {
-        setError(response?.message || response?.error || "Failed to unpublish blog");
+      const body = new FormData();
+      body.append("data", JSON.stringify({ status: "published", isActive: true }));
+      const res = await apiFetch(blogApi.update(blog._id), {
+        method: "PUT",
+        headers: { Accept: "application/json" },
+        body,
+      });
+      const response = await parseApiResponse<BlogPost>(res);
+      if (!res.ok || response.success === false) {
+        setError(getResponseMessage(response, "Failed to publish blog"));
+        return;
       }
+      setSuccess("Blog published.");
+      await loadBlogs();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to unpublish blog");
+      setError(err instanceof Error ? err.message : "Failed to publish blog");
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -486,87 +532,66 @@ export default function BlogManagement({
       )}
 
       <section className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex items-center gap-2 shrink-0 pb-2 mr-1">
             <Filter className="w-4 h-4 text-gray-500 dark:text-slate-400" />
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Filters
-            </h3>
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">Filters</span>
           </div>
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={filters.search}
+              onChange={(e) => updateFilter("search", e.target.value)}
+              placeholder="Search title or content"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
+            />
+          </div>
+          <select
+            value={filters.status}
+            onChange={(e) => updateFilter("status", e.target.value)}
+            className="min-w-[130px] px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
+            aria-label="Status"
+          >
+            <option value="all">All Statuses</option>
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+          </select>
+          <select
+            value={filters.sportGroup}
+            onChange={(e) => updateFilter("sportGroup", e.target.value)}
+            className="min-w-[150px] px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
+            aria-label="Sport Group"
+          >
+            <option value="">All Sport Groups</option>
+            {sportGroups.map((group) => (
+              <option key={group._id} value={group._id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filters.sport}
+            disabled={!filters.sportGroup}
+            onChange={(e) => updateFilter("sport", e.target.value)}
+            className="min-w-[150px] px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white disabled:opacity-50"
+            aria-label="Sport"
+          >
+            <option value="">
+              {filters.sportGroup ? `All ${selectedFilterGroupName || "Sports"}` : "Select Sport Group first"}
+            </option>
+            {filterSports.map((sport) => (
+              <option key={sport._id} value={sport._id}>
+                {sport.name}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={resetFilters}
-            className="text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:underline"
+            className="px-3 py-2 text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:underline shrink-0"
           >
             Clear
           </button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="md:col-span-1">
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-              Search
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                value={filters.search}
-                onChange={(e) => updateFilter("search", e.target.value)}
-                placeholder="Search title or content"
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-              Status
-            </label>
-            <select
-              value={filters.status}
-              onChange={(e) => updateFilter("status", e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
-            >
-              <option value="all">All Statuses</option>
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-              Sport Group
-            </label>
-            <select
-              value={filters.sportGroup}
-              onChange={(e) => updateFilter("sportGroup", e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
-            >
-              <option value="">All Sport Groups</option>
-              {sportGroups.map((group) => (
-                <option key={group._id} value={group._id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-              Sport
-            </label>
-            <select
-              value={filters.sport}
-              disabled={!filters.sportGroup}
-              onChange={(e) => updateFilter("sport", e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white disabled:opacity-50"
-            >
-              <option value="">
-                {filters.sportGroup ? `All ${selectedFilterGroupName || "Sports"}` : "Select Sport Group first"}
-              </option>
-              {filterSports.map((sport) => (
-                <option key={sport._id} value={sport._id}>
-                  {sport.name}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </section>
 
@@ -647,7 +672,7 @@ export default function BlogManagement({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {blog.status === "published" && blog.isActive && (
+                    {isPublicBlog(blog) && (
                       <Link
                         href={`/blogs/${blog.slug}`}
                         className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm"
@@ -666,11 +691,22 @@ export default function BlogManagement({
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleDelete(blog)}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 text-sm"
+                      onClick={() => void handleTogglePublish(blog)}
+                      disabled={togglingId === blog._id}
+                      className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm disabled:opacity-50 ${
+                        isPublicBlog(blog)
+                          ? "border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          : "border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                      }`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Unpublish
+                      {togglingId === blog._id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : isPublicBlog(blog) ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                      {isPublicBlog(blog) ? "Unpublish" : "Publish"}
                     </button>
                   </div>
                 </article>
@@ -748,6 +784,10 @@ export default function BlogManagement({
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                       placeholder="training-ideas-for-match-day"
                     />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                      Leave blank to auto-generate from the title. This becomes the URL path
+                      (e.g. /blogs/your-slug).
+                    </p>
                   </div>
 
                   <div>
@@ -812,7 +852,7 @@ export default function BlogManagement({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                      Sport Group
+                      Sport Group (optional)
                     </label>
                     <select
                       value={form.sportGroup}
@@ -830,7 +870,7 @@ export default function BlogManagement({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                      Sport
+                      Sport (optional)
                     </label>
                     <select
                       value={form.sport}
@@ -853,7 +893,14 @@ export default function BlogManagement({
                     </label>
                     <select
                       value={form.status}
-                      onChange={(e) => updateForm("status", e.target.value as BlogStatus)}
+                      onChange={(e) => {
+                        const newStatus = e.target.value as BlogStatus;
+                        setForm((prev) => ({
+                          ...prev,
+                          status: newStatus,
+                          isActive: newStatus === "published" ? true : prev.isActive,
+                        }));
+                      }}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                     >
                       <option value="published">Published</option>
