@@ -2,6 +2,7 @@ import express from 'express';
 import { uploadFile } from '../middleware/uploadFileMiddleware.js';
 import * as coachController from '../controllers/coachController.js';
 import * as blogController from '../controllers/blogController.js';
+import * as videoController from '../controllers/videoController.js';
 const router = express.Router();
 
 // branch
@@ -51,6 +52,38 @@ router.put(
     blogController.updateCoachBlog
 );
 router.delete('/blogs/:blogId', blogController.deleteCoachBlog);
+
+const VIDEO_UPLOAD = {
+    mode: 'fields',
+    fields: [
+        { name: 'video-thumbnail', maxCount: 1 },
+        { name: 'video-file', maxCount: 1 },
+    ],
+    optional: true,
+    maxFileSize: 100 * 1024 * 1024,
+    allowedMimeTypes: [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'video/mp4',
+        'video/webm',
+        'video/quicktime',
+    ],
+    uploadTimeout: 120000,
+};
+
+router.get('/videos', videoController.listCoachVideos);
+router.post(
+    '/videos',
+    uploadFile(VIDEO_UPLOAD),
+    videoController.createCoachVideo
+);
+router.put(
+    '/videos/:videoId',
+    uploadFile(VIDEO_UPLOAD),
+    videoController.updateCoachVideo
+);
+router.delete('/videos/:videoId', videoController.deleteCoachVideo);
 
 router.post('/join-backup-coach/:eventId', coachController.joinBackupCoach);
 

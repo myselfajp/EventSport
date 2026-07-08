@@ -139,6 +139,28 @@ export const EP = {
     },
     newsBySlug: (slug: string) =>
       `${API_V1_BASE}/public/news/${encodeURIComponent(slug)}`,
+    videos: (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sportGroup?: string;
+      sport?: string;
+      videoType?: "educational" | "normal";
+      coachId?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set("page", String(params.page));
+      if (params?.limit) q.set("limit", String(params.limit));
+      if (params?.search) q.set("search", params.search);
+      if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+      if (params?.sport) q.set("sport", params.sport);
+      if (params?.videoType) q.set("videoType", params.videoType);
+      if (params?.coachId) q.set("coachId", params.coachId);
+      const qs = q.toString();
+      return `${API_V1_BASE}/public/videos${qs ? `?${qs}` : ""}`;
+    },
+    videoBySlug: (slug: string) =>
+      `${API_V1_BASE}/public/videos/${encodeURIComponent(slug)}`,
     heroClick: (slideId: string) =>
       `${API_V1_BASE}/public/hero-click/${encodeURIComponent(slideId)}`,
   },
@@ -280,6 +302,31 @@ export const EP = {
       create: `${ADMIN_API}/news`,
       update: (newsId: string) => `${ADMIN_API}/news/${newsId}`,
       delete: (newsId: string) => `${ADMIN_API}/news/${newsId}`,
+    },
+    videos: {
+      list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sportGroup?: string;
+        sport?: string;
+        videoType?: "educational" | "normal";
+        status?: "draft" | "published" | "all";
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (params?.search) q.set("search", params.search);
+        if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+        if (params?.sport) q.set("sport", params.sport);
+        if (params?.videoType) q.set("videoType", params.videoType);
+        if (params?.status) q.set("status", params.status);
+        const qs = q.toString();
+        return `${ADMIN_API}/videos${qs ? `?${qs}` : ""}`;
+      },
+      create: `${ADMIN_API}/videos`,
+      update: (videoId: string) => `${ADMIN_API}/videos/${videoId}`,
+      delete: (videoId: string) => `${ADMIN_API}/videos/${videoId}`,
     },
     contractAcceptances: {
       list: (params?: {
@@ -460,6 +507,31 @@ export const EP = {
       create: `${COACH_DATA_API}/blogs`,
       update: (blogId: string) => `${COACH_DATA_API}/blogs/${blogId}`,
       delete: (blogId: string) => `${COACH_DATA_API}/blogs/${blogId}`,
+    },
+    videos: {
+      list: (params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sportGroup?: string;
+        sport?: string;
+        videoType?: "educational" | "normal";
+        status?: "draft" | "published" | "all";
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (params?.search) q.set("search", params.search);
+        if (params?.sportGroup) q.set("sportGroup", params.sportGroup);
+        if (params?.sport) q.set("sport", params.sport);
+        if (params?.videoType) q.set("videoType", params.videoType);
+        if (params?.status) q.set("status", params.status);
+        const qs = q.toString();
+        return `${COACH_DATA_API}/videos${qs ? `?${qs}` : ""}`;
+      },
+      create: `${COACH_DATA_API}/videos`,
+      update: (videoId: string) => `${COACH_DATA_API}/videos/${videoId}`,
+      delete: (videoId: string) => `${COACH_DATA_API}/videos/${videoId}`,
     },
   },
   PARTICIPANT_LIST: {

@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
@@ -188,6 +189,7 @@ export default function BlogManagement({
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const title = mode === "coach" ? "My Blogs" : "Blogs";
 
@@ -441,13 +443,20 @@ export default function BlogManagement({
         setTogglingId(blog._id);
         setError("");
         setSuccess("");
-        const response = await fetchJSON(blogApi.delete(blog._id), { method: "DELETE" });
-        if (response?.success) {
-          setSuccess("Blog unpublished.");
-          await loadBlogs();
-        } else {
-          setError(response?.message || response?.error || "Failed to unpublish blog");
+        const body = new FormData();
+        body.append("data", JSON.stringify({ status: "draft", isActive: false }));
+        const res = await apiFetch(blogApi.update(blog._id), {
+          method: "PUT",
+          headers: { Accept: "application/json" },
+          body,
+        });
+        const response = await parseApiResponse<BlogPost>(res);
+        if (!res.ok || response.success === false) {
+          setError(getResponseMessage(response, "Failed to unpublish blog"));
+          return;
         }
+        setSuccess("Blog unpublished.");
+        await loadBlogs();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to unpublish blog");
       } finally {
@@ -482,6 +491,33 @@ export default function BlogManagement({
       setError(err instanceof Error ? err.message : "Failed to publish blog");
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleDelete = async (blog: BlogPost) => {
+    if (
+      !confirm(
+        `Delete "${blog.title}" permanently? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingId(blog._id);
+      setError("");
+      setSuccess("");
+      const response = await fetchJSON(blogApi.delete(blog._id), { method: "DELETE" });
+      if (response?.success) {
+        setSuccess("Blog deleted.");
+        await loadBlogs();
+      } else {
+        setError(response?.message || response?.error || "Failed to delete blog");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete blog");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -707,6 +743,19 @@ export default function BlogManagement({
                         <CheckCircle2 className="w-4 h-4" />
                       )}
                       {isPublicBlog(blog) ? "Unpublish" : "Publish"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(blog)}
+                      disabled={deletingId === blog._id}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 text-sm disabled:opacity-50"
+                    >
+                      {deletingId === blog._id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      Delete
                     </button>
                   </div>
                 </article>
