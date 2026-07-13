@@ -1,6 +1,6 @@
 import { AppError } from './appError.js';
 
-export const HERO_CONTEXTS = ['home', 'blog', 'news'];
+export const HERO_CONTEXTS = ['home', 'blog', 'news', 'videos'];
 
 export function parseHeroContext(raw, { defaultContext = 'home' } = {}) {
     const ctx = String(raw || defaultContext).trim().toLowerCase();

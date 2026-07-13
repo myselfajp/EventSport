@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
   Mail,
@@ -134,6 +134,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const [reviewSummary, setReviewSummary] = useState<
     CoachReviewsData["summary"] | null
   >(null);
+  const [eventFilter, setEventFilter] = useState<"all" | "active" | "past">("all");
 
   const { data: followStats } = useCoachFollowStats(
     isOpen ? resolvedCoachId : null
@@ -151,6 +152,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
       setShowCoachCalendar(false);
       setShowFollowersModal(false);
       setReviewSummary(null);
+      setEventFilter("all");
     }
   }, [isOpen, coachId]);
 
@@ -219,6 +221,82 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
       month: "short",
       year: "numeric",
     }).format(new Date(isoString));
+  };
+
+  const { activeEvents, pastEvents, allEvents } = useMemo(() => {
+    const events = data?.event || [];
+    if (!events.length) return { activeEvents: [] as Event[], pastEvents: [] as Event[], allEvents: [] as Event[] };
+    const now = Date.now();
+    const active: Event[] = [];
+    const past: Event[] = [];
+    for (const event of events) {
+      const endMs = new Date(event.endTime || event.startTime).getTime();
+      if (endMs >= now) active.push(event);
+      else past.push(event);
+    }
+    return { activeEvents: active, pastEvents: past, allEvents: events };
+  }, [data?.event]);
+
+  const filteredEvents = useMemo(() => {
+    if (eventFilter === "active") return activeEvents;
+    if (eventFilter === "past") return pastEvents;
+    return allEvents;
+  }, [eventFilter, activeEvents, pastEvents, allEvents]);
+
+  const eventEmptyMessage =
+    eventFilter === "active"
+      ? "No active events found."
+      : eventFilter === "past"
+        ? "No past events found."
+        : "No events found.";
+
+  const renderEventGrid = (events: Event[], emptyMessage: string) => {
+    if (events.length === 0) {
+      return (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 italic">
+          {emptyMessage}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {events.map((event) => (
+          <div
+            key={event._id}
+            className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group"
+          >
+            <div className="h-32 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+              {event.banner?.path || event.photo?.path ? (
+                <img
+                  src={
+                    getImageUrl(event.banner?.path) ||
+                    getImageUrl(event.photo?.path)!
+                  }
+                  alt={event.name}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500">
+                  <Calendar className="w-8 h-8" />
+                </div>
+              )}
+              <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-semibold text-gray-700 dark:text-gray-200 shadow-sm">
+                {event.sport?.name}
+              </div>
+            </div>
+            <div className="p-4">
+              <h5 className="font-bold text-gray-900 dark:text-white mb-1 truncate">
+                {event.name}
+              </h5>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                {formatDate(event.startTime)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const isOwnerOrCreator = (resource: any, type: 'club' | 'group') => {
@@ -518,54 +596,31 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                 />
               </div>
 
-              {/* Events Section */}
+              {/* Events */}
               <div>
-                <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />
-                  Active Events
-                </h4>
-                {data.event && data.event.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {data.event.map((event) => (
-                      <div
-                        key={event._id}
-                        className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group"
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <h4 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />
+                    Events
+                  </h4>
+                  <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 p-1">
+                    {(["all", "active", "past"] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        type="button"
+                        onClick={() => setEventFilter(filter)}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                          eventFilter === filter
+                            ? "bg-cyan-600 text-white shadow-sm"
+                            : "text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
+                        }`}
                       >
-                        <div className="h-32 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
-                          {event.banner?.path || event.photo?.path ? (
-                            <img
-                              src={
-                                getImageUrl(event.banner?.path) ||
-                                getImageUrl(event.photo?.path)!
-                              }
-                              alt={event.name}
-                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500">
-                              <Calendar className="w-8 h-8" />
-                            </div>
-                          )}
-                          <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-semibold text-gray-700 dark:text-gray-200 shadow-sm">
-                            {event.sport?.name}
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <h5 className="font-bold text-gray-900 dark:text-white mb-1 truncate">
-                            {event.name}
-                          </h5>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                            {formatDate(event.startTime)}
-                          </div>
-                        </div>
-                      </div>
+                        {filter === "all" ? "All" : filter === "active" ? "Active" : "Past"}
+                      </button>
                     ))}
                   </div>
-                ) : (
-                  <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 italic">
-                    No active events found.
-                  </div>
-                )}
+                </div>
+                {renderEventGrid(filteredEvents, eventEmptyMessage)}
               </div>
 
               {/* Clubs Section */}

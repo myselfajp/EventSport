@@ -555,7 +555,7 @@ export default function BlogManagement({
         </div>
       </div>
 
-      {(error || success) && (
+      {(error || success) && !showModal && (
         <div
           className={`rounded-lg border px-4 py-3 text-sm ${
             error
@@ -786,7 +786,7 @@ export default function BlogManagement({
 
       {showModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-2xl">
+          <div className="flex flex-col w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-2xl">
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-slate-700">
               <div>
                 <h3 className="text-lg font-semibold text-gray-950 dark:text-white">
@@ -806,7 +806,21 @@ export default function BlogManagement({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-73px)]">
+            {(error || success) && (
+              <div
+                className={`mx-5 mt-3 shrink-0 rounded-lg border px-4 py-3 text-sm ${
+                  error
+                    ? "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                    : "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                }`}
+                role="alert"
+              >
+                {error || success}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0">
               <div className="p-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="space-y-4">
                   <div>
@@ -975,8 +989,9 @@ export default function BlogManagement({
                   </label>
                 </aside>
               </div>
+              </div>
 
-              <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-950/40">
+              <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-950/40">
                 <button
                   type="button"
                   onClick={closeModal}

@@ -8,7 +8,7 @@ import DashboardHeroSlider, {
   type DashboardHeroSlideDTO,
 } from "@/components/DashboardHeroSlider";
 
-export type HeroPageContext = "home" | "blog" | "news";
+export type HeroPageContext = "home" | "blog" | "news" | "videos";
 
 function mapHeroSlides(data: Record<string, unknown>[]): DashboardHeroSlideDTO[] {
   return data.map((row) => {

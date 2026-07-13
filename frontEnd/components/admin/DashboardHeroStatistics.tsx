@@ -68,16 +68,17 @@ function downloadCsv(data: AnalyticsData) {
   URL.revokeObjectURL(url);
 }
 
-const PAGE_LABELS: Record<"home" | "blog" | "news", string> = {
+const PAGE_LABELS: Record<"home" | "blog" | "news" | "videos", string> = {
   home: "Home page",
   blog: "Blog page",
   news: "News page",
+  videos: "Videos page",
 };
 
 export default function DashboardHeroStatistics({
   context = "home",
 }: {
-  context?: "home" | "blog" | "news";
+  context?: "home" | "blog" | "news" | "videos";
 }) {
   const [days, setDays] = useState<number>(30);
   const [slideId, setSlideId] = useState("");

@@ -134,7 +134,7 @@ function formatSlideDate(iso?: string): string {
 }
 
 type HeroSection = "slides" | "statistics" | "logo";
-type HeroPageContext = "home" | "blog" | "news";
+type HeroPageContext = "home" | "blog" | "news" | "videos";
 
 const HERO_PAGE_OPTIONS: { id: HeroPageContext; label: string; description: string }[] = [
   {
@@ -151,6 +151,11 @@ const HERO_PAGE_OPTIONS: { id: HeroPageContext; label: string; description: stri
     id: "news",
     label: "News",
     description: "Banner at the top of the public news listing page.",
+  },
+  {
+    id: "videos",
+    label: "Videos",
+    description: "Banner at the top of the public videos listing page.",
   },
 ];
 

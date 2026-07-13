@@ -73,7 +73,7 @@ export const EP = {
     contractsCatalog: `${API_V1_BASE}/public/contracts`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
     dashboardHeaderLogo: `${API_V1_BASE}/public/dashboard-header-logo`,
-    dashboardHeroSlides: (context?: "home" | "blog" | "news") => {
+    dashboardHeroSlides: (context?: "home" | "blog" | "news" | "videos") => {
       const q = new URLSearchParams();
       if (context) q.set("context", context);
       const qs = q.toString();
@@ -372,7 +372,7 @@ export const EP = {
       delete: `${ADMIN_API}/dashboard-header-logo`,
     },
     dashboardHeroSlides: {
-      list: (context?: "home" | "blog" | "news") => {
+      list: (context?: "home" | "blog" | "news" | "videos") => {
         const q = new URLSearchParams();
         if (context) q.set("context", context);
         const qs = q.toString();
@@ -382,7 +382,7 @@ export const EP = {
       update: (slideId: string) => `${ADMIN_API}/dashboard-hero-slides/${slideId}`,
       delete: (slideId: string) => `${ADMIN_API}/dashboard-hero-slides/${slideId}`,
       analytics: (params?: {
-        context?: "home" | "blog" | "news";
+        context?: "home" | "blog" | "news" | "videos";
         days?: number;
         slideId?: string;
         from?: string;

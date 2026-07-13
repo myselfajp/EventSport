@@ -16,6 +16,12 @@ import {
 } from "@/app/lib/video-utils";
 import { VideoTypeIcon } from "@/components/video/VideoTypeIcons";
 
+type VideoAuthor = {
+  name: string;
+  type: "admin" | "coach";
+  coachId?: string | null;
+};
+
 type VideoItem = {
   _id: string;
   title: string;
@@ -28,7 +34,7 @@ type VideoItem = {
   externalUrl?: string;
   sportGroup?: { _id: string; name: string } | null;
   sport?: { _id: string; name: string } | null;
-  author?: { name: string; type: string };
+  author?: VideoAuthor;
   publishedAt?: string;
 };
 
@@ -39,6 +45,23 @@ function formatDate(value?: string) {
     month: "long",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function AuthorLink({ author }: { author?: VideoAuthor }) {
+  const name = author?.name || "EventSport Team";
+
+  if (author?.type === "coach" && author.coachId) {
+    return (
+      <Link
+        href={`/videos?coach=${encodeURIComponent(author.coachId)}`}
+        className="font-medium text-cyan-700 dark:text-cyan-300 hover:underline"
+      >
+        {name}
+      </Link>
+    );
+  }
+
+  return <span>{name}</span>;
 }
 
 export default function VideoDetailPage() {
@@ -164,13 +187,23 @@ export default function VideoDetailPage() {
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500 dark:text-slate-400">
                       <span className="inline-flex items-center gap-1.5">
                         <User className="w-4 h-4" />
-                        {video.author?.name || "EventSport Team"}
+                        <AuthorLink author={video.author} />
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays className="w-4 h-4" />
                         {formatDate(video.publishedAt)}
                       </span>
                     </div>
+                    {video.author?.type === "coach" && video.author.coachId && (
+                      <div className="pt-2">
+                        <Link
+                          href={`/videos?coach=${encodeURIComponent(video.author.coachId)}`}
+                          className="inline-flex items-center text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:underline"
+                        >
+                          View all videos by {video.author.name}
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
