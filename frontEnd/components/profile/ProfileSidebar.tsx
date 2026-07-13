@@ -21,6 +21,8 @@ import {
   Layers,
   Heart,
   BookOpen,
+  Briefcase,
+  ClipboardList,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -66,6 +68,8 @@ import { useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
 import { fetchJSON } from "@/app/lib/api";
 import BlogManagement from "@/components/blog/BlogManagement";
+import PerformanceApplyModal from "./PerformanceApplyModal";
+import ServiceRequestsPanel from "@/components/service-requests/ServiceRequestsPanel";
 
 interface ProfileSidebarProps {
   onLogout: () => void;
@@ -91,7 +95,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const queryClient = useQueryClient();
   const hasCoachProfile = !!user?.coach;
   const hasGamerProfile = !!user?.participant;
+  const hasPerformanceProfile = !!user?.performanceMember;
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
+  const [isApplyChoiceOpen, setIsApplyChoiceOpen] = useState(false);
+  const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
+  const [isServiceRequestsOpen, setIsServiceRequestsOpen] = useState(false);
   const [isFacilityModalOpen, setIsFacilityModalOpen] = useState(false);
   const [isClubModalOpen, setIsClubModalOpen] = useState(false);
 
@@ -271,12 +279,23 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     setIsCoachModalOpen(false);
   };
 
+  const handlePerformanceSaved = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    setIsPerformanceModalOpen(false);
+  };
+
   const handleOpenCoachModal = () => {
+    setIsApplyChoiceOpen(false);
     setIsCoachModalOpen(true);
   };
 
   const handleCloseCoachModal = () => {
     setIsCoachModalOpen(false);
+  };
+
+  const handleOpenPerformanceModal = () => {
+    setIsApplyChoiceOpen(false);
+    setIsPerformanceModalOpen(true);
   };
 
   const handleCreateFacility = async (formData: FormData) => {
@@ -899,6 +918,25 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         <GamerProfileRequiredBanner className="mb-4" />
       )}
 
+      <button
+        type="button"
+        onClick={() => setIsServiceRequestsOpen(true)}
+        className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left"
+      >
+        <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50">
+          <ClipboardList className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-gray-800 dark:text-white text-sm">
+            Service Requests
+          </div>
+          <div className="text-xs text-cyan-700 dark:text-cyan-300">
+            Open requests or review incoming offers
+          </div>
+        </div>
+        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+      </button>
+
       {/* Quick actions — 7 items in one row (replaces old Favorites / Following cards) */}
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-6 sm:mb-8 w-full items-stretch">
         <QuickActionButton
@@ -1006,14 +1044,46 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         </button>
       )}
 
+      {hasPerformanceProfile && (
+        <button
+          type="button"
+          onClick={handleOpenPerformanceModal}
+          className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-left"
+        >
+          <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/50">
+            <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-gray-800 dark:text-white text-sm">
+              Edit Performance Team Profile
+            </div>
+            <div className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
+              <Check className="w-3 h-3" />
+              Performance profile saved
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        </button>
+      )}
+
       <div className="space-y-2 mb-6">
         <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
           Need specialized accounts?
         </h4>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Add or edit your coach profile and manage facility, salon, club, or
-          sport community resources.
+          Add or edit your coach or Performance Team profile and manage
+          facility, salon, club, or sport community resources.
         </p>
+
+        {(!hasCoachProfile || !hasPerformanceProfile) && user?.role !== 0 && (
+          <button
+            type="button"
+            onClick={() => setIsApplyChoiceOpen(true)}
+            className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-left text-sm text-orange-800 transition-colors hover:bg-orange-100 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-200"
+          >
+            Apply as Coach or Performance Team
+          </button>
+        )}
 
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
           <button
@@ -1083,7 +1153,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           ) : (
             <button
               type="button"
-              onClick={handleOpenCoachModal}
+              onClick={() => setIsApplyChoiceOpen(true)}
               className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-all"
             >
               <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/50 mb-1">
@@ -1093,7 +1163,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 Apply
               </span>
               <span className="text-[10px] text-orange-600 dark:text-orange-400 text-center leading-tight">
-                coach
+                provider
               </span>
             </button>
           )}
@@ -1121,11 +1191,76 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         )}
       </div>
 
+      {isApplyChoiceOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Apply
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsApplyChoiceOpen(false)}
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+              Choose which provider profile you want to create or update.
+            </p>
+            <div className="grid gap-3">
+              {!hasCoachProfile && (
+                <button
+                  type="button"
+                  onClick={handleOpenCoachModal}
+                  className="rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-500 dark:border-gray-700"
+                >
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    Coach
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Send sport branch certificates for admin approval.
+                  </div>
+                </button>
+              )}
+              {!hasPerformanceProfile && (
+                <button
+                  type="button"
+                  onClick={handleOpenPerformanceModal}
+                  className="rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-500 dark:border-gray-700"
+                >
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    Performance Team
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Apply as manager, psychologist, dietitian, or psychotherapist.
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Coach Modal */}
       <CoachModal
         isOpen={isCoachModalOpen}
         onClose={handleCloseCoachModal}
         onSubmit={handleCreateCoach}
+      />
+
+      <PerformanceApplyModal
+        isOpen={isPerformanceModalOpen}
+        onClose={() => setIsPerformanceModalOpen(false)}
+        onSaved={handlePerformanceSaved}
+      />
+
+      <ServiceRequestsPanel
+        isOpen={isServiceRequestsOpen}
+        onClose={() => setIsServiceRequestsOpen(false)}
+        hasGamerProfile={hasGamerProfile}
+        isProvider={hasCoachProfile || hasPerformanceProfile}
       />
 
       {/* Facility Modal */}

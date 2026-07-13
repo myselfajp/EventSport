@@ -87,6 +87,21 @@ router.put(
     requireAdminPermission('admin.coaches'),
     adminController.rejectCertificate
 );
+router.post(
+    '/performance/applications',
+    requireAdminPermission('admin.coaches'),
+    adminController.getPerformanceApplications
+);
+router.put(
+    '/performance/applications/:applicationId/approve',
+    requireAdminPermission('admin.coaches'),
+    adminController.approvePerformanceApplication
+);
+router.put(
+    '/performance/applications/:applicationId/reject',
+    requireAdminPermission('admin.coaches'),
+    adminController.rejectPerformanceApplication
+);
 
 // User Profile Details
 router.get(

@@ -57,6 +57,8 @@ const FACILITY_API = `${API_V1_BASE}/facility`;
 const COMPANY_API = `${API_V1_BASE}/company`;
 const LOCATION_API = `${API_V1_BASE}/location`;
 const MESSAGES_API = `${API_V1_BASE}/messages`;
+const PERFORMANCE_API = `${API_V1_BASE}/performance`;
+const SERVICE_REQUESTS_API = `${API_V1_BASE}/service-requests`;
 
 export const EP = {
   API_BASE: API_V1_BASE,
@@ -248,6 +250,13 @@ export const EP = {
         `${ADMIN_API}/coaches/branches/${branchId}/approve`,
       reject: (branchId: string) =>
         `${ADMIN_API}/coaches/branches/${branchId}/reject`,
+    },
+    performance: {
+      applications: `${ADMIN_API}/performance/applications`,
+      approve: (applicationId: string) =>
+        `${ADMIN_API}/performance/applications/${applicationId}/approve`,
+      reject: (applicationId: string) =>
+        `${ADMIN_API}/performance/applications/${applicationId}/reject`,
     },
     staticPages: {
       getAll: `${ADMIN_API}/static-pages`,
@@ -533,6 +542,22 @@ export const EP = {
       update: (videoId: string) => `${COACH_DATA_API}/videos/${videoId}`,
       delete: (videoId: string) => `${COACH_DATA_API}/videos/${videoId}`,
     },
+  },
+  PERFORMANCE: {
+    currentProfile: `${PERFORMANCE_API}/current-profile`,
+    apply: `${PERFORMANCE_API}/apply`,
+    members: (branch?: string) =>
+      `${PERFORMANCE_API}/members${branch ? `?branch=${encodeURIComponent(branch)}` : ""}`,
+  },
+  SERVICE_REQUESTS: {
+    questions: `${SERVICE_REQUESTS_API}/questions`,
+    create: `${SERVICE_REQUESTS_API}`,
+    mine: `${SERVICE_REQUESTS_API}/mine`,
+    incoming: `${SERVICE_REQUESTS_API}/incoming`,
+    respond: (requestId: string) =>
+      `${SERVICE_REQUESTS_API}/${requestId}/respond`,
+    selectResponse: (requestId: string, responseId: string) =>
+      `${SERVICE_REQUESTS_API}/${requestId}/responses/${responseId}/select`,
   },
   PARTICIPANT_LIST: {
     getParticipantList: `${API_V1_BASE}/get-participant-list`,

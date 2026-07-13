@@ -8,6 +8,7 @@ import { fetchJSON } from "../lib/api";
 import { EP } from "../lib/endpoints";
 import UsersManagement from "../../components/admin/UsersManagement";
 import CoachCertificateApproval from "../../components/admin/CoachCertificateApproval";
+import PerformanceTeamApproval from "../../components/admin/PerformanceTeamApproval";
 import EnumManagement from "../../components/admin/EnumManagement";
 import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
@@ -26,6 +27,7 @@ type TabType =
   | "users"
   | "blacklist"
   | "coaches"
+  | "performance"
   | "enums"
   | "events"
   | "blogs"
@@ -43,6 +45,7 @@ const TAB_ORDER: TabType[] = [
   "users",
   "blacklist",
   "coaches",
+  "performance",
   "enums",
   "events",
   "blogs",
@@ -61,6 +64,7 @@ const TAB_LABEL: Record<TabType, string> = {
   users: "Users",
   blacklist: "Blacklist",
   coaches: "Coach Certificates",
+  performance: "Performance Team",
   enums: "Enum Management",
   events: "Events",
   blogs: "Blogs",
@@ -82,6 +86,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   users: "admin.users",
   blacklist: ["admin.blacklist", "admin.users"],
   coaches: "admin.coaches",
+  performance: "admin.coaches",
   enums: "admin.enums",
   events: "admin.events",
   blogs: "admin.blogs",
@@ -239,6 +244,7 @@ export default function AdminPanelPage() {
             {activeTab === "users" && <UsersManagement isFullAdmin={isFullAdmin} />}
             {activeTab === "blacklist" && <BlacklistManagement />}
             {activeTab === "coaches" && <CoachCertificateApproval />}
+            {activeTab === "performance" && <PerformanceTeamApproval />}
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
             {activeTab === "blogs" && <BlogManagement mode="admin" />}

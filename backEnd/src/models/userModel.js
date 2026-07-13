@@ -72,6 +72,11 @@ const userSchema = new mongoose.Schema(
             ref: 'Coach',
             default: null,
         },
+        performanceMember: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'PerformanceMember',
+            default: null,
+        },
         facility: [
             {
                 type: mongoose.Schema.Types.ObjectId,
