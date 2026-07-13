@@ -10,7 +10,7 @@ export const VIDEO_TYPE_OPTIONS: Array<{
   },
   {
     id: "normal",
-    label: "Normal Videos",
+    label: "General Videos",
   },
 ];
 

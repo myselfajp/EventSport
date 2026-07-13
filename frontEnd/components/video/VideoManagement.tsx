@@ -532,7 +532,7 @@ export default function VideoManagement({
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Videos</h2>
           </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-            Upload educational or normal videos. Coaches and admins can manage their own uploads.
+            Upload educational or general videos. Coaches and admins can manage their own uploads.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -555,7 +555,7 @@ export default function VideoManagement({
         </div>
       </div>
 
-      {success && (
+      {success && !showModal && (
         <div className="rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
           {success}
         </div>
@@ -790,14 +790,14 @@ export default function VideoManagement({
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className={`bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full ${embedded ? "max-w-3xl" : "max-w-4xl"} max-h-[90vh] overflow-hidden border border-gray-200 dark:border-slate-700`}>
+          <div className={`flex flex-col bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full ${embedded ? "max-w-3xl" : "max-w-4xl"} max-h-[90vh] overflow-hidden border border-gray-200 dark:border-slate-700`}>
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-slate-700">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {editing ? "Edit Video" : "Add Video"}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-slate-400">
-                  Choose educational or normal type, upload a thumbnail, and add a video file or external URL.
+                  Choose educational or general type, upload a thumbnail, and add a video file or external URL.
                 </p>
               </div>
               <button
@@ -810,13 +810,21 @@ export default function VideoManagement({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-5 overflow-y-auto max-h-[calc(90vh-73px)] space-y-4">
-              {error && (
-                <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-                  {error}
-                </div>
-              )}
+            {(error || success) && (
+              <div
+                className={`mx-5 mt-3 shrink-0 rounded-lg border px-4 py-3 text-sm ${
+                  error
+                    ? "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                    : "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                }`}
+                role="alert"
+              >
+                {error || success}
+              </div>
+            )}
 
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 p-5 space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 {VIDEO_TYPE_OPTIONS.map((option) => (
                   <button
@@ -975,8 +983,9 @@ export default function VideoManagement({
                   <span className="text-sm text-gray-700 dark:text-slate-200">Active</span>
                 </label>
               </div>
+              </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-950/40">
                 <button
                   type="button"
                   onClick={closeModal}

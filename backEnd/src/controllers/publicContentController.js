@@ -171,7 +171,7 @@ export const getPublicDashboardHeaderLogo = async (req, res, next) => {
     }
 };
 
-/** Active dashboard hero slides for a public page (home, blog, news). */
+/** Active dashboard hero slides for a public page (home, blog, news, videos). */
 export const getPublicDashboardHeroSlides = async (req, res, next) => {
     try {
         const context = parseHeroContext(req.query?.context);

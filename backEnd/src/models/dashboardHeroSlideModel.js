@@ -66,10 +66,10 @@ const dashboardHeroSlideSchema = new mongoose.Schema(
         lastClickedAt: {
             type: Date,
         },
-        /** home | blog | news — which public page shows this slide */
+        /** home | blog | news | videos — which public page shows this slide */
         context: {
             type: String,
-            enum: ['home', 'blog', 'news'],
+            enum: ['home', 'blog', 'news', 'videos'],
             default: 'home',
             index: true,
         },

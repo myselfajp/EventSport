@@ -145,7 +145,7 @@ export default function NewsPage() {
             ) : newsItems.length === 0 ? (
               <div className="py-16 text-center rounded-xl border border-dashed border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400">No news articles found.</div>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {newsItems.map(item => (
                   <Link key={item._id} href={`/news/${item.slug}`} className="group bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden hover:border-cyan-300 dark:hover:border-cyan-700 hover:shadow-md transition-all">
                     <div className="aspect-[16/9] bg-gray-100 dark:bg-slate-700 overflow-hidden">
