@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import AdminPermissionGroup from '../models/adminPermissionGroupModel.js';
 import Coach from '../models/coachModel.js';
 import Branch from '../models/branchModel.js';
+import PerformanceMember from '../models/performanceMemberModel.js';
 import Event from '../models/eventModel.js';
 import Reservation from '../models/reservationModel.js';
 import Participant from '../models/participantModel.js';
@@ -684,6 +685,121 @@ export const getPendingCoaches = async (req, res, next) => {
             perPage,
             pageNumber,
             totalPages: Math.ceil(total / perPage),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getPerformanceApplications = async (req, res, next) => {
+    try {
+        const { perPage, pageNumber, search } = SearchQuerySchema.parse({
+            perPage: req.body?.perPage || req.query?.perPage,
+            pageNumber: req.body?.pageNumber || req.query?.pageNumber,
+            search: req.body?.search || req.query?.search,
+        });
+
+        const statusParam = String(req.body?.status || req.query?.status || 'Pending').trim();
+        const allowedStatuses = ['Pending', 'Approved', 'Rejected'];
+        const status = allowedStatuses.includes(statusParam) ? statusParam : 'Pending';
+
+        const applications = await PerformanceMember.find({ status })
+            .populate('user', 'firstName lastName email phone photo')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        let filteredApplications = applications;
+        if (search) {
+            const trimmed = search.trim();
+            const oidMatch =
+                /^[a-fA-F0-9]{24}$/.test(trimmed) &&
+                mongoose.Types.ObjectId.isValid(trimmed);
+
+            if (oidMatch) {
+                filteredApplications = applications.filter(
+                    (item) => String(item._id) === trimmed || String(item.user?._id) === trimmed
+                );
+            } else {
+                const searchLower = trimmed.toLowerCase();
+                filteredApplications = applications.filter((item) => {
+                    const userName = `${item.user?.firstName || ''} ${item.user?.lastName || ''}`;
+                    return (
+                        item.name?.toLowerCase().includes(searchLower) ||
+                        userName.toLowerCase().includes(searchLower) ||
+                        item.user?.email?.toLowerCase().includes(searchLower) ||
+                        item.branch?.toLowerCase().includes(searchLower)
+                    );
+                });
+            }
+        }
+
+        const total = filteredApplications.length;
+        const data = filteredApplications.slice((pageNumber - 1) * perPage, pageNumber * perPage);
+
+        res.status(200).json({
+            success: true,
+            data,
+            total,
+            status,
+            perPage,
+            pageNumber,
+            totalPages: Math.ceil(total / perPage),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const approvePerformanceApplication = async (req, res, next) => {
+    try {
+        const applicationId = mongoObjectId.parse(req.params.applicationId);
+
+        const application = await PerformanceMember.findByIdAndUpdate(
+            applicationId,
+            { status: 'Approved', isVerified: true, rejectionReason: '' },
+            { new: true }
+        ).populate('user', 'firstName lastName email phone photo');
+
+        if (!application) {
+            throw new AppError(404, 'Performance application not found');
+        }
+
+        await User.findByIdAndUpdate(application.user._id ?? application.user, {
+            performanceMember: application._id,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Performance Team application approved successfully',
+            data: application,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const rejectPerformanceApplication = async (req, res, next) => {
+    try {
+        const applicationId = mongoObjectId.parse(req.params.applicationId);
+
+        const application = await PerformanceMember.findByIdAndUpdate(
+            applicationId,
+            {
+                status: 'Rejected',
+                isVerified: false,
+                rejectionReason: String(req.body?.reason || '').trim(),
+            },
+            { new: true }
+        ).populate('user', 'firstName lastName email phone photo');
+
+        if (!application) {
+            throw new AppError(404, 'Performance application not found');
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Performance Team application rejected successfully',
+            data: application,
         });
     } catch (err) {
         next(err);
