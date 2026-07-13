@@ -9,6 +9,8 @@ import ProfileSidebar from "./profile/ProfileSidebar";
 interface LeftSidebarProps {
   isOpen: boolean;
   gamerProfileOpenSignal?: number;
+  serviceRequestsOpenSignal?: number;
+  serviceRequestsPreferredTab?: "mine" | "incoming" | null;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
   onShowActivity?: () => void;
@@ -65,6 +67,8 @@ const DUMMY_COMPANIES = [
 const LeftSidebar: React.FC<LeftSidebarProps> = ({
   isOpen,
   gamerProfileOpenSignal = 0,
+  serviceRequestsOpenSignal = 0,
+  serviceRequestsPreferredTab = null,
   onShowFollowings,
   onShowFavorites,
   onShowActivity,
@@ -101,6 +105,8 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         <ProfileSidebar
           onLogout={handleLogout}
           gamerProfileOpenSignal={gamerProfileOpenSignal}
+          serviceRequestsOpenSignal={serviceRequestsOpenSignal}
+          serviceRequestsPreferredTab={serviceRequestsPreferredTab}
           onShowFollowings={onShowFollowings}
           onShowFavorites={onShowFavorites}
           onShowActivity={onShowActivity}

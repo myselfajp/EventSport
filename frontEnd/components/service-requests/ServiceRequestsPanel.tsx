@@ -63,6 +63,7 @@ type Props = {
   onClose: () => void;
   hasGamerProfile: boolean;
   isProvider: boolean;
+  preferredTab?: "mine" | "incoming" | null;
 };
 
 function providerLabel(response: ServiceRequestResponse) {
@@ -86,6 +87,7 @@ export default function ServiceRequestsPanel({
   onClose,
   hasGamerProfile,
   isProvider,
+  preferredTab = null,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"mine" | "incoming">("mine");
@@ -113,10 +115,14 @@ export default function ServiceRequestsPanel({
 
   useEffect(() => {
     if (!isOpen) return;
+    if (preferredTab && visibleTabs.find((item) => item.id === preferredTab)) {
+      setTab(preferredTab);
+      return;
+    }
     if (!visibleTabs.find((item) => item.id === tab)) {
       setTab(visibleTabs[0]?.id || "mine");
     }
-  }, [isOpen, tab, visibleTabs]);
+  }, [isOpen, preferredTab, tab, visibleTabs]);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -74,6 +74,8 @@ import ServiceRequestsPanel from "@/components/service-requests/ServiceRequestsP
 interface ProfileSidebarProps {
   onLogout: () => void;
   gamerProfileOpenSignal?: number;
+  serviceRequestsOpenSignal?: number;
+  serviceRequestsPreferredTab?: "mine" | "incoming" | null;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
   onShowActivity?: () => void;
@@ -84,6 +86,8 @@ interface ProfileSidebarProps {
 const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   onLogout,
   gamerProfileOpenSignal = 0,
+  serviceRequestsOpenSignal = 0,
+  serviceRequestsPreferredTab = null,
   onShowFollowings,
   onShowFavorites,
   onShowActivity,
@@ -266,6 +270,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     if (!gamerProfileOpenSignal) return;
     setIsParticipantModalOpen(true);
   }, [gamerProfileOpenSignal]);
+
+  useEffect(() => {
+    if (!serviceRequestsOpenSignal) return;
+    setIsServiceRequestsOpen(true);
+  }, [serviceRequestsOpenSignal]);
 
   const handleCreateParticipant = async (formData: any) => {
     console.log("Participant profile saved:", formData);
@@ -1261,6 +1270,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         onClose={() => setIsServiceRequestsOpen(false)}
         hasGamerProfile={hasGamerProfile}
         isProvider={hasCoachProfile || hasPerformanceProfile}
+        preferredTab={serviceRequestsPreferredTab}
       />
 
       {/* Facility Modal */}
