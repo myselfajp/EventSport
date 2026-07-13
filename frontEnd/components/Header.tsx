@@ -86,6 +86,16 @@ const Header: React.FC<HeaderProps> = ({
     if (url && typeof url === "string") {
       setIsNotificationsOpen(false);
       try {
+        if (url.startsWith("/?serviceRequests=") && typeof window !== "undefined") {
+          const tab = new URLSearchParams(url.slice(url.indexOf("?"))).get("serviceRequests");
+          window.history.pushState(null, "", url);
+          window.dispatchEvent(
+            new CustomEvent("eventsport:open-service-requests", {
+              detail: { tab: tab === "incoming" ? "incoming" : "mine" },
+            })
+          );
+          return;
+        }
         if (url.startsWith("/")) {
           router.push(url);
         } else {

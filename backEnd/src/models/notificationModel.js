@@ -59,6 +59,8 @@ const notificationSchema = new mongoose.Schema(
                 'invite_event_received',
                 'invite_group_received',
                 'message_received',
+                'service_request_created',
+                'service_request_response_received',
                 // Follow / discovery
                 'follow_new_event',
                 'nearby_event_created',

@@ -41,10 +41,42 @@ const EventsDashboard = () => {
   const [selectedStaticPageName, setSelectedStaticPageName] = useState<string | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const [gamerProfileOpenSignal, setGamerProfileOpenSignal] = useState(0);
+  const [serviceRequestsOpenSignal, setServiceRequestsOpenSignal] = useState(0);
+  const [serviceRequestsPreferredTab, setServiceRequestsPreferredTab] = useState<
+    "mine" | "incoming" | null
+  >(null);
   const openGamerProfile = useCallback(() => {
     setLeftSidebarOpen(true);
     setGamerProfileOpenSignal((n) => n + 1);
   }, []);
+
+  const openServiceRequests = useCallback((tab: "mine" | "incoming" = "mine") => {
+    setServiceRequestsPreferredTab(tab);
+    setLeftSidebarOpen(true);
+    setServiceRequestsOpenSignal((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    const readTabFromUrl = () => {
+      if (typeof window === "undefined") return null;
+      const value = new URLSearchParams(window.location.search).get("serviceRequests");
+      if (!value) return null;
+      return value === "incoming" ? "incoming" : "mine";
+    };
+
+    const initialTab = readTabFromUrl();
+    if (initialTab) openServiceRequests(initialTab);
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ tab?: "mine" | "incoming" }>).detail;
+      openServiceRequests(detail?.tab || readTabFromUrl() || "mine");
+    };
+
+    window.addEventListener("eventsport:open-service-requests", handler);
+    return () => {
+      window.removeEventListener("eventsport:open-service-requests", handler);
+    };
+  }, [openServiceRequests]);
   const isCoach = user?.coach != null;
   const canManageEvents = isCoach || user?.role === 0;
 
@@ -246,6 +278,8 @@ const EventsDashboard = () => {
       <LeftSidebar
         isOpen={leftSidebarOpen}
         gamerProfileOpenSignal={gamerProfileOpenSignal}
+        serviceRequestsOpenSignal={serviceRequestsOpenSignal}
+        serviceRequestsPreferredTab={serviceRequestsPreferredTab}
         onShowFollowings={() => {
           setShowCoachCalendar(false);
           setShowFavorites(false);

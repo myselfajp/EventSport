@@ -6,6 +6,7 @@ import PerformanceMember, { PERFORMANCE_BRANCHES } from '../models/performanceMe
 import ServiceRequest from '../models/serviceRequestModel.js';
 import ServiceRequestResponse from '../models/serviceRequestResponseModel.js';
 import { findOrCreateConversation } from './messageController.js';
+import { createNotification } from '../utils/notificationHelper.js';
 
 const REQUEST_QUESTIONS = [
     { key: 'skillLevel', question: 'What is your current skill level?' },
@@ -22,6 +23,8 @@ const REQUEST_QUESTIONS = [
 
 const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
+
+const serviceRequestActionUrl = (tab) => `/?serviceRequests=${tab}`;
 
 function normalizeAnswers(input) {
     const byKey = new Map();
@@ -66,6 +69,79 @@ async function getProviderProfile(user, targetType = null) {
     throw new AppError(403, 'Approved coach or Performance Team profile is required.');
 }
 
+async function getProviderUserIdsForRequest(request) {
+    if (request.targetType === 'coach') {
+        const approvedCoachIds = await Branch.distinct('coach', { status: 'Approved' });
+        if (!approvedCoachIds.length) return [];
+
+        const users = await User.find({
+            coach: { $in: approvedCoachIds },
+            isActive: { $ne: false },
+            _id: { $ne: request.requester },
+        })
+            .select('_id')
+            .lean();
+        return users.map((user) => user._id);
+    }
+
+    const members = await PerformanceMember.find({
+        branch: request.performanceBranch,
+        status: 'Approved',
+        isVerified: true,
+        user: { $ne: request.requester },
+    })
+        .select('user')
+        .lean();
+
+    return members.map((member) => member.user).filter(Boolean);
+}
+
+function serviceTargetLabel(request) {
+    if (request.targetType === 'coach') return 'coaching';
+    return `${request.performanceBranch || 'performance'} support`;
+}
+
+async function notifyProvidersOfServiceRequest(request) {
+    const providerUserIds = await getProviderUserIdsForRequest(request);
+    if (!providerUserIds.length) return null;
+
+    return createNotification({
+        scope: 'group',
+        type: 'service_request_created',
+        title: 'New service request',
+        message: `A new ${serviceTargetLabel(request)} service request is available. Would you like to review it?`,
+        data: {
+            serviceRequestId: request._id,
+            targetType: request.targetType,
+            performanceBranch: request.performanceBranch || null,
+        },
+        targetUsers: providerUserIds,
+        priority: 'normal',
+        icon: 'users',
+        actionUrl: serviceRequestActionUrl('incoming'),
+        createdBy: request.requester,
+    });
+}
+
+async function notifyRequesterOfProviderInterest(request, providerUser) {
+    const providerName = `${providerUser?.firstName || ''} ${providerUser?.lastName || ''}`.trim();
+    return createNotification({
+        scope: 'user',
+        type: 'service_request_response_received',
+        title: 'Someone is interested in your request',
+        message: `${providerName || 'A provider'} is interested in your service request.`,
+        data: {
+            serviceRequestId: request._id,
+            providerUserId: providerUser?._id,
+        },
+        userId: request.requester,
+        priority: 'normal',
+        icon: 'bell',
+        actionUrl: serviceRequestActionUrl('mine'),
+        createdBy: providerUser?._id,
+    });
+}
+
 export const getQuestionCatalog = async (_req, res, next) => {
     try {
         res.status(200).json({ success: true, data: REQUEST_QUESTIONS });
@@ -99,6 +175,10 @@ export const createServiceRequest = async (req, res, next) => {
             title: trim(req.body?.title, 160) || '',
             answers: normalizeAnswers(req.body?.answers),
         });
+
+        void notifyProvidersOfServiceRequest(request).catch((notifErr) =>
+            console.error('notifyProvidersOfServiceRequest failed:', notifErr)
+        );
 
         res.status(201).json({ success: true, data: request });
     } catch (err) {
@@ -215,6 +295,11 @@ export const respondToRequest = async (req, res, next) => {
             throw new AppError(403, 'This request is for another Performance Team branch.');
         }
 
+        const existingResponse = await ServiceRequestResponse.findOne({
+            serviceRequest: request._id,
+            providerUser: req.user._id,
+        }).lean();
+
         const response = await ServiceRequestResponse.findOneAndUpdate(
             { serviceRequest: request._id, providerUser: req.user._id },
             {
@@ -232,6 +317,12 @@ export const respondToRequest = async (req, res, next) => {
             },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
+
+        if (!existingResponse || existingResponse.status !== 'interested') {
+            void notifyRequesterOfProviderInterest(request, req.user).catch((notifErr) =>
+                console.error('notifyRequesterOfProviderInterest failed:', notifErr)
+            );
+        }
 
         res.status(200).json({ success: true, data: response });
     } catch (err) {

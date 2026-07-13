@@ -67,6 +67,8 @@ export default function NotificationManagement() {
     { value: "invite_event_received", label: "Event Invite Received" },
     { value: "invite_group_received", label: "Group Invite Received" },
     { value: "message_received", label: "Message Received" },
+    { value: "service_request_created", label: "Service Request Created" },
+    { value: "service_request_response_received", label: "Service Request Response Received" },
     { value: "follow_new_event", label: "Followed Coach – New Event" },
     { value: "nearby_event_created", label: "Nearby Event Created" },
     { value: "club_new_event", label: "Followed Club – New Event" },
