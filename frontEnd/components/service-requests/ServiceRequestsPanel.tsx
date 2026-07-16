@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, X } from "lucide-react";
+import { ChevronLeft, MessageSquare, X } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import ServiceRequestWizard from "@/components/service-requests/ServiceRequestWizard";
@@ -41,6 +41,7 @@ type Props = {
   isProvider: boolean;
   preferredTab?: "mine" | "incoming" | null;
   autoStartWizard?: boolean;
+  focusRequestId?: string | null;
 };
 
 function providerLabel(response: ServiceRequestResponse) {
@@ -71,6 +72,7 @@ export default function ServiceRequestsPanel({
   isProvider,
   preferredTab = null,
   autoStartWizard = false,
+  focusRequestId = null,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"mine" | "incoming">("mine");
@@ -82,6 +84,7 @@ export default function ServiceRequestsPanel({
   const [interestMessage, setInterestMessage] = useState<Record<string, string>>({});
   const [showMyRequestHistory, setShowMyRequestHistory] = useState(false);
   const [showIncomingList, setShowIncomingList] = useState(false);
+  const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
 
   const canCreate = hasGamerProfile;
   const visibleTabs = useMemo(
@@ -97,8 +100,17 @@ export default function ServiceRequestsPanel({
       setShowMyRequestHistory(false);
       setShowIncomingList(false);
       setWizardOpen(false);
+      setFocusedRequestId(null);
       return;
     }
+    if (focusRequestId) {
+      setFocusedRequestId(focusRequestId);
+      setShowMyRequestHistory(true);
+      setWizardOpen(false);
+      setShowIncomingList(false);
+      return;
+    }
+    setFocusedRequestId(null);
     if (preferredTab === "incoming") {
       setShowIncomingList(true);
       setWizardOpen(false);
@@ -107,7 +119,7 @@ export default function ServiceRequestsPanel({
     if (autoStartWizard && hasGamerProfile) {
       setWizardOpen(true);
     }
-  }, [isOpen, preferredTab, autoStartWizard, hasGamerProfile]);
+  }, [isOpen, preferredTab, autoStartWizard, hasGamerProfile, focusRequestId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -193,6 +205,67 @@ export default function ServiceRequestsPanel({
 
   if (!isOpen) return null;
 
+  const focusedRequest = focusedRequestId
+    ? myRequests.find((r) => r._id === focusedRequestId) || null
+    : null;
+
+  const renderMyRequestCard = (request: ServiceRequest) => (
+    <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-white">
+            {request.title || requestTargetLabel(request)}
+          </h3>
+          <p className="text-xs text-gray-500">
+            {requestTargetLabel(request)} · {request.status}
+          </p>
+        </div>
+        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-100">
+          {request.responses?.length || 0} interested
+        </span>
+      </div>
+      <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+        {(request.answers || []).slice(0, 4).map((answer) => (
+          <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+            <div className="text-xs text-gray-500">{answer.question}</div>
+            <div className="text-gray-800 dark:text-gray-100">{answer.answer || "-"}</div>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {(request.responses || []).length === 0 && (
+          <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
+            No offers yet.
+          </p>
+        )}
+        {(request.responses || []).map((response) => (
+          <div
+            key={response._id}
+            className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <div className="font-medium text-gray-900 dark:text-white">
+                {providerLabel(response)}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                {response.message || "Interested in this request."}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={request.status !== "open" || response.status !== "interested"}
+              onClick={() => selectProvider(request._id, response._id)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Choose & Message
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm es-animate-overlay">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 es-animate-dialog dark:bg-gray-800 dark:ring-white/10">
@@ -253,7 +326,32 @@ export default function ServiceRequestsPanel({
             />
           )}
 
-          {!loading && !wizardOpen && tab === "mine" && (
+          {!loading && !wizardOpen && tab === "mine" && focusedRequestId && (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setFocusedRequestId(null)}
+                className="inline-flex items-center gap-1 text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                All requests
+              </button>
+              {focusedRequest ? (
+                <>
+                  <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+                    Review the offer below and pick a provider to start messaging.
+                  </div>
+                  {renderMyRequestCard(focusedRequest)}
+                </>
+              ) : (
+                <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+                  This request is no longer available.
+                </p>
+              )}
+            </div>
+          )}
+
+          {!loading && !wizardOpen && tab === "mine" && !focusedRequestId && (
             <div className="space-y-4">
               {!showMyRequestHistory ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
@@ -288,57 +386,7 @@ export default function ServiceRequestsPanel({
                       No service requests yet.
                     </p>
                   )}
-                  {myRequests.map((request) => (
-                    <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">
-                            {request.title || requestTargetLabel(request)}
-                          </h3>
-                          <p className="text-xs text-gray-500">
-                            {requestTargetLabel(request)} · {request.status}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-100">
-                          {request.responses?.length || 0} interested
-                        </span>
-                      </div>
-                      <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
-                        {(request.answers || []).slice(0, 4).map((answer) => (
-                          <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
-                            <div className="text-xs text-gray-500">{answer.question}</div>
-                            <div className="text-gray-800 dark:text-gray-100">{answer.answer || "-"}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="space-y-2">
-                        {(request.responses || []).map((response) => (
-                          <div
-                            key={response._id}
-                            className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div>
-                              <div className="font-medium text-gray-900 dark:text-white">
-                                {providerLabel(response)}
-                              </div>
-                              <div className="text-sm text-gray-600 dark:text-gray-300">
-                                {response.message || "Interested in this request."}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              disabled={request.status !== "open" || response.status !== "interested"}
-                              onClick={() => selectProvider(request._id, response._id)}
-                              className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white disabled:opacity-50"
-                            >
-                              <MessageSquare className="h-4 w-4" />
-                              Choose & Message
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  {myRequests.map((request) => renderMyRequestCard(request))}
                 </>
               )}
             </div>

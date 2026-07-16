@@ -49,7 +49,7 @@ export interface MessagesPageResult {
 export async function getConversations(): Promise<Conversation[]> {
   const res = await fetchJSON(EP.MESSAGES.CONVERSATIONS, { method: "GET" });
   if (res?.success === false) {
-    throw new Error(res?.error || res?.message || "Konuşmalar yüklenemedi.");
+    throw new Error(res?.error || res?.message || "Failed to load conversations.");
   }
   return (res?.data ?? []) as Conversation[];
 }
@@ -64,7 +64,7 @@ export async function getMessages(
   )}?page=${page}&limit=${limit}`;
   const res = await fetchJSON(url, { method: "GET" });
   if (res?.success === false) {
-    throw new Error(res?.error || res?.message || "Mesajlar yüklenemedi.");
+    throw new Error(res?.error || res?.message || "Failed to load messages.");
   }
   return {
     messages: (res?.data ?? []) as Message[],
@@ -80,9 +80,41 @@ export async function createConversation(
     body: { recipientId },
   });
   if (res?.success === false) {
-    throw new Error(res?.error || res?.message || "Konuşma oluşturulamadı.");
+    throw new Error(res?.error || res?.message || "Failed to create conversation.");
   }
   return res?.data as Conversation;
+}
+
+export async function deleteMessage(
+  conversationId: string,
+  messageId: string,
+  scope: "me" | "everyone" = "me"
+): Promise<void> {
+  const res = await fetchJSON(
+    EP.MESSAGES.DELETE_MESSAGE(conversationId, messageId),
+    { method: "DELETE", body: { scope } }
+  );
+  if (res?.success === false) {
+    throw new Error(res?.error || res?.message || "Failed to delete message.");
+  }
+}
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const res = await fetchJSON(
+    EP.MESSAGES.CONVERSATION_MESSAGES(conversationId),
+    { method: "DELETE" }
+  );
+  if (res?.success === false) {
+    throw new Error(res?.error || res?.message || "Failed to delete conversation.");
+  }
+}
+
+export function messagePreview(message?: Message | null, isMine?: boolean): string {
+  if (!message) return "New conversation";
+  if (message.isDeleted) {
+    return isMine ? "You deleted this message" : "This message was deleted";
+  }
+  return message.content || "New conversation";
 }
 
 export function senderId(message: Message): string {
@@ -92,6 +124,6 @@ export function senderId(message: Message): string {
 }
 
 export function fullName(user?: MessageUser | null): string {
-  if (!user) return "Kullanıcı";
-  return `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Kullanıcı";
+  if (!user) return "User";
+  return `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User";
 }

@@ -113,6 +113,8 @@ const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
 
 const serviceRequestActionUrl = (tab) => `/?serviceRequests=${tab}`;
+const serviceRequestFocusUrl = (requestId) =>
+    `/?serviceRequests=mine&requestId=${requestId}`;
 
 function normalizeAnswers(input, targetType) {
     const catalog = questionsForTarget(targetType);
@@ -246,7 +248,7 @@ async function notifyRequesterOfProviderInterest(request, providerUser) {
         userId: request.requester,
         priority: 'normal',
         icon: 'bell',
-        actionUrl: serviceRequestActionUrl('mine'),
+        actionUrl: serviceRequestFocusUrl(request._id),
         createdBy: providerUser?._id,
     });
 }

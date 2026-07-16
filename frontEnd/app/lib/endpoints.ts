@@ -623,6 +623,8 @@ export const EP = {
     CONVERSATIONS: `${MESSAGES_API}/conversations`,
     CONVERSATION_MESSAGES: (id: string) =>
       `${MESSAGES_API}/conversations/${id}`,
+    DELETE_MESSAGE: (conversationId: string, messageId: string) =>
+      `${MESSAGES_API}/conversations/${conversationId}/messages/${messageId}`,
   },
   NOTIFICATIONS: {
     getAll: `${API_V1_BASE}/notifications`,

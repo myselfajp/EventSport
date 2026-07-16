@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
@@ -14,17 +14,17 @@ const MessagingPage: React.FC = () => {
 
   const [selected, setSelected] = useState<Conversation | null>(null);
 
-  // Shares the cache with ConversationList (same query key) so selecting a
-  // conversation from a URL param does not trigger a second network request.
   const { data: conversations } = useQuery({
     queryKey: ["messages", "conversations"],
     queryFn: getConversations,
   });
 
-  // Auto-select the conversation referenced by ?conversationId=... once it is
-  // available. Applied a single time per param value so manual navigation in
-  // the list is never overridden. Invalid/foreign ids silently fall back to
-  // the conversation list.
+  const handleConversationDeleted = useCallback((conversationId: string) => {
+    setSelected((current) =>
+      current?._id === conversationId ? null : current
+    );
+  }, []);
+
   const appliedParamRef = useRef<string | null>(null);
   useEffect(() => {
     if (!conversationIdParam) {
@@ -43,8 +43,6 @@ const MessagingPage: React.FC = () => {
 
   return (
     <div className="flex h-full rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-      {/* Left panel: conversation list.
-          On mobile it is only shown when no conversation is selected. */}
       <div
         className={`w-full md:w-80 lg:w-96 md:flex-shrink-0 border-r border-gray-200 dark:border-slate-700 ${
           selected ? "hidden md:block" : "block"
@@ -53,11 +51,10 @@ const MessagingPage: React.FC = () => {
         <ConversationList
           selectedId={selected?._id}
           onSelect={(conv) => setSelected(conv)}
+          onConversationDeleted={handleConversationDeleted}
         />
       </div>
 
-      {/* Right panel: selected conversation.
-          On mobile it is only shown when a conversation is selected. */}
       <div
         className={`flex-1 min-w-0 ${selected ? "block" : "hidden md:block"}`}
       >
@@ -67,6 +64,9 @@ const MessagingPage: React.FC = () => {
             conversationId={selected._id}
             otherUser={selected.otherUser}
             onBack={() => setSelected(null)}
+            onConversationDeleted={() =>
+              handleConversationDeleted(selected._id)
+            }
           />
         ) : (
           <div className="hidden md:flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
