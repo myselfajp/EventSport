@@ -103,6 +103,10 @@ export const createOrUpdateProfile = async (req, res, next) => {
 export const listApprovedMembers = async (req, res, next) => {
     try {
         const branch = normalizeText(req.query?.branch, 64);
+        const search = normalizeText(req.query?.search, 120);
+        const pageNumber = Math.max(1, Number.parseInt(req.query?.pageNumber, 10) || 1);
+        const perPage = Math.min(100, Math.max(1, Number.parseInt(req.query?.perPage, 10) || 10));
+
         const filter = { status: 'Approved', isVerified: true };
         if (branch) {
             if (!PERFORMANCE_BRANCHES.includes(branch)) {
@@ -111,12 +115,34 @@ export const listApprovedMembers = async (req, res, next) => {
             filter.branch = branch;
         }
 
-        const members = await PerformanceMember.find(filter)
-            .populate('user', 'firstName lastName photo')
-            .sort({ createdAt: -1 })
-            .lean();
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { title: { $regex: search, $options: 'i' } },
+            ];
+        }
 
-        res.status(200).json({ success: true, data: members });
+        const skip = (pageNumber - 1) * perPage;
+        const [members, total] = await Promise.all([
+            PerformanceMember.find(filter)
+                .populate('user', 'firstName lastName photo')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(perPage)
+                .lean(),
+            PerformanceMember.countDocuments(filter),
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: members,
+            pagination: {
+                currentPage: pageNumber,
+                totalPages: Math.max(1, Math.ceil(total / perPage) || 1),
+                perPage,
+                total,
+            },
+        });
     } catch (err) {
         next(err);
     }
