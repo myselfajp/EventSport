@@ -546,8 +546,20 @@ export const EP = {
   PERFORMANCE: {
     currentProfile: `${PERFORMANCE_API}/current-profile`,
     apply: `${PERFORMANCE_API}/apply`,
-    members: (branch?: string) =>
-      `${PERFORMANCE_API}/members${branch ? `?branch=${encodeURIComponent(branch)}` : ""}`,
+    members: (params?: {
+      branch?: string;
+      search?: string;
+      pageNumber?: number;
+      perPage?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.branch) q.set("branch", params.branch);
+      if (params?.search) q.set("search", params.search);
+      if (params?.pageNumber) q.set("pageNumber", String(params.pageNumber));
+      if (params?.perPage) q.set("perPage", String(params.perPage));
+      const qs = q.toString();
+      return `${PERFORMANCE_API}/members${qs ? `?${qs}` : ""}`;
+    },
   },
   SERVICE_REQUESTS: {
     questions: `${SERVICE_REQUESTS_API}/questions`,

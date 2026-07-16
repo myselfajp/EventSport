@@ -15,6 +15,7 @@ import {
   Heart,
   Loader2,
   Check,
+  Briefcase,
 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -56,13 +57,6 @@ import {
   useFollowMutation,
   useUnfollowMutation,
 } from "@/app/hooks/useFollows";
-import LocationFields, {
-  emptyLocationValue,
-} from "@/components/location/LocationFields";
-import {
-  buildLocationSearchPayload,
-  type LocationValue,
-} from "@/app/lib/location-api";
 
 interface FindModalProps {
   isOpen: boolean;
@@ -72,10 +66,34 @@ interface FindModalProps {
 type SearchType =
   | "coach"
   | "participant"
+  | "performance"
   | "facility"
   | "company"
   | "club"
   | "group";
+
+type PerformanceMemberResult = {
+  _id: string;
+  name: string;
+  branch: string;
+  title?: string;
+  about?: string;
+  user?: {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    photo?: {
+      path?: string;
+    };
+  };
+};
+
+const PERFORMANCE_BRANCH_LABELS: Record<string, string> = {
+  manager: "Manager",
+  psychologist: "Psychologist",
+  dietitian: "Dietitian",
+  psychotherapist: "Psychotherapist",
+};
 
 const SEARCH_TYPE_LABELS: Record<
   SearchType,
@@ -83,6 +101,11 @@ const SEARCH_TYPE_LABELS: Record<
 > = {
   coach: { singular: "Coach", plural: "coaches", placeholder: "coach" },
   participant: { singular: "Gamer", plural: "gamers", placeholder: "gamer" },
+  performance: {
+    singular: "Performance Team",
+    plural: "Performance Team members",
+    placeholder: "Performance Team member",
+  },
   facility: {
     singular: "Facility",
     plural: "facilities",
@@ -107,7 +130,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   const [selectedType, setSelectedType] = useState<SearchType>("coach");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<
-    UserType[] | Facility[] | Company[] | Club[] | Group[]
+    UserType[] | Facility[] | Company[] | Club[] | Group[] | PerformanceMemberResult[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,9 +162,10 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [sportGroupFilter, setSportGroupFilter] = useState("");
   const [sportFilter, setSportFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState<LocationValue>(
-    emptyLocationValue()
-  );
+  const [performanceBranchFilter, setPerformanceBranchFilter] = useState("");
+  const [selectedPerformance, setSelectedPerformance] =
+    useState<PerformanceMemberResult | null>(null);
+  const [showPerformanceDetails, setShowPerformanceDetails] = useState(false);
   const [sportGroups, setSportGroups] = useState<SportGroup[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
   const [isLoadingSportGroups, setIsLoadingSportGroups] = useState(false);
@@ -344,8 +368,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const locationPayload = () => buildLocationSearchPayload(locationFilter);
-
   const searchCoaches = async (filters: {
     search?: string;
     sport?: string;
@@ -374,8 +396,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.isVerified !== undefined) {
         payload.isVerified = filters.isVerified;
       }
-
-      Object.assign(payload, locationPayload());
 
       const response = await fetchJSON(EP.COACH.getCoachList, {
         method: "POST",
@@ -428,8 +448,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         payload.sport = filters.sport;
       }
 
-      Object.assign(payload, locationPayload());
-
       const response = await fetchJSON(EP.PARTICIPANT_LIST.getParticipantList, {
         method: "POST",
         body: payload,
@@ -452,6 +470,51 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       setError("An error occurred while searching gamers");
       setSearchResults([]);
       console.error("Error searching participants:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const searchPerformanceMembers = async (filters: {
+    search?: string;
+    branch?: string;
+    pageNumber?: number;
+    perPage?: number;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(!!filters.search);
+
+    try {
+      const response = await fetchJSON(
+        EP.PERFORMANCE.members({
+          search:
+            filters.search && filters.search.trim().length >= 2
+              ? filters.search.trim()
+              : undefined,
+          branch: filters.branch || undefined,
+          pageNumber: filters.pageNumber || 1,
+          perPage: filters.perPage || 5,
+        }),
+        { method: "GET" }
+      );
+
+      if (response?.success && Array.isArray(response?.data)) {
+        setSearchResults(response.data);
+        setPagination({
+          currentPage: response.pagination?.currentPage || 1,
+          totalPages: response.pagination?.totalPages || 1,
+          total: response.pagination?.total || response.data.length,
+          perPage: response.pagination?.perPage || filters.perPage || 5,
+        });
+      } else {
+        setError(response?.message || "Failed to search Performance Team members");
+        setSearchResults([]);
+      }
+    } catch (err) {
+      setError("An error occurred while searching Performance Team members");
+      setSearchResults([]);
+      console.error("Error searching performance members:", err);
     } finally {
       setIsLoading(false);
     }
@@ -480,8 +543,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.sport) {
         payload.mainSport = filters.sport;
       }
-
-      Object.assign(payload, locationPayload());
 
       const response: FacilitySearchResponse = await fetchJSON(
         EP.FACILITY.getFacility,
@@ -535,8 +596,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.sport) {
         payload.mainSport = filters.sport;
       }
-
-      Object.assign(payload, locationPayload());
 
       const response: CompanySearchResponse = await fetchJSON(
         EP.COMPANY.getCompany,
@@ -596,8 +655,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         payload.mainSport = filters.sport;
       }
 
-      Object.assign(payload, locationPayload());
-
       const response: ClubSearchResponse = await fetchJSON(EP.CLUB.getClub, {
         method: "POST",
         body: payload,
@@ -647,8 +704,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       if (filters.sport) {
         payload.mainSport = filters.sport;
       }
-
-      Object.assign(payload, locationPayload());
 
       const response: GroupSearchResponse = await fetchJSON(EP.GROUP.getGroup, {
         method: "POST",
@@ -729,6 +784,13 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         pageNumber: 1,
         perPage: pagination.perPage,
       });
+    } else if (selectedType === "performance") {
+      searchPerformanceMembers({
+        search: searchQuery.trim().length >= 2 ? searchQuery : "",
+        branch: performanceBranchFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
     } else if (selectedType === "facility") {
       searchFacilities({
         search: searchQuery.trim().length >= 2 ? searchQuery : "",
@@ -776,6 +838,13 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         pageNumber: page,
         perPage: pagination.perPage,
       });
+    } else if (selectedType === "performance") {
+      searchPerformanceMembers({
+        search: hasSearched ? searchQuery : "",
+        branch: performanceBranchFilter || undefined,
+        pageNumber: page,
+        perPage: pagination.perPage,
+      });
     } else if (selectedType === "facility") {
       searchFacilities({
         search: hasSearched ? searchQuery : "",
@@ -807,8 +876,6 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const hasActiveLocationFilter = () => Boolean(locationFilter.district);
-
   const runFilterSearch = () => {
     if (selectedType === "coach") {
       searchCoaches({
@@ -822,6 +889,13 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       searchParticipants({
         search: hasSearched && searchQuery ? searchQuery : "",
         sport: sportFilter || undefined,
+        pageNumber: 1,
+        perPage: pagination.perPage,
+      });
+    } else if (selectedType === "performance") {
+      searchPerformanceMembers({
+        search: hasSearched && searchQuery ? searchQuery : "",
+        branch: performanceBranchFilter || undefined,
         pageNumber: 1,
         perPage: pagination.perPage,
       });
@@ -872,6 +946,12 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
           pageNumber: 1,
           perPage: pagination.perPage,
         });
+      } else if (selectedType === "performance") {
+        searchPerformanceMembers({
+          branch: performanceBranchFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        });
       } else if (selectedType === "facility") {
         searchFacilities({
           sport: sportFilter || undefined,
@@ -906,10 +986,10 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     }
   }, [sportGroupFilter]);
 
-  // Handle sport filter changes - make API call
   useEffect(() => {
     if (!isOpen) return;
-    if (!hasSearched && !searchQuery && !sportFilter && !hasActiveLocationFilter()) {
+    if (selectedType === "performance") return;
+    if (!hasSearched && !searchQuery && !sportFilter) {
       return;
     }
     runFilterSearch();
@@ -918,12 +998,15 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!hasSearched && !searchQuery && !sportFilter && !hasActiveLocationFilter()) {
-      return;
-    }
-    runFilterSearch();
+    if (selectedType !== "performance") return;
+    searchPerformanceMembers({
+      search: hasSearched && searchQuery ? searchQuery : "",
+      branch: performanceBranchFilter || undefined,
+      pageNumber: 1,
+      perPage: pagination.perPage,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationFilter.district]);
+  }, [performanceBranchFilter]);
 
   // Clear results when type changes to ensure proper filtering
   useEffect(() => {
@@ -938,7 +1021,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     setHasSearched(false);
     setSportGroupFilter("");
     setSportFilter("");
-    setLocationFilter(emptyLocationValue());
+    setPerformanceBranchFilter("");
   }, [selectedType]);
 
   const handleUserSelect = (
@@ -974,6 +1057,16 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   const handleGroupSelect = (group: Group) => {
     setSelectedGroup(group);
     setShowGroupDetails(true);
+  };
+
+  const handlePerformanceSelect = (member: PerformanceMemberResult) => {
+    setSelectedPerformance(member);
+    setShowPerformanceDetails(true);
+  };
+
+  const handleClosePerformanceDetails = () => {
+    setShowPerformanceDetails(false);
+    setSelectedPerformance(null);
   };
 
   const handleCloseUserProfile = () => {
@@ -1035,15 +1128,18 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     setSelectedClub(null);
     setShowGroupDetails(false);
     setSelectedGroup(null);
+    setShowPerformanceDetails(false);
+    setSelectedPerformance(null);
+    setPerformanceBranchFilter("");
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4 backdrop-blur-sm es-animate-overlay">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10 w-full max-w-2xl mx-auto max-h-[90vh] overflow-y-auto es-animate-dialog">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur z-10 rounded-t-2xl">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
             Find
           </h2>
@@ -1062,7 +1158,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               What are you looking for?
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedType("coach")}
@@ -1112,6 +1208,33 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                   }`}
                 >
                   Gamer
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedType("performance")}
+                className={`flex flex-col items-center p-2.5 sm:p-3 rounded-lg border transition-all ${
+                  selectedType === "performance"
+                    ? "border-emerald-500 bg-emerald-900/30"
+                    : "border-gray-700 hover:border-gray-600"
+                }`}
+              >
+                <Briefcase
+                  className={`w-5 h-5 sm:w-6 sm:h-6 mb-1.5 ${
+                    selectedType === "performance"
+                      ? "text-emerald-500"
+                      : "text-gray-400 dark:text-gray-500"
+                  }`}
+                />
+                <span
+                  className={`text-xs font-medium text-center ${
+                    selectedType === "performance"
+                      ? "text-emerald-300"
+                      : "text-gray-400"
+                  }`}
+                >
+                  Performance Team
                 </span>
               </button>
 
@@ -1243,12 +1366,30 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
             </div>
           </form>
 
-          {/* Sport filters — all tabs */}
-          <div className="mb-4">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-              Sport type
-            </p>
-            <div className="flex gap-3">
+          {selectedType === "performance" ? (
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Branch
+              </p>
+              <select
+                value={performanceBranchFilter}
+                onChange={(e) => setPerformanceBranchFilter(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-emerald-500 text-base dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">All branches</option>
+                {Object.entries(PERFORMANCE_BRANCH_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Sport type
+              </p>
+              <div className="flex gap-3">
                 <select
                   value={sportGroupFilter}
                   onChange={(e) => {
@@ -1309,18 +1450,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                     ))}
                 </select>
               </div>
-          </div>
-
-          <div className="mb-6">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-              Istanbul district
-            </p>
-            <LocationFields
-              value={locationFilter}
-              onChange={setLocationFilter}
-              showAddressLine={false}
-            />
-          </div>
+            </div>
+          )}
 
           {/* Search Results */}
           <div className="flex-1 overflow-auto max-h-96">
@@ -1497,6 +1628,49 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                               </span>
                               <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 text-xs rounded-full">
                                 {participant.membershipLevel}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else if (selectedType === "performance") {
+                    const member = result as PerformanceMemberResult;
+                    const displayName =
+                      member.name ||
+                      `${member.user?.firstName || ""} ${member.user?.lastName || ""}`.trim();
+                    return (
+                      <div
+                        key={member._id}
+                        onClick={() => handlePerformanceSelect(member)}
+                        className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 rounded-full flex items-center justify-center overflow-hidden">
+                            {member.user?.photo?.path ? (
+                              <img
+                                src={EP.assetUrl(member.user.photo.path)}
+                                alt={displayName}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 dark:text-white truncate">
+                              {displayName}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {PERFORMANCE_BRANCH_LABELS[member.branch] || member.branch}
+                              {member.title ? ` • ${member.title}` : ""}
+                            </div>
+                            <div className="flex gap-1 mt-1">
+                              <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs rounded-full">
+                                Performance Team
+                              </span>
+                              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 text-xs rounded-full">
+                                Verified
                               </span>
                             </div>
                           </div>
@@ -1949,6 +2123,41 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         onClose={handleCloseGroupDetails}
         group={selectedGroup}
       />
+
+      {showPerformanceDetails && selectedPerformance && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {selectedPerformance.name}
+                </h3>
+                <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                  {PERFORMANCE_BRANCH_LABELS[selectedPerformance.branch] ||
+                    selectedPerformance.branch}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClosePerformanceDetails}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {selectedPerformance.title && (
+              <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+                {selectedPerformance.title}
+              </p>
+            )}
+            {selectedPerformance.about && (
+              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                {selectedPerformance.about}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
