@@ -2,34 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, MessageSquare, X } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
-
-const PERFORMANCE_BRANCHES = [
-  { value: "manager", label: "Manager" },
-  { value: "psychologist", label: "Psychologist" },
-  { value: "dietitian", label: "Dietitian" },
-  { value: "psychotherapist", label: "Psychotherapist" },
-];
-
-const FALLBACK_QUESTIONS = [
-  { key: "skillLevel", question: "What is your current skill level?" },
-  { key: "goal", question: "What goal do you want to achieve?" },
-  { key: "sessionFormat", question: "Do you prefer private sessions or group sessions?" },
-  { key: "locationPreference", question: "Where would you like to receive the service?" },
-  { key: "budget", question: "Do you have a budget, and if so, how much?" },
-  { key: "availability", question: "Which days and times are you available?" },
-  { key: "experience", question: "Have you received support in this area before?" },
-  { key: "duration", question: "How long do you want to receive support?" },
-  { key: "communicationPreference", question: "Do you prefer online or in-person sessions?" },
-  { key: "notes", question: "Is there anything else you want to add?" },
-];
-
-type Question = {
-  key: string;
-  question: string;
-};
+import ServiceRequestWizard from "@/components/service-requests/ServiceRequestWizard";
 
 type ServiceRequestResponse = {
   _id: string;
@@ -64,6 +40,7 @@ type Props = {
   hasGamerProfile: boolean;
   isProvider: boolean;
   preferredTab?: "mine" | "incoming" | null;
+  autoStartWizard?: boolean;
 };
 
 function providerLabel(response: ServiceRequestResponse) {
@@ -78,8 +55,13 @@ function providerLabel(response: ServiceRequestResponse) {
 
 function requestTargetLabel(request: ServiceRequest) {
   if (request.targetType === "coach") return "Coach";
-  const match = PERFORMANCE_BRANCHES.find((b) => b.value === request.performanceBranch);
-  return match ? match.label : "Performance Team";
+  const branches: Record<string, string> = {
+    manager: "Manager",
+    psychologist: "Psychologist",
+    dietitian: "Dietitian",
+    psychotherapist: "Psychotherapist",
+  };
+  return branches[request.performanceBranch || ""] || "Performance Team";
 }
 
 export default function ServiceRequestsPanel({
@@ -88,22 +70,19 @@ export default function ServiceRequestsPanel({
   hasGamerProfile,
   isProvider,
   preferredTab = null,
+  autoStartWizard = false,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"mine" | "incoming">("mine");
-  const [questions, setQuestions] = useState<Question[]>(FALLBACK_QUESTIONS);
   const [myRequests, setMyRequests] = useState<ServiceRequest[]>([]);
   const [incoming, setIncoming] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [step, setStep] = useState(0);
-  const [targetType, setTargetType] = useState<"coach" | "performance">("performance");
-  const [performanceBranch, setPerformanceBranch] = useState("dietitian");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [interestMessage, setInterestMessage] = useState<Record<string, string>>({});
+  const [showMyRequestHistory, setShowMyRequestHistory] = useState(false);
+  const [showIncomingList, setShowIncomingList] = useState(false);
 
-  const activeQuestion = questions[step];
   const canCreate = hasGamerProfile;
   const visibleTabs = useMemo(
     () => [
@@ -112,6 +91,23 @@ export default function ServiceRequestsPanel({
     ],
     [hasGamerProfile, isProvider]
   );
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowMyRequestHistory(false);
+      setShowIncomingList(false);
+      setWizardOpen(false);
+      return;
+    }
+    if (preferredTab === "incoming") {
+      setShowIncomingList(true);
+      setWizardOpen(false);
+      return;
+    }
+    if (autoStartWizard && hasGamerProfile) {
+      setWizardOpen(true);
+    }
+  }, [isOpen, preferredTab, autoStartWizard, hasGamerProfile]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -135,13 +131,6 @@ export default function ServiceRequestsPanel({
       setLoading(true);
       setError("");
 
-      const questionRes = await fetchJSON(EP.SERVICE_REQUESTS.questions, {
-        method: "GET",
-      });
-      if (questionRes?.success && Array.isArray(questionRes.data)) {
-        setQuestions(questionRes.data);
-      }
-
       if (hasGamerProfile && tab === "mine") {
         const res = await fetchJSON(EP.SERVICE_REQUESTS.mine, { method: "GET" });
         if (res?.success) setMyRequests(res.data || []);
@@ -158,41 +147,10 @@ export default function ServiceRequestsPanel({
     }
   };
 
-  const submitWizard = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const payload = {
-        targetType,
-        performanceBranch: targetType === "performance" ? performanceBranch : undefined,
-        title:
-          targetType === "coach"
-            ? "Coach service request"
-            : `${requestTargetLabel({
-                _id: "",
-                targetType,
-                performanceBranch,
-                status: "open",
-              })} service request`,
-        answers,
-      };
-      const res = await fetchJSON(EP.SERVICE_REQUESTS.create, {
-        method: "POST",
-        body: payload,
-      });
-      if (res?.success === false) {
-        throw new Error(res?.message || "Service request could not be created.");
-      }
-      setWizardOpen(false);
-      setStep(0);
-      setAnswers({});
-      setTab("mine");
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Service request could not be created.");
-    } finally {
-      setLoading(false);
-    }
+  const handleWizardSubmitted = async () => {
+    setTab("mine");
+    setShowMyRequestHistory(true);
+    await loadData();
   };
 
   const respond = async (requestId: string) => {
@@ -241,10 +199,10 @@ export default function ServiceRequestsPanel({
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Service Requests
+              Coach Me
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Gamers create requests, providers show interest, gamer chooses.
+              Find a coach or Performance Team member that fits your goals.
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
@@ -272,9 +230,9 @@ export default function ServiceRequestsPanel({
             <button
               type="button"
               onClick={() => setWizardOpen(true)}
-              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
-              Open Service Request
+              New request
             </button>
           )}
         </div>
@@ -289,180 +247,138 @@ export default function ServiceRequestsPanel({
           {loading && <div className="py-8 text-center text-sm text-gray-500">Loading...</div>}
 
           {!loading && wizardOpen && (
-            <div className="mb-6 rounded-xl border border-cyan-200 bg-cyan-50 p-5 dark:border-cyan-900 dark:bg-cyan-950/20">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Step {step + 1} / {questions.length}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {step === 0 ? "Choose request target, then answer the questions." : activeQuestion.question}
-                  </p>
-                </div>
-                <button onClick={() => setWizardOpen(false)} className="text-gray-500">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+            <ServiceRequestWizard
+              onClose={() => setWizardOpen(false)}
+              onSubmitted={handleWizardSubmitted}
+            />
+          )}
 
-              {step === 0 && (
-                <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          {!loading && !wizardOpen && tab === "mine" && (
+            <div className="space-y-4">
+              {!showMyRequestHistory ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Use <span className="font-medium text-gray-900 dark:text-white">New request</span>{" "}
+                    to send a request to a coach or Performance Team member.
+                  </p>
                   <button
                     type="button"
-                    onClick={() => setTargetType("coach")}
-                    className={`rounded-lg border p-3 text-left ${
-                      targetType === "coach"
-                        ? "border-cyan-500 bg-white dark:bg-gray-800"
-                        : "border-gray-200 dark:border-gray-700"
-                    }`}
+                    onClick={() => setShowMyRequestHistory(true)}
+                    className="mt-4 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 py-2.5 text-sm font-medium text-emerald-800 shadow-sm transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-200 dark:hover:bg-slate-700"
                   >
-                    Coach
+                    Past requests ({myRequests.length})
                   </button>
-                  <div
-                    className={`rounded-lg border p-3 ${
-                      targetType === "performance"
-                        ? "border-cyan-500 bg-white dark:bg-gray-800"
-                        : "border-gray-200 dark:border-gray-700"
-                    }`}
-                  >
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Past requests
+                    </h3>
                     <button
                       type="button"
-                      onClick={() => setTargetType("performance")}
-                      className="mb-2 block w-full text-left"
+                      onClick={() => setShowMyRequestHistory(false)}
+                      className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
                     >
-                      Performance Team
+                      Hide list
                     </button>
-                    <select
-                      value={performanceBranch}
-                      onChange={(e) => {
-                        setTargetType("performance");
-                        setPerformanceBranch(e.target.value);
-                      }}
-                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
-                    >
-                      {PERFORMANCE_BRANCHES.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
-                </div>
-              )}
-
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {activeQuestion.question}
-              </label>
-              <textarea
-                value={answers[activeQuestion.key] || ""}
-                onChange={(e) =>
-                  setAnswers((prev) => ({ ...prev, [activeQuestion.key]: e.target.value }))
-                }
-                rows={4}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-700"
-              />
-
-              <div className="mt-4 flex justify-between">
-                <button
-                  type="button"
-                  disabled={step === 0}
-                  onClick={() => setStep((s) => Math.max(0, s - 1))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-gray-600"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Back
-                </button>
-                {step < questions.length - 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => setStep((s) => Math.min(questions.length - 1, s + 1))}
-                    className="inline-flex items-center gap-1 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={submitWizard}
-                    className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm text-white"
-                  >
-                    <Check className="h-4 w-4" />
-                    Submit
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {!loading && tab === "mine" && (
-            <div className="space-y-4">
-              {myRequests.length === 0 && (
-                <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
-                  No service requests yet.
-                </p>
-              )}
-              {myRequests.map((request) => (
-                <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {request.title || requestTargetLabel(request)}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {requestTargetLabel(request)} · {request.status}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-100">
-                      {request.responses?.length || 0} interested
-                    </span>
-                  </div>
-                  <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
-                    {(request.answers || []).slice(0, 4).map((answer) => (
-                      <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
-                        <div className="text-xs text-gray-500">{answer.question}</div>
-                        <div className="text-gray-800 dark:text-gray-100">{answer.answer || "-"}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="space-y-2">
-                    {(request.responses || []).map((response) => (
-                      <div
-                        key={response._id}
-                        className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
-                      >
+                  {myRequests.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+                      No service requests yet.
+                    </p>
+                  )}
+                  {myRequests.map((request) => (
+                    <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {providerLabel(response)}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-300">
-                            {response.message || "Interested in this request."}
-                          </div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {request.title || requestTargetLabel(request)}
+                          </h3>
+                          <p className="text-xs text-gray-500">
+                            {requestTargetLabel(request)} · {request.status}
+                          </p>
                         </div>
-                        <button
-                          type="button"
-                          disabled={request.status !== "open" || response.status !== "interested"}
-                          onClick={() => selectProvider(request._id, response._id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white disabled:opacity-50"
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                          Choose & Message
-                        </button>
+                        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-100">
+                          {request.responses?.length || 0} interested
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                      <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+                        {(request.answers || []).slice(0, 4).map((answer) => (
+                          <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                            <div className="text-xs text-gray-500">{answer.question}</div>
+                            <div className="text-gray-800 dark:text-gray-100">{answer.answer || "-"}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        {(request.responses || []).map((response) => (
+                          <div
+                            key={response._id}
+                            className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div>
+                              <div className="font-medium text-gray-900 dark:text-white">
+                                {providerLabel(response)}
+                              </div>
+                              <div className="text-sm text-gray-600 dark:text-gray-300">
+                                {response.message || "Interested in this request."}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={request.status !== "open" || response.status !== "interested"}
+                              onClick={() => selectProvider(request._id, response._id)}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                              Choose & Message
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
-          {!loading && tab === "incoming" && (
+          {!loading && !wizardOpen && tab === "incoming" && (
             <div className="space-y-4">
-              {incoming.length === 0 && (
-                <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
-                  No incoming service requests for your provider profile.
-                </p>
-              )}
-              {incoming.map((request) => (
+              {!showIncomingList ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Review service requests sent by gamers and show your interest.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowIncomingList(true)}
+                    className="mt-4 inline-flex items-center justify-center rounded-lg border border-cyan-300 bg-white px-4 py-2.5 text-sm font-medium text-cyan-800 shadow-sm transition-colors hover:bg-cyan-50 dark:border-cyan-800 dark:bg-slate-800 dark:text-cyan-200 dark:hover:bg-slate-700"
+                  >
+                    View Incoming Requests ({incoming.length})
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Incoming Requests
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowIncomingList(false)}
+                      className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
+                    >
+                      Hide list
+                    </button>
+                  </div>
+                  {incoming.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+                      No incoming service requests for your provider profile.
+                    </p>
+                  )}
+                  {incoming.map((request) => (
                 <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div>
@@ -513,6 +429,8 @@ export default function ServiceRequestsPanel({
                   )}
                 </div>
               ))}
+                </>
+              )}
             </div>
           )}
         </div>

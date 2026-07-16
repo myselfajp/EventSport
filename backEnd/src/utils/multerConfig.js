@@ -5,6 +5,15 @@ import { randomBytes } from 'crypto';
 const DEFAULT_ALLOWED_SIZE = 5 * 1024 * 1024;
 const DEFAULT_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+/** Coach / Performance Team certificate uploads (images + PDF). */
+export const CERTIFICATE_ALLOWED_MIME_TYPES = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+];
+
 export const createMulter = (options = {}) => {
     const {
         maxFileSize = DEFAULT_ALLOWED_SIZE,
@@ -31,10 +40,21 @@ export const createMulter = (options = {}) => {
         storage,
         limits: { fileSize: maxFileSize },
         fileFilter: (req, file, cb) => {
-            if (!allowedMimeTypes.includes(file.mimetype)) {
-                return cb(new multer.MulterError('UNEXPECTED_FILE'), false);
+            if (allowedMimeTypes.includes(file.mimetype)) {
+                return cb(null, true);
             }
-            cb(null, true);
+
+            const ext = path.extname(file.originalname).toLowerCase();
+            const allowsPdf = allowedMimeTypes.includes('application/pdf');
+            if (
+                allowsPdf &&
+                ext === '.pdf' &&
+                (file.mimetype === 'application/octet-stream' || !file.mimetype)
+            ) {
+                return cb(null, true);
+            }
+
+            return cb(new multer.MulterError('UNEXPECTED_FILE'), false);
         },
     });
 };

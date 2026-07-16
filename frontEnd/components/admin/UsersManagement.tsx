@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Download } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import CoachModal from "../profile/CoachModal";
@@ -35,6 +35,14 @@ interface User {
   isPhoneVerified: boolean;
   participant?: any;
   coach?: any;
+  performanceMember?: {
+    _id: string;
+    name?: string;
+    branch?: string;
+    title?: string;
+    status?: string;
+    isVerified?: boolean;
+  };
   facility?: any[];
   summary?: {
     coach?: {
@@ -44,6 +52,12 @@ interface User {
     };
     participant?: {
       joinedEventsCount: number;
+    };
+    performance?: {
+      branch: string;
+      status: string;
+      isVerified: boolean;
+      title: string;
     };
     facility?: {
       facilityCount: number;
@@ -68,7 +82,18 @@ interface User {
   createdAt: string;
 }
 
-type ProfileTab = 'participant' | 'coach' | 'facility' | 'leaderboard';
+type ProfileTab = 'participant' | 'coach' | 'performance' | 'facility' | 'leaderboard';
+
+const PERFORMANCE_BRANCHES = [
+  { value: "manager", label: "Manager" },
+  { value: "psychologist", label: "Psychologist" },
+  { value: "dietitian", label: "Dietitian" },
+  { value: "psychotherapist", label: "Psychotherapist" },
+] as const;
+
+function performanceBranchLabel(branch?: string) {
+  return PERFORMANCE_BRANCHES.find((item) => item.value === branch)?.label || branch || "—";
+}
 
 type ActivityParticipantRow = {
   participantId: string;
@@ -144,6 +169,14 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
   const [editingProfileUser, setEditingProfileUser] = useState<User | null>(null);
   const [editingFacility, setEditingFacility] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
+  const [expandedPerformanceBranches, setExpandedPerformanceBranches] = useState<
+    Record<string, boolean>
+  >({
+    manager: true,
+    psychologist: true,
+    dietitian: true,
+    psychotherapist: true,
+  });
   const [loadedPermissionGroups, setLoadedPermissionGroups] = useState<
     Array<{ _id: string; name: string; slug?: string }>
   >([]);
@@ -200,7 +233,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       setLoading(true);
       setError("");
       const body: any = {
-        perPage: 10,
+        perPage: activeTab === "performance" ? 100 : 10,
         pageNumber: page,
         profileType: activeTab,
       };
@@ -561,6 +594,47 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
             ])
           );
         }
+      } else if (activeTab === "performance") {
+        lines.push(
+          csvRow([
+            "User ID",
+            "First Name",
+            "Last Name",
+            "Email",
+            "Phone",
+            "Terms Ver",
+            "KVKK",
+            "Active",
+            "Branch",
+            "Title",
+            "Status",
+            "Verified",
+          ])
+        );
+        for (const u of rows) {
+          const termsV =
+            u.termsAccepted?.versionId &&
+            typeof u.termsAccepted.versionId === "object" &&
+            (u.termsAccepted.versionId as { version?: number }).version != null
+              ? `v${(u.termsAccepted.versionId as { version?: number }).version}`
+              : "";
+          lines.push(
+            csvRow([
+              u._id,
+              u.firstName,
+              u.lastName,
+              u.email,
+              u.phone,
+              termsV,
+              u.kvkkConsent?.agreed ? "Yes" : "No",
+              u.isActive === false ? "No" : "Yes",
+              performanceBranchLabel(u.summary?.performance?.branch || u.performanceMember?.branch),
+              u.summary?.performance?.title || u.performanceMember?.title || "",
+              u.summary?.performance?.status || u.performanceMember?.status || "",
+              u.summary?.performance?.isVerified || u.performanceMember?.isVerified ? "Yes" : "No",
+            ])
+          );
+        }
       } else {
         lines.push(
           csvRow([
@@ -680,6 +754,10 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
         }
       }
 
+      if (user.performanceMember && typeof user.performanceMember === "object") {
+        details.performance = user.performanceMember;
+      }
+
       setDetailsData(details);
     } catch (err: any) {
       setError(err.message || "Failed to fetch details");
@@ -687,6 +765,72 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       setLoadingDetails(false);
     }
   };
+
+  const groupedPerformanceUsers = useMemo(() => {
+    const groups: Record<string, User[]> = {
+      manager: [],
+      psychologist: [],
+      dietitian: [],
+      psychotherapist: [],
+    };
+    for (const user of users) {
+      const branch = user.performanceMember?.branch || user.summary?.performance?.branch;
+      if (branch && groups[branch]) {
+        groups[branch].push(user);
+      }
+    }
+    return groups;
+  }, [users]);
+
+  const togglePerformanceBranch = (branch: string) => {
+    setExpandedPerformanceBranches((prev) => ({
+      ...prev,
+      [branch]: !prev[branch],
+    }));
+  };
+
+  const renderUserActions = (user: User) => (
+    <div className="flex gap-2 flex-wrap">
+      <button
+        onClick={() => handleViewDetails(user)}
+        className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+      >
+        Details
+      </button>
+      <button
+        onClick={() => handleEdit(user)}
+        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+      >
+        Edit User
+      </button>
+      {(user.coach || user.participant || (user.facility && user.facility.length > 0)) && (
+        <button
+          onClick={() => handleEditProfile(user)}
+          className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+        >
+          Edit Profile
+        </button>
+      )}
+      <button
+        onClick={() => handleToggleActive(user)}
+        className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
+      >
+        {user.isActive === false ? "Activate" : "Deactivate"}
+      </button>
+      <button
+        onClick={() => handleBlacklistUser(user)}
+        className="px-3 py-1 bg-slate-700 text-white rounded hover:bg-slate-800 text-sm"
+      >
+        Blacklist
+      </button>
+      <button
+        onClick={() => handleDelete(user._id)}
+        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+      >
+        Delete
+      </button>
+    </div>
+  );
 
   const formatDateTime = (iso?: string) => {
     if (!iso) return "—";
@@ -700,6 +844,10 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
   const getProfileSummary = (user: User) => {
     const parts: string[] = [];
     if (user.coach) parts.push("Coach");
+    if (user.performanceMember) {
+      const branch = user.performanceMember.branch || user.summary?.performance?.branch;
+      parts.push(`Performance Team (${performanceBranchLabel(branch)})`);
+    }
     if (user.participant) parts.push("Gamer");
     if (user.facility && user.facility.length > 0) parts.push(`Facility Owner (${user.facility.length})`);
     return parts.length > 0 ? parts.join(", ") : "Regular User";
@@ -760,6 +908,16 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
             }`}
           >
             Coaches
+          </button>
+          <button
+            onClick={() => setActiveTab('performance')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'performance'
+                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
+            }`}
+          >
+            Performance Team
           </button>
           <button
             onClick={() => setActiveTab('facility')}
@@ -990,7 +1148,11 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder={`Search ${activeTab}s by name, email, phone, or paste a 24-char user / participant / coach / facility ID`}
+          placeholder={
+            activeTab === "performance"
+              ? "Search performance team members by name, email, phone, or user ID"
+              : `Search ${activeTab}s by name, email, phone, or paste a 24-char user / participant / coach / facility ID`
+          }
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -1008,6 +1170,93 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
 
       {loading ? (
         <div className="text-center py-8">Loading...</div>
+      ) : activeTab === "performance" ? (
+        <div className="space-y-4">
+          {PERFORMANCE_BRANCHES.map((branch) => {
+            const branchUsers = groupedPerformanceUsers[branch.value] || [];
+            const expanded = expandedPerformanceBranches[branch.value] ?? true;
+            return (
+              <section
+                key={branch.value}
+                className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => togglePerformanceBranch(branch.value)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left bg-gray-50 dark:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {expanded ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                    <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+                      {branch.label}
+                    </h3>
+                    <span className="inline-flex items-center rounded-full bg-cyan-100 dark:bg-cyan-900/40 px-2.5 py-0.5 text-xs font-medium text-cyan-800 dark:text-cyan-200">
+                      {branchUsers.length}
+                    </span>
+                  </div>
+                </button>
+
+                {expanded && (
+                  <div className="divide-y divide-gray-200 dark:divide-slate-700">
+                    {branchUsers.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-gray-500 dark:text-slate-400 italic">
+                        No {branch.label.toLowerCase()} members yet.
+                      </div>
+                    ) : (
+                      branchUsers.map((user) => (
+                        <div
+                          key={user._id}
+                          className="px-4 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <div className="font-semibold text-gray-900 dark:text-slate-100">
+                              {user.firstName} {user.lastName}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-slate-300">
+                              {user.email} • {user.phone}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="rounded bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-gray-700 dark:text-slate-200">
+                                User ID: <code className="select-all">{user._id}</code>
+                              </span>
+                              {user.performanceMember?._id && (
+                                <span className="rounded bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-gray-700 dark:text-slate-200">
+                                  Profile ID:{" "}
+                                  <code className="select-all">{user.performanceMember._id}</code>
+                                </span>
+                              )}
+                              <span
+                                className={`rounded px-2 py-0.5 font-medium ${
+                                  user.summary?.performance?.status === "Approved"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
+                                    : user.summary?.performance?.status === "Rejected"
+                                      ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                                }`}
+                              >
+                                {user.summary?.performance?.status || user.performanceMember?.status || "Pending"}
+                              </span>
+                              {user.summary?.performance?.title || user.performanceMember?.title ? (
+                                <span className="text-gray-500 dark:text-slate-400">
+                                  {user.summary?.performance?.title || user.performanceMember?.title}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {renderUserActions(user)}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       ) : (
         <>
           <div className="overflow-x-auto">
@@ -1175,46 +1424,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                       </>
                     )}
                     <td className="border border-gray-300 dark:border-slate-600 p-2">
-                      <div className="flex gap-2 flex-wrap">
-                        <button
-                          onClick={() => handleViewDetails(user)}
-                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                        >
-                          Details
-                        </button>
-                        <button
-                          onClick={() => handleEdit(user)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                        >
-                          Edit User
-                        </button>
-                        {(user.coach || user.participant || (user.facility && user.facility.length > 0)) && (
-                          <button
-                            onClick={() => handleEditProfile(user)}
-                            className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
-                          >
-                            Edit Profile
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleToggleActive(user)}
-                          className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
-                        >
-                          {user.isActive === false ? "Activate" : "Deactivate"}
-                        </button>
-                        <button
-                          onClick={() => handleBlacklistUser(user)}
-                          className="px-3 py-1 bg-slate-700 text-white rounded hover:bg-slate-800 text-sm"
-                        >
-                          Blacklist
-                        </button>
-                        <button
-                          onClick={() => handleDelete(user._id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      {renderUserActions(user)}
                     </td>
                   </tr>
                 ))}
@@ -1609,7 +1819,33 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                   </div>
                 )}
 
-                {!detailsData?.coach && !detailsData?.participant && !detailsData?.facility && !detailsData?.club && (
+                {detailsData?.performance && (
+                  <div className="mb-6 p-4 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
+                    <h4 className="font-semibold text-violet-900 dark:text-violet-200 mb-3">
+                      Performance Team Profile
+                    </h4>
+                    <div className="space-y-2 text-sm text-gray-700 dark:text-slate-300">
+                      <div>
+                        <span className="font-medium">Branch:</span>{" "}
+                        {performanceBranchLabel(detailsData.performance.branch)}
+                      </div>
+                      {detailsData.performance.title && (
+                        <div>
+                          <span className="font-medium">Title:</span> {detailsData.performance.title}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-medium">Status:</span> {detailsData.performance.status || "Pending"}
+                      </div>
+                      <div>
+                        <span className="font-medium">Verified:</span>{" "}
+                        {detailsData.performance.isVerified ? "Yes" : "No"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!detailsData?.coach && !detailsData?.participant && !detailsData?.facility && !detailsData?.club && !detailsData?.performance && (
                   <div className="text-center py-8 text-gray-500 dark:text-slate-400">
                     No profile details available for this user.
                   </div>

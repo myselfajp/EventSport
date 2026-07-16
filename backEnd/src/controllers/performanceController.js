@@ -34,6 +34,14 @@ export const createOrUpdateProfile = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
 
+        const freshUser = await User.findById(req.user._id).select('coach performanceMember').lean();
+        if (freshUser?.coach) {
+            throw new AppError(
+                403,
+                'Coaches cannot apply to the Performance Team. Coach and Performance Team roles are mutually exclusive.'
+            );
+        }
+
         const payload = parseProfilePayload(req.body?.data || req.body);
         const branch = normalizeText(payload.branch, 64);
         if (!PERFORMANCE_BRANCHES.includes(branch)) {

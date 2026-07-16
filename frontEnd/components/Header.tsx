@@ -22,12 +22,14 @@ import {
   BookOpen,
   Newspaper,
   Video,
+  Sparkles,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { fetchJSON } from "../app/lib/api";
 import { EP } from "../app/lib/endpoints";
 import { getConversations } from "../app/lib/messages-api";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useMe } from "../app/hooks/useAuth";
 
 interface HeaderProps {
   onLeftSidebarToggle: () => void;
@@ -69,6 +71,8 @@ const Header: React.FC<HeaderProps> = ({
   onRightSidebarToggle,
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
+  const { data: user, isPending: isUserPending } = useMe();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -77,6 +81,27 @@ const Header: React.FC<HeaderProps> = ({
   const [loading, setLoading] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
   const [headerLogoAlt, setHeaderLogoAlt] = useState("EventSport");
+
+  const handleCoachMeClick = () => {
+    if (isUserPending) return;
+    if (!user) {
+      if (pathname === "/") {
+        window.dispatchEvent(new CustomEvent("eventsport:open-login"));
+      } else {
+        router.push("/?login=1");
+      }
+      return;
+    }
+    if (pathname === "/") {
+      window.dispatchEvent(
+        new CustomEvent("eventsport:open-coach-me", {
+          detail: { tab: "mine", autoWizard: true },
+        })
+      );
+      return;
+    }
+    router.push("/?coachMe=1");
+  };
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.isRead) {
@@ -88,7 +113,6 @@ const Header: React.FC<HeaderProps> = ({
       try {
         if (url.startsWith("/?serviceRequests=") && typeof window !== "undefined") {
           const tab = new URLSearchParams(url.slice(url.indexOf("?"))).get("serviceRequests");
-          window.history.pushState(null, "", url);
           window.dispatchEvent(
             new CustomEvent("eventsport:open-service-requests", {
               detail: { tab: tab === "incoming" ? "incoming" : "mine" },
@@ -309,41 +333,61 @@ const Header: React.FC<HeaderProps> = ({
             ) : null}
           </div>
 
-          <div className="flex flex-1 items-center justify-end gap-0.5 md:gap-1 min-w-0">
-          {/* Theme Toggle */}
-          <ThemeToggle variant="icon" />
-
-          {/* Messages */}
-          <button
-            onClick={() => router.push("/messaging")}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded relative text-gray-700 dark:text-slate-300 transition-colors"
-            aria-label="Messages"
-          >
-            <MessageSquare className="w-5 h-5" />
-            {messageUnreadCount > 0 && (
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center">
-                <span className="text-xs text-white font-medium">
-                  {messageUnreadCount > 9 ? "9+" : messageUnreadCount}
-                </span>
-              </div>
-            )}
-          </button>
-
-          {/* Notifications */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="flex flex-1 items-center justify-end min-w-0 gap-2 sm:gap-3">
             <button
-              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded relative text-gray-700 dark:text-slate-300 transition-colors"
+              type="button"
+              onClick={handleCoachMeClick}
+              disabled={isUserPending}
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-2.5 sm:px-5 sm:py-2.5 text-sm sm:text-base font-semibold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-600 hover:to-green-600 hover:shadow-emerald-500/40 hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70"
             >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center">
-                  <span className="text-xs text-white font-medium">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                </div>
-              )}
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" strokeWidth={2} />
+              <span>Coach Me</span>
             </button>
+
+            <div className="inline-flex items-center gap-2 sm:gap-3 rounded-xl border border-gray-200/70 dark:border-slate-700/70 bg-gray-50/60 dark:bg-slate-800/40 px-1.5 py-1 sm:px-2 sm:py-1.5">
+              <ThemeToggle
+                variant="icon"
+                className="!w-9 !h-9 !p-0 shrink-0 !bg-transparent hover:!bg-white dark:hover:!bg-slate-700/80 shadow-none"
+              />
+
+              <span
+                className="hidden sm:block w-px h-6 bg-gray-200 dark:bg-slate-600 shrink-0"
+                aria-hidden
+              />
+
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => router.push("/messaging")}
+                  className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700/80 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
+                  aria-label="Messages"
+                >
+                  <MessageSquare className="w-5 h-5" strokeWidth={1.75} />
+                  {messageUnreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-0.5 bg-red-500 rounded-full border-2 border-gray-50 dark:border-slate-800 flex items-center justify-center">
+                      <span className="text-[10px] leading-none text-white font-semibold">
+                        {messageUnreadCount > 9 ? "9+" : messageUnreadCount}
+                      </span>
+                    </span>
+                  )}
+                </button>
+
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700/80 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
+                    aria-label="Notifications"
+                  >
+                    <Bell className="w-5 h-5" strokeWidth={1.75} />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-0.5 bg-red-500 rounded-full border-2 border-gray-50 dark:border-slate-800 flex items-center justify-center">
+                        <span className="text-[10px] leading-none text-white font-semibold">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      </span>
+                    )}
+                  </button>
 
             {/* Notifications Dropdown */}
             {isNotificationsOpen && (
@@ -438,14 +482,16 @@ const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* Calendar Toggle */}
-          <button
-            onClick={onRightSidebarToggle}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 transition-colors"
-            aria-label="Open calendar"
-          >
-            <Calendar className="w-5 h-5" strokeWidth={1.75} />
-          </button>
+                <button
+                  type="button"
+                  onClick={onRightSidebarToggle}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700/80 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
+                  aria-label="Open calendar"
+                >
+                  <Calendar className="w-5 h-5" strokeWidth={1.75} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>

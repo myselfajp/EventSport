@@ -62,11 +62,12 @@ export const getAdminPanel = async (req, res, next) => {
 // User Management
 export const getAllUsers = async (req, res, next) => {
     try {
-        const { perPage, pageNumber, search, profileType } = SearchQuerySchema.parse({
+        const { perPage, pageNumber, search, profileType, performanceBranch } = SearchQuerySchema.parse({
             perPage: req.body?.perPage || req.query?.perPage,
             pageNumber: req.body?.pageNumber || req.query?.pageNumber,
             search: req.body?.search || req.query?.search,
             profileType: req.body?.profileType || req.query?.profileType,
+            performanceBranch: req.body?.performanceBranch || req.query?.performanceBranch,
         });
 
         const query = {};
@@ -91,6 +92,7 @@ export const getAllUsers = async (req, res, next) => {
                 { _id: trimmedSearch },
                 { participant: trimmedSearch },
                 { coach: trimmedSearch },
+                { performanceMember: trimmedSearch },
                 { facility: trimmedSearch },
                 { company: trimmedSearch }
             );
@@ -106,6 +108,17 @@ export const getAllUsers = async (req, res, next) => {
             query.coach = { $exists: true, $ne: null };
         } else if (profileType === 'facility') {
             query.facility = { $exists: true, $ne: null, $not: { $size: 0 } };
+        } else if (profileType === 'performance') {
+            if (performanceBranch) {
+                const performanceIds = await PerformanceMember.find({ branch: performanceBranch })
+                    .select('_id')
+                    .lean();
+                query.performanceMember = {
+                    $in: performanceIds.map((row) => row._id),
+                };
+            } else {
+                query.performanceMember = { $exists: true, $ne: null };
+            }
         }
 
         const users = await User.find(query)
@@ -119,6 +132,7 @@ export const getAllUsers = async (req, res, next) => {
                 },
             })
             .populate('coach', 'name isVerified')
+            .populate('performanceMember', 'name branch title status isVerified')
             .populate('facility', 'name mainSport')
             .populate('termsAccepted.versionId', 'docType version title isActive')
             .populate('kvkkConsent.versionId', 'docType version title isActive')
@@ -196,6 +210,19 @@ export const getAllUsers = async (req, res, next) => {
                             .map(({ name, count }) => `${name}: ${count}`)
                             .join(', '),
                     };
+                }
+
+                if (user.performanceMember) {
+                    const profile =
+                        typeof user.performanceMember === 'object' ? user.performanceMember : null;
+                    if (profile) {
+                        summary.performance = {
+                            branch: profile.branch,
+                            status: profile.status,
+                            isVerified: profile.isVerified,
+                            title: profile.title || '',
+                        };
+                    }
                 }
 
                 if (user.coach) {

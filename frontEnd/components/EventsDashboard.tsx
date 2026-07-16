@@ -22,9 +22,16 @@ import YourNextEventSection from "./YourNextEventSection";
 import HotUpcomingSection from "./HotUpcomingSection";
 import CheckInTimesSection from "./dashboard/CheckInTimesSection";
 import NotificationEventLinkHandler from "./notification/NotificationEventLinkHandler";
+import ServiceRequestsPanel from "./service-requests/ServiceRequestsPanel";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
+import {
+  clearLoginUrlParam,
+  clearServiceRequestsUrlParam,
+  readLoginFromUrl,
+  readServiceRequestsTabFromUrl,
+} from "@/app/lib/service-request-url";
 
 const EventsDashboard = () => {
   const router = useRouter();
@@ -41,42 +48,61 @@ const EventsDashboard = () => {
   const [selectedStaticPageName, setSelectedStaticPageName] = useState<string | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const [gamerProfileOpenSignal, setGamerProfileOpenSignal] = useState(0);
-  const [serviceRequestsOpenSignal, setServiceRequestsOpenSignal] = useState(0);
   const [serviceRequestsPreferredTab, setServiceRequestsPreferredTab] = useState<
     "mine" | "incoming" | null
   >(null);
+  const [coachMePanelOpen, setCoachMePanelOpen] = useState(false);
+  const [coachMeAutoWizard, setCoachMeAutoWizard] = useState(false);
   const openGamerProfile = useCallback(() => {
     setLeftSidebarOpen(true);
     setGamerProfileOpenSignal((n) => n + 1);
   }, []);
 
+  const openCoachMe = useCallback(
+    (tab: "mine" | "incoming" = "mine", autoWizard = tab === "mine") => {
+      setServiceRequestsPreferredTab(tab);
+      setCoachMeAutoWizard(autoWizard);
+      setCoachMePanelOpen(true);
+    },
+    []
+  );
+
   const openServiceRequests = useCallback((tab: "mine" | "incoming" = "mine") => {
-    setServiceRequestsPreferredTab(tab);
-    setLeftSidebarOpen(true);
-    setServiceRequestsOpenSignal((n) => n + 1);
-  }, []);
+    openCoachMe(tab);
+  }, [openCoachMe]);
 
   useEffect(() => {
-    const readTabFromUrl = () => {
-      if (typeof window === "undefined") return null;
-      const value = new URLSearchParams(window.location.search).get("serviceRequests");
-      if (!value) return null;
-      return value === "incoming" ? "incoming" : "mine";
+    const initialTab = readServiceRequestsTabFromUrl();
+    if (initialTab) {
+      openServiceRequests(initialTab);
+      clearServiceRequestsUrlParam();
+    }
+
+    if (readLoginFromUrl() && !isUserPending && !user) {
+      setLeftSidebarOpen(true);
+      clearLoginUrlParam();
+    }
+
+    const coachMeHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{ tab?: "mine" | "incoming"; autoWizard?: boolean }>).detail;
+      const tab = detail?.tab || "mine";
+      openCoachMe(tab, detail?.autoWizard ?? tab === "mine");
+      clearServiceRequestsUrlParam();
     };
 
-    const initialTab = readTabFromUrl();
-    if (initialTab) openServiceRequests(initialTab);
-
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ tab?: "mine" | "incoming" }>).detail;
-      openServiceRequests(detail?.tab || readTabFromUrl() || "mine");
+    const loginHandler = () => {
+      if (!user) setLeftSidebarOpen(true);
     };
 
-    window.addEventListener("eventsport:open-service-requests", handler);
+    window.addEventListener("eventsport:open-coach-me", coachMeHandler);
+    window.addEventListener("eventsport:open-service-requests", coachMeHandler);
+    window.addEventListener("eventsport:open-login", loginHandler);
     return () => {
-      window.removeEventListener("eventsport:open-service-requests", handler);
+      window.removeEventListener("eventsport:open-coach-me", coachMeHandler);
+      window.removeEventListener("eventsport:open-service-requests", coachMeHandler);
+      window.removeEventListener("eventsport:open-login", loginHandler);
     };
-  }, [openServiceRequests]);
+  }, [openCoachMe, openServiceRequests, user, isUserPending]);
   const isCoach = user?.coach != null;
   const canManageEvents = isCoach || user?.role === 0;
 
@@ -278,8 +304,6 @@ const EventsDashboard = () => {
       <LeftSidebar
         isOpen={leftSidebarOpen}
         gamerProfileOpenSignal={gamerProfileOpenSignal}
-        serviceRequestsOpenSignal={serviceRequestsOpenSignal}
-        serviceRequestsPreferredTab={serviceRequestsPreferredTab}
         onShowFollowings={() => {
           setShowCoachCalendar(false);
           setShowFavorites(false);
@@ -414,6 +438,19 @@ const EventsDashboard = () => {
           setIsAddEventModalOpen(false);
           fetchEvents();
         }}
+      />
+
+      <ServiceRequestsPanel
+        isOpen={coachMePanelOpen}
+        onClose={() => {
+          setCoachMePanelOpen(false);
+          setCoachMeAutoWizard(false);
+          clearServiceRequestsUrlParam();
+        }}
+        hasGamerProfile={!!user?.participant}
+        isProvider={!!user?.coach || !!user?.performanceMember}
+        preferredTab={serviceRequestsPreferredTab}
+        autoStartWizard={coachMeAutoWizard}
       />
 
       {/* Mobile Toggle - Left Sidebar */}
