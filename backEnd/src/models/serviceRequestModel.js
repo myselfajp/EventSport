@@ -44,9 +44,9 @@ const serviceRequestSchema = new mongoose.Schema(
             type: [serviceRequestAnswerSchema],
             validate: {
                 validator(value) {
-                    return Array.isArray(value) && value.length === 10;
+                    return Array.isArray(value) && value.length >= 11;
                 },
-                message: 'Service request must include exactly 10 answers.',
+                message: 'Service request answers are incomplete.',
             },
         },
         status: {

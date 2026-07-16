@@ -411,6 +411,15 @@ const CoachModal: React.FC<CoachModalProps> = ({
   };
 
   const handleFileUpload = (index: number, file: File) => {
+    const isPdf =
+      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+    if (isPdf) {
+      updateBranch(index, "certificate", file);
+      updateBranch(index, "certificatePreview", null);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const preview = e.target?.result as string;
@@ -420,9 +429,24 @@ const CoachModal: React.FC<CoachModalProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const isPdfCertificate = (file?: File | null, mimeType?: string, name?: string) => {
+    if (file) {
+      return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    }
+    if (mimeType === "application/pdf") return true;
+    return Boolean(name?.toLowerCase().endsWith(".pdf"));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!adminUserId && user?.performanceMember) {
+      setError(
+        "Performance Team members cannot apply as coaches. These roles are mutually exclusive."
+      );
+      return;
+    }
 
     if (formData.branches.length === 0) {
       setError("Please add at least one branch");
@@ -935,7 +959,22 @@ const CoachModal: React.FC<CoachModalProps> = ({
                         </label>
                         <div className="relative">
                           <div className="border-2 border-dashed border-gray-300 dark:border-gray-500 rounded-lg p-3 text-center hover:border-cyan-400 dark:hover:border-cyan-500 transition-colors cursor-pointer">
-                            {branch.certificatePreview ? (
+                            {branch.certificate &&
+                            isPdfCertificate(
+                              branch.certificate,
+                              branch.existingCertificate?.mimeType,
+                              branch.certificate?.name ||
+                                branch.existingCertificate?.originalName
+                            ) ? (
+                              <div className="space-y-2">
+                                <Upload className="w-8 h-8 mx-auto text-emerald-500 dark:text-emerald-400" />
+                                <p className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate">
+                                  {branch.certificate?.name ||
+                                    branch.existingCertificate?.originalName}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">PDF document</p>
+                              </div>
+                            ) : branch.certificatePreview ? (
                               <div className="space-y-2">
                                 <img
                                   src={branch.certificatePreview}
@@ -944,6 +983,21 @@ const CoachModal: React.FC<CoachModalProps> = ({
                                 />
                                 <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
                                   {branch.certificate?.name}
+                                </p>
+                              </div>
+                            ) : branch.existingCertificate &&
+                              isPdfCertificate(
+                                null,
+                                branch.existingCertificate.mimeType,
+                                branch.existingCertificate.originalName
+                              ) ? (
+                              <div className="space-y-2">
+                                <Upload className="w-8 h-8 mx-auto text-emerald-500 dark:text-emerald-400" />
+                                <p className="text-xs text-green-600 dark:text-green-400 truncate">
+                                  {branch.existingCertificate.originalName}
+                                </p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
+                                  PDF · Click to change
                                 </p>
                               </div>
                             ) : branch.existingCertificate ? (
@@ -960,13 +1014,13 @@ const CoachModal: React.FC<CoachModalProps> = ({
                               <div className="space-y-2">
                                 <Upload className="w-8 h-8 mx-auto text-gray-400 dark:text-gray-500" />
                                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                                  Upload certificate
+                                  Upload certificate (PNG, JPG, or PDF)
                                 </p>
                               </div>
                             )}
                             <input
                               type="file"
-                              accept="image/png,image/jpg,image/jpeg,application/pdf"
+                              accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf,.pdf"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {

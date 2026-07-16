@@ -62,7 +62,7 @@ export function ThemeToggle({
       <button
         onClick={toggleTheme}
         className={`
-          relative p-2 rounded-lg
+          relative inline-flex items-center justify-center w-9 h-9 shrink-0 rounded-lg
           bg-gray-100 hover:bg-gray-200 
           dark:bg-slate-800 dark:hover:bg-slate-700
           text-gray-700 dark:text-slate-300

@@ -243,6 +243,13 @@ export const createBranch = async (req, res, next) => {
         if (!req.user) throw new AppError(401);
 
         const user = req.user;
+        if (user.performanceMember) {
+            throw new AppError(
+                403,
+                'Performance Team members cannot apply as coaches. Coach and Performance Team roles are mutually exclusive.'
+            );
+        }
+
         const {
             branches: result,
             agreeCoachAgreement,

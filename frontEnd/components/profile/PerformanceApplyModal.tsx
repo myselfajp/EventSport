@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { X, Upload } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { useMe } from "@/app/hooks/useAuth";
 
 const PERFORMANCE_BRANCHES = [
   { value: "manager", label: "Manager" },
@@ -33,6 +34,7 @@ export default function PerformanceApplyModal({
   onClose,
   onSaved,
 }: PerformanceApplyModalProps) {
+  const { data: user } = useMe();
   const [profile, setProfile] = useState<PerformanceProfile | null>(null);
   const [branch, setBranch] = useState("dietitian");
   const [title, setTitle] = useState("");
@@ -85,6 +87,13 @@ export default function PerformanceApplyModal({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
+
+    if (user?.coach) {
+      setError(
+        "Coaches cannot apply to the Performance Team. These roles are mutually exclusive."
+      );
+      return;
+    }
 
     if (!profile && !certificate) {
       setError("Please upload your certificate or license.");
@@ -207,7 +216,7 @@ export default function PerformanceApplyModal({
                   </span>
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf,.pdf"
                     className="hidden"
                     onChange={(e) => setCertificate(e.target.files?.[0] || null)}
                   />

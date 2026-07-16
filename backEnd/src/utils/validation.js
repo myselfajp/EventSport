@@ -626,7 +626,11 @@ export const SearchQuerySchema = z
         search: z.string().optional(),
 
         // Profile Type Filter
-        profileType: z.enum(['participant', 'coach', 'facility']).optional(),
+        profileType: z.enum(['participant', 'coach', 'facility', 'performance']).optional(),
+
+        performanceBranch: z
+            .enum(['manager', 'psychologist', 'dietitian', 'psychotherapist'])
+            .optional(),
 
         // Sorting
         sortBy: z.string().optional(),

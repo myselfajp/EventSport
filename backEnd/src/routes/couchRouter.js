@@ -1,5 +1,6 @@
 import express from 'express';
 import { uploadFile } from '../middleware/uploadFileMiddleware.js';
+import { CERTIFICATE_ALLOWED_MIME_TYPES } from '../utils/multerConfig.js';
 import * as coachController from '../controllers/coachController.js';
 import * as blogController from '../controllers/blogController.js';
 import * as videoController from '../controllers/videoController.js';
@@ -8,7 +9,12 @@ const router = express.Router();
 // branch
 router.post(
     '/create-branch',
-    uploadFile({ mode: 'array', fieldName: 'coach-certificate', optional: true }),
+    uploadFile({
+        mode: 'array',
+        fieldName: 'coach-certificate',
+        optional: true,
+        allowedMimeTypes: CERTIFICATE_ALLOWED_MIME_TYPES,
+    }),
     coachController.createBranch
 );
 

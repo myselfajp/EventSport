@@ -8,25 +8,114 @@ import ServiceRequestResponse from '../models/serviceRequestResponseModel.js';
 import { findOrCreateConversation } from './messageController.js';
 import { createNotification } from '../utils/notificationHelper.js';
 
-const REQUEST_QUESTIONS = [
-    { key: 'skillLevel', question: 'What is your current skill level?' },
-    { key: 'goal', question: 'What goal do you want to achieve?' },
-    { key: 'sessionFormat', question: 'Do you prefer private sessions or group sessions?' },
-    { key: 'locationPreference', question: 'Where would you like to receive the service?' },
-    { key: 'budget', question: 'Do you have a budget, and if so, how much?' },
-    { key: 'availability', question: 'Which days and times are you available?' },
-    { key: 'experience', question: 'Have you received support in this area before?' },
-    { key: 'duration', question: 'How long do you want to receive support?' },
-    { key: 'communicationPreference', question: 'Do you prefer online or in-person sessions?' },
-    { key: 'notes', question: 'Is there anything else you want to add?' },
+const SPORTS_GOAL_OPTIONS = [
+    'Just started, I don\'t have any idea what to do',
+    'Beginner with few months of experience',
+    'Motivating Back - I made it in the past, decided to come back',
+    'I want to keep up with pre intermediates',
+    'I want to keep up with intermediates',
+    'I want to keep up with professionals',
+    'I want to be a champion and have long term commitment',
 ];
+
+const REQUEST_QUESTIONS = [
+    {
+        key: 'sportGroupBranch',
+        question: 'Sport group and branch',
+        type: 'sport_select',
+        targets: ['coach'],
+    },
+    {
+        key: 'level',
+        question: 'Your level',
+        type: 'level_confirm',
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'sportsGoal',
+        question: 'Your sports goal',
+        type: 'single_choice',
+        options: SPORTS_GOAL_OPTIONS,
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'sessionFormat',
+        question: 'Private lesson or group lesson?',
+        type: 'single_choice',
+        options: ['Private lesson', 'Group lesson'],
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'instructorGender',
+        question: 'Instructor gender preference',
+        type: 'single_choice',
+        options: ['No preference', 'Male instructor', 'Female instructor'],
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'location',
+        question: 'Country, city, and district',
+        type: 'location',
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'budget',
+        question: 'Monthly budget',
+        type: 'single_choice',
+        options: ['I have set a monthly budget', 'Let me get a quote'],
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'availableDays',
+        question: 'Which days are you available?',
+        type: 'multi_choice',
+        options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'availableTimes',
+        question: 'Which time slots work for you?',
+        type: 'multi_choice',
+        options: [
+            'Morning (6am–12pm)',
+            'Afternoon (12pm–5pm)',
+            'Evening (5pm–9pm)',
+            'Night (9pm+)',
+        ],
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'facilityPreference',
+        question: 'Facility preference',
+        type: 'single_choice',
+        options: ['Private facility', 'Open area', 'No preference'],
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'additionalDetails',
+        question: 'Any other details?',
+        type: 'textarea',
+        targets: ['coach', 'performance'],
+    },
+    {
+        key: 'emailConsent',
+        question: 'Email contact consent',
+        type: 'consent',
+        targets: ['coach', 'performance'],
+    },
+];
+
+function questionsForTarget(targetType) {
+    return REQUEST_QUESTIONS.filter((q) => q.targets.includes(targetType));
+}
 
 const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
 
 const serviceRequestActionUrl = (tab) => `/?serviceRequests=${tab}`;
 
-function normalizeAnswers(input) {
+function normalizeAnswers(input, targetType) {
+    const catalog = questionsForTarget(targetType);
     const byKey = new Map();
     if (Array.isArray(input)) {
         for (const item of input) {
@@ -36,10 +125,30 @@ function normalizeAnswers(input) {
         for (const [key, value] of Object.entries(input)) byKey.set(key, value);
     }
 
-    return REQUEST_QUESTIONS.map((q) => ({
-        ...q,
-        answer: trim(byKey.get(q.key) ?? '', 1000),
-    }));
+    const answers = catalog.map((q) => {
+        const raw = byKey.get(q.key);
+        const answer =
+            Array.isArray(raw) ? raw.map((v) => trim(String(v), 200)).join(', ') : trim(raw ?? '', 1000);
+        if (!answer) {
+            throw new AppError(400, `${q.question} is required.`);
+        }
+        if (q.key === 'emailConsent') {
+            const normalized = answer.toLowerCase();
+            const accepted =
+                normalized.startsWith('yes') ||
+                ['true', 'accepted', 'i agree'].includes(normalized);
+            if (!accepted) {
+                throw new AppError(400, 'Email contact consent is required.');
+            }
+        }
+        return {
+            key: q.key,
+            question: q.question,
+            answer,
+        };
+    });
+
+    return answers;
 }
 
 async function getProviderProfile(user, targetType = null) {
@@ -172,8 +281,10 @@ export const createServiceRequest = async (req, res, next) => {
             participant: req.user.participant,
             targetType,
             performanceBranch: targetType === 'performance' ? performanceBranch : undefined,
-            title: trim(req.body?.title, 160) || '',
-            answers: normalizeAnswers(req.body?.answers),
+            title:
+                trim(req.body?.title, 160) ||
+                (targetType === 'coach' ? 'Coach Me' : `${performanceBranch} service request`),
+            answers: normalizeAnswers(req.body?.answers, targetType),
         });
 
         void notifyProvidersOfServiceRequest(request).catch((notifErr) =>

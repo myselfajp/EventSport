@@ -1,6 +1,7 @@
 import express from 'express';
 const router = express.Router();
 import { uploadFile } from '../middleware/uploadFileMiddleware.js';
+import { CERTIFICATE_ALLOWED_MIME_TYPES } from '../utils/multerConfig.js';
 import * as adminController from '../controllers/adminController.js';
 import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
@@ -139,7 +140,12 @@ router.get(
 router.post(
     '/users/:userId/coach-profile',
     requireAdminPermission('admin.users'),
-    uploadFile({ mode: 'array', fieldName: 'coach-certificate', optional: true }),
+    uploadFile({
+        mode: 'array',
+        fieldName: 'coach-certificate',
+        optional: true,
+        allowedMimeTypes: CERTIFICATE_ALLOWED_MIME_TYPES,
+    }),
     adminController.updateCoachProfile
 );
 router.post(

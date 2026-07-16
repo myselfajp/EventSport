@@ -22,7 +22,6 @@ import {
   Heart,
   BookOpen,
   Briefcase,
-  ClipboardList,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -69,13 +68,10 @@ import { useFollows } from "@/app/hooks/useFollows";
 import { fetchJSON } from "@/app/lib/api";
 import BlogManagement from "@/components/blog/BlogManagement";
 import PerformanceApplyModal from "./PerformanceApplyModal";
-import ServiceRequestsPanel from "@/components/service-requests/ServiceRequestsPanel";
 
 interface ProfileSidebarProps {
   onLogout: () => void;
   gamerProfileOpenSignal?: number;
-  serviceRequestsOpenSignal?: number;
-  serviceRequestsPreferredTab?: "mine" | "incoming" | null;
   onShowFollowings?: () => void;
   onShowFavorites?: () => void;
   onShowActivity?: () => void;
@@ -86,8 +82,6 @@ interface ProfileSidebarProps {
 const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   onLogout,
   gamerProfileOpenSignal = 0,
-  serviceRequestsOpenSignal = 0,
-  serviceRequestsPreferredTab = null,
   onShowFollowings,
   onShowFavorites,
   onShowActivity,
@@ -103,7 +97,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
   const [isApplyChoiceOpen, setIsApplyChoiceOpen] = useState(false);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
-  const [isServiceRequestsOpen, setIsServiceRequestsOpen] = useState(false);
   const [isFacilityModalOpen, setIsFacilityModalOpen] = useState(false);
   const [isClubModalOpen, setIsClubModalOpen] = useState(false);
 
@@ -270,11 +263,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     if (!gamerProfileOpenSignal) return;
     setIsParticipantModalOpen(true);
   }, [gamerProfileOpenSignal]);
-
-  useEffect(() => {
-    if (!serviceRequestsOpenSignal) return;
-    setIsServiceRequestsOpen(true);
-  }, [serviceRequestsOpenSignal]);
 
   const handleCreateParticipant = async (formData: any) => {
     console.log("Participant profile saved:", formData);
@@ -927,25 +915,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         <GamerProfileRequiredBanner className="mb-4" />
       )}
 
-      <button
-        type="button"
-        onClick={() => setIsServiceRequestsOpen(true)}
-        className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left"
-      >
-        <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50">
-          <ClipboardList className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-800 dark:text-white text-sm">
-            Service Requests
-          </div>
-          <div className="text-xs text-cyan-700 dark:text-cyan-300">
-            Open requests or review incoming offers
-          </div>
-        </div>
-        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-      </button>
-
       {/* Quick actions — 7 items in one row (replaces old Favorites / Following cards) */}
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-6 sm:mb-8 w-full items-stretch">
         <QuickActionButton
@@ -1084,7 +1053,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           facility, salon, club, or sport community resources.
         </p>
 
-        {(!hasCoachProfile || !hasPerformanceProfile) && user?.role !== 0 && (
+        {(!hasCoachProfile && !hasPerformanceProfile) && user?.role !== 0 && (
           <button
             type="button"
             onClick={() => setIsApplyChoiceOpen(true)}
@@ -1219,7 +1188,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               Choose which provider profile you want to create or update.
             </p>
             <div className="grid gap-3">
-              {!hasCoachProfile && (
+              {!hasCoachProfile && !hasPerformanceProfile && (
                 <button
                   type="button"
                   onClick={handleOpenCoachModal}
@@ -1233,7 +1202,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   </div>
                 </button>
               )}
-              {!hasPerformanceProfile && (
+              {!hasCoachProfile && !hasPerformanceProfile && (
                 <button
                   type="button"
                   onClick={handleOpenPerformanceModal}
@@ -1246,6 +1215,16 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     Apply as manager, psychologist, dietitian, or psychotherapist.
                   </div>
                 </button>
+              )}
+              {hasCoachProfile && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  You are already a coach. Coach and Performance Team roles cannot be combined.
+                </p>
+              )}
+              {hasPerformanceProfile && !hasCoachProfile && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  You are already on the Performance Team. Coach and Performance Team roles cannot be combined.
+                </p>
               )}
             </div>
           </div>
@@ -1263,14 +1242,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         isOpen={isPerformanceModalOpen}
         onClose={() => setIsPerformanceModalOpen(false)}
         onSaved={handlePerformanceSaved}
-      />
-
-      <ServiceRequestsPanel
-        isOpen={isServiceRequestsOpen}
-        onClose={() => setIsServiceRequestsOpen(false)}
-        hasGamerProfile={hasGamerProfile}
-        isProvider={hasCoachProfile || hasPerformanceProfile}
-        preferredTab={serviceRequestsPreferredTab}
       />
 
       {/* Facility Modal */}
