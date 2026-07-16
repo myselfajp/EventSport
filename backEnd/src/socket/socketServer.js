@@ -6,6 +6,11 @@ import User from '../models/userModel.js';
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import { createNotification } from '../utils/notificationHelper.js';
+import {
+    deleteConversationForUser,
+    deleteMessageForUser,
+    sanitizeMessageForClient,
+} from '../controllers/messageController.js';
 
 // Express app'ten ayrı bir HTTP server: socket.io bu server'a bağlanır.
 const httpServer = http.createServer(app);
@@ -109,10 +114,11 @@ io.on('connection', (socket) => {
 
             conversation.lastMessage = message._id;
             conversation.lastMessageAt = message.createdAt;
+            conversation.hiddenFor = [];
             await conversation.save();
 
             message = await message.populate('sender', PUBLIC_USER_FIELDS);
-            const payloadOut = message.toObject();
+            const payloadOut = sanitizeMessageForClient(message.toObject());
 
             // Relay the message to every participant's room (sender included).
             conversation.participants.forEach((participantId) => {
@@ -208,6 +214,83 @@ io.on('connection', (socket) => {
             });
         } catch (err) {
             console.error('socket mark_read error:', err.message);
+        }
+    });
+
+    /**
+     * delete_message: { conversationId, messageId, scope?: 'me' | 'everyone' }
+     */
+    socket.on('delete_message', async (payload = {}, ack) => {
+        try {
+            const { conversationId, messageId, scope } = payload;
+            if (!conversationId || !messageId) {
+                if (typeof ack === 'function') {
+                    ack({ success: false, error: 'conversationId and messageId are required' });
+                }
+                return;
+            }
+
+            const result = await deleteMessageForUser(
+                socket.userId,
+                conversationId,
+                messageId,
+                scope
+            );
+
+            result.participantIds.forEach((participantId) => {
+                io.to(participantId).emit('message_deleted', {
+                    conversationId: result.conversationId,
+                    messageId: result.messageId,
+                    mode: result.mode,
+                    message: result.message || null,
+                });
+            });
+
+            if (typeof ack === 'function') {
+                ack({ success: true, data: result });
+            }
+        } catch (err) {
+            console.error('socket delete_message error:', err.message);
+            if (typeof ack === 'function') {
+                ack({
+                    success: false,
+                    error: err.message || 'Failed to delete message',
+                });
+            }
+        }
+    });
+
+    /**
+     * delete_conversation: { conversationId }
+     * Sohbeti yalnızca istek yapan kullanıcıdan gizler.
+     */
+    socket.on('delete_conversation', async (payload = {}, ack) => {
+        try {
+            const { conversationId } = payload;
+            if (!conversationId) {
+                if (typeof ack === 'function') {
+                    ack({ success: false, error: 'conversationId is required' });
+                }
+                return;
+            }
+
+            const result = await deleteConversationForUser(socket.userId, conversationId);
+
+            io.to(socket.userId).emit('conversation_deleted', {
+                conversationId: result.conversationId,
+            });
+
+            if (typeof ack === 'function') {
+                ack({ success: true, data: result });
+            }
+        } catch (err) {
+            console.error('socket delete_conversation error:', err.message);
+            if (typeof ack === 'function') {
+                ack({
+                    success: false,
+                    error: err.message || 'Failed to delete conversation',
+                });
+            }
         }
     });
 

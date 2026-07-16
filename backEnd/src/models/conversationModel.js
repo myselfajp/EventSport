@@ -19,6 +19,13 @@ const conversationSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        /** Kullanıcı bazlı sohbet gizleme — listede görünmez, yeni mesaj gelince açılır. */
+        hiddenFor: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            },
+        ],
     },
     { timestamps: true }
 );

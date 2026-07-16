@@ -112,10 +112,16 @@ const Header: React.FC<HeaderProps> = ({
       setIsNotificationsOpen(false);
       try {
         if (url.startsWith("/?serviceRequests=") && typeof window !== "undefined") {
-          const tab = new URLSearchParams(url.slice(url.indexOf("?"))).get("serviceRequests");
+          const params = new URLSearchParams(url.slice(url.indexOf("?")));
+          const tab = params.get("serviceRequests");
+          const requestId = params.get("requestId");
           window.dispatchEvent(
             new CustomEvent("eventsport:open-service-requests", {
-              detail: { tab: tab === "incoming" ? "incoming" : "mine" },
+              detail: {
+                tab: tab === "incoming" ? "incoming" : "mine",
+                requestId: requestId || undefined,
+                autoWizard: false,
+              },
             })
           );
           return;

@@ -28,6 +28,13 @@ const messageSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        /** Kullanıcı bazlı "benden sil" — bu listedeki kullanıcılar mesajı görmez. */
+        hiddenFor: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            },
+        ],
     },
     { timestamps: true }
 );

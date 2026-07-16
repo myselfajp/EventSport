@@ -30,6 +30,7 @@ import {
   clearLoginUrlParam,
   clearServiceRequestsUrlParam,
   readLoginFromUrl,
+  readServiceRequestFocusFromUrl,
   readServiceRequestsTabFromUrl,
 } from "@/app/lib/service-request-url";
 
@@ -53,15 +54,23 @@ const EventsDashboard = () => {
   >(null);
   const [coachMePanelOpen, setCoachMePanelOpen] = useState(false);
   const [coachMeAutoWizard, setCoachMeAutoWizard] = useState(false);
+  const [coachMeFocusRequestId, setCoachMeFocusRequestId] = useState<
+    string | null
+  >(null);
   const openGamerProfile = useCallback(() => {
     setLeftSidebarOpen(true);
     setGamerProfileOpenSignal((n) => n + 1);
   }, []);
 
   const openCoachMe = useCallback(
-    (tab: "mine" | "incoming" = "mine", autoWizard = tab === "mine") => {
+    (
+      tab: "mine" | "incoming" = "mine",
+      autoWizard = tab === "mine",
+      focusRequestId: string | null = null
+    ) => {
       setServiceRequestsPreferredTab(tab);
-      setCoachMeAutoWizard(autoWizard);
+      setCoachMeAutoWizard(focusRequestId ? false : autoWizard);
+      setCoachMeFocusRequestId(focusRequestId);
       setCoachMePanelOpen(true);
     },
     []
@@ -74,7 +83,8 @@ const EventsDashboard = () => {
   useEffect(() => {
     const initialTab = readServiceRequestsTabFromUrl();
     if (initialTab) {
-      openServiceRequests(initialTab);
+      const focusId = readServiceRequestFocusFromUrl();
+      openCoachMe(initialTab, !focusId && initialTab === "mine", focusId);
       clearServiceRequestsUrlParam();
     }
 
@@ -84,9 +94,19 @@ const EventsDashboard = () => {
     }
 
     const coachMeHandler = (event: Event) => {
-      const detail = (event as CustomEvent<{ tab?: "mine" | "incoming"; autoWizard?: boolean }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          tab?: "mine" | "incoming";
+          autoWizard?: boolean;
+          requestId?: string;
+        }>
+      ).detail;
       const tab = detail?.tab || "mine";
-      openCoachMe(tab, detail?.autoWizard ?? tab === "mine");
+      openCoachMe(
+        tab,
+        detail?.autoWizard ?? tab === "mine",
+        detail?.requestId ?? null
+      );
       clearServiceRequestsUrlParam();
     };
 
@@ -445,12 +465,14 @@ const EventsDashboard = () => {
         onClose={() => {
           setCoachMePanelOpen(false);
           setCoachMeAutoWizard(false);
+          setCoachMeFocusRequestId(null);
           clearServiceRequestsUrlParam();
         }}
         hasGamerProfile={!!user?.participant}
         isProvider={!!user?.coach || !!user?.performanceMember}
         preferredTab={serviceRequestsPreferredTab}
         autoStartWizard={coachMeAutoWizard}
+        focusRequestId={coachMeFocusRequestId}
       />
 
       {/* Mobile Toggle - Left Sidebar */}

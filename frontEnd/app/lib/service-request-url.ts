@@ -14,6 +14,11 @@ export function readLoginFromUrl(): boolean {
   return new URLSearchParams(window.location.search).get("login") === "1";
 }
 
+export function readServiceRequestFocusFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("requestId") || null;
+}
+
 function clearUrlParams(...keys: string[]) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
@@ -29,9 +34,9 @@ function clearUrlParams(...keys: string[]) {
   window.history.replaceState(null, "", `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`);
 }
 
-/** Remove `serviceRequests` / `coachMe` from the address bar so refresh does not reopen the panel. */
+/** Remove `serviceRequests` / `coachMe` / `requestId` from the address bar so refresh does not reopen the panel. */
 export function clearServiceRequestsUrlParam() {
-  clearUrlParams("serviceRequests", "coachMe");
+  clearUrlParams("serviceRequests", "coachMe", "requestId");
 }
 
 export function clearLoginUrlParam() {
