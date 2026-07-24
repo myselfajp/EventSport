@@ -85,6 +85,7 @@ export default function ServiceRequestsPanel({
   const [showMyRequestHistory, setShowMyRequestHistory] = useState(false);
   const [showIncomingList, setShowIncomingList] = useState(false);
   const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
+  const [focusedIncomingRequestId, setFocusedIncomingRequestId] = useState<string | null>(null);
 
   const canCreate = hasGamerProfile;
   const visibleTabs = useMemo(
@@ -101,16 +102,27 @@ export default function ServiceRequestsPanel({
       setShowIncomingList(false);
       setWizardOpen(false);
       setFocusedRequestId(null);
+      setFocusedIncomingRequestId(null);
       return;
     }
     if (focusRequestId) {
+      if (preferredTab === "incoming") {
+        setFocusedIncomingRequestId(focusRequestId);
+        setShowIncomingList(true);
+        setWizardOpen(false);
+        setFocusedRequestId(null);
+        setShowMyRequestHistory(false);
+        return;
+      }
       setFocusedRequestId(focusRequestId);
       setShowMyRequestHistory(true);
       setWizardOpen(false);
       setShowIncomingList(false);
+      setFocusedIncomingRequestId(null);
       return;
     }
     setFocusedRequestId(null);
+    setFocusedIncomingRequestId(null);
     if (preferredTab === "incoming") {
       setShowIncomingList(true);
       setWizardOpen(false);
@@ -137,6 +149,14 @@ export default function ServiceRequestsPanel({
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, tab]);
+
+  useEffect(() => {
+    if (!isOpen || !focusedIncomingRequestId || tab !== "incoming" || !showIncomingList) return;
+    const el = document.getElementById(`incoming-request-${focusedIncomingRequestId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isOpen, focusedIncomingRequestId, tab, showIncomingList, incoming.length]);
 
   const loadData = async () => {
     try {
@@ -427,7 +447,15 @@ export default function ServiceRequestsPanel({
                     </p>
                   )}
                   {incoming.map((request) => (
-                <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                <div
+                  key={request._id}
+                  id={`incoming-request-${request._id}`}
+                  className={`rounded-xl border p-4 dark:border-gray-700 ${
+                    focusedIncomingRequestId === request._id
+                      ? "border-cyan-500 ring-2 ring-cyan-200 dark:ring-cyan-800"
+                      : "border-gray-200"
+                  }`}
+                >
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">

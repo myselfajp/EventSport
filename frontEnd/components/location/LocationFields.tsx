@@ -51,7 +51,7 @@ const LocationFields: React.FC<LocationFieldsProps> = ({
     <div className={`space-y-3 ${className}`}>
       <div>
         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-          Istanbul district (ilçe)
+          Istanbul district
         </label>
         <select
           value={value.district}

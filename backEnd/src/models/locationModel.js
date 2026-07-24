@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-/** Istanbul ilçe (and future region-specific areas). */
+/** Istanbul districts (and future region-specific areas). */
 const districtSchema = new mongoose.Schema(
     {
         region: {

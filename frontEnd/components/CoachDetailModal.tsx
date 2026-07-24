@@ -134,7 +134,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
   const [reviewSummary, setReviewSummary] = useState<
     CoachReviewsData["summary"] | null
   >(null);
-  const [eventFilter, setEventFilter] = useState<"all" | "active" | "past">("all");
+  const [eventFilter, setEventFilter] = useState<"all" | "active" | "past">("active");
 
   const { data: followStats } = useCoachFollowStats(
     isOpen ? resolvedCoachId : null
@@ -152,7 +152,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
       setShowCoachCalendar(false);
       setShowFollowersModal(false);
       setReviewSummary(null);
-      setEventFilter("all");
+      setEventFilter("active");
     }
   }, [isOpen, coachId]);
 

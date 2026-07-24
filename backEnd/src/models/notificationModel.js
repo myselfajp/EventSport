@@ -52,6 +52,8 @@ const notificationSchema = new mongoose.Schema(
                 // Certificates
                 'certificate_approved',
                 'certificate_rejected',
+                'performance_application_approved',
+                'performance_application_rejected',
                 // Joins / invites
                 'join_request_approved',
                 'join_request_rejected',

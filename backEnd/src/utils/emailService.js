@@ -27,20 +27,20 @@ function createTransporter() {
 export async function sendRegistrationOtpEmail({ to, firstName, otp }) {
     const from =
         process.env.SMTP_FROM || process.env.SMTP_USER || 'EventSport <noreply@eventsport.local>';
-    const name = firstName?.trim() || 'Kullanıcı';
-    const subject = 'EventSport — Kayıt doğrulama kodunuz';
-    const text = `Merhaba ${name},\n\nEventSport kayıt doğrulama kodunuz: ${otp}\n\nBu kod 10 dakika geçerlidir.\n\nBu işlemi siz yapmadıysanız bu e-postayı yok sayın.`;
+    const name = firstName?.trim() || 'User';
+    const subject = 'EventSport — Your registration verification code';
+    const text = `Hello ${name},\n\nYour EventSport registration verification code: ${otp}\n\nThis code is valid for 10 minutes.\n\nIf you did not request this, you can ignore this email.`;
     const html = `
-      <p>Merhaba <strong>${escapeHtml(name)}</strong>,</p>
-      <p>EventSport kayıt doğrulama kodunuz:</p>
+      <p>Hello <strong>${escapeHtml(name)}</strong>,</p>
+      <p>Your EventSport registration verification code:</p>
       <p style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#0891b2;">${otp}</p>
-      <p style="font-size:12px;color:#666;">Kod 10 dakika geçerlidir.</p>
+      <p style="font-size:12px;color:#666;">This code is valid for 10 minutes.</p>
     `;
 
     if (!isSmtpConfigured()) {
-        console.log('\n--- Kayıt OTP (SMTP ayarlı değil) ---');
-        console.log(`Alıcı: ${to}`);
-        console.log(`Kod: ${otp}\n`);
+        console.log('\n--- Registration OTP (SMTP not configured) ---');
+        console.log(`To: ${to}`);
+        console.log(`Code: ${otp}\n`);
         return { sent: false };
     }
 

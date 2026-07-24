@@ -17,7 +17,7 @@ export default function RegistrationLocationFields({ value, onChange }: Props) {
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  // Auto-detect country once on mount (best-effort, defaults to Türkiye).
+  // Auto-detect country once on mount (best-effort, defaults to Turkey).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -37,9 +37,9 @@ export default function RegistrationLocationFields({ value, onChange }: Props) {
           districtName: "",
           postalCode: nextCountry === "US" ? detected?.postalCode || "" : "",
         });
-        setDetectedLabel(nextCountry === "US" ? "United States" : "Türkiye");
+        setDetectedLabel(nextCountry === "US" ? "United States" : "Turkey");
       } catch {
-        if (!cancelled) setDetectedLabel("Türkiye");
+        if (!cancelled) setDetectedLabel("Turkey");
       } finally {
         if (!cancelled) setDetecting(false);
       }

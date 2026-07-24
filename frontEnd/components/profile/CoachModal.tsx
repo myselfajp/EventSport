@@ -442,10 +442,10 @@ const CoachModal: React.FC<CoachModalProps> = ({
     setError("");
 
     if (!adminUserId && user?.performanceMember) {
-      setError(
-        "Performance Team members cannot apply as coaches. These roles are mutually exclusive."
+      const confirmed = window.confirm(
+        "You are currently on the Performance Team. If you apply as a coach, your Performance Team profile will be removed. Do you want to continue?"
       );
-      return;
+      if (!confirmed) return;
     }
 
     if (formData.branches.length === 0) {
@@ -525,6 +525,9 @@ const CoachModal: React.FC<CoachModalProps> = ({
         if (marketingConsent && activeCommercialMessages?._id) {
           payload.commercialMessagesVersionId = activeCommercialMessages._id;
         }
+      }
+      if (!adminUserId && user?.performanceMember) {
+        payload.confirmRoleSwitch = true;
       }
       formDataToSend.append("data", JSON.stringify(payload));
       console.log(
@@ -1055,16 +1058,16 @@ const CoachModal: React.FC<CoachModalProps> = ({
                   <span>
                     I have read and agree to the{" "}
                     <Link
-                      href="/sozlesmeler#coach-agreement"
+                      href="/contracts#coach-agreement"
                       className="text-cyan-600 dark:text-cyan-400 underline font-medium"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Antrenör Sözleşmesi
+                      Coach Agreement
                     </Link>
-                    . (Cezai Şartlar, Antrenör Donanımları, Gizlilik — tümü{" "}
+                    . (Penalty Terms, Coach Equipment, Privacy — all on{" "}
                     <Link
-                      href="/sozlesmeler"
+                      href="/contracts"
                       className="text-cyan-600 dark:text-cyan-400 underline"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1107,6 +1110,12 @@ const CoachModal: React.FC<CoachModalProps> = ({
                     )}
                   </span>
                 </label>
+              </div>
+            )}
+
+            {!adminUserId && user?.performanceMember && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                You are currently on the Performance Team. Submitting this application will remove your Performance Team profile.
               </div>
             )}
 

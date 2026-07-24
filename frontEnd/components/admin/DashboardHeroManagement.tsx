@@ -241,9 +241,9 @@ export default function DashboardHeroManagement() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
 
-  /** Kırpılmış nihai dosya — backend'e bu gönderilir */
+  /** Final cropped file sent to the backend */
   const [croppedFile, setCroppedFile] = useState<File | null>(null);
-  /** Kırpılmış dosyanın önizleme URL'i */
+  /** Preview URL for the cropped file */
   const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
 
   /** Crop modal durumu */

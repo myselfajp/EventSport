@@ -76,10 +76,8 @@ const TAB_LABEL: Record<TabType, string> = {
   "dashboard-hero": "Dashboard Hero",
   suggestions: "Suggestions",
   reports: "Reports",
-  "permission-groups": "İzin grupları",
+  "permission-groups": "Permission Groups",
 };
-
-TAB_LABEL["permission-groups"] = "Permission Groups";
 
 /** Admin API permission slug per tab (UI-only tabs use same keys as backend constants). */
 const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
@@ -215,9 +213,6 @@ export default function AdminPanelPage() {
           {visibleTabs.length === 0 && (
             <p className="text-amber-800 dark:text-amber-200 text-sm mb-4">
               Your account does not have any assigned admin permissions. Ask a full admin to assign a permission group.
-              {/*
-              Hesabınıza atanmış bir admin izni yok. Tam yetkili yöneticiden izin grubu isteyin.
-              */}
             </p>
           )}
 

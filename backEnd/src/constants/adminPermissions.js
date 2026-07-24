@@ -24,21 +24,21 @@ export const ADMIN_PERMISSION_KEYS = [
 ];
 
 export const ADMIN_PERMISSION_LABELS = {
-    [ADMIN_PERMISSION_STAR]: 'Tam yetki',
-    'admin.users': 'Kullanıcılar',
+    [ADMIN_PERMISSION_STAR]: 'Full access',
+    'admin.users': 'Users',
     'admin.blacklist': 'Blacklist',
-    'admin.coaches': 'Koç sertifikaları',
-    'admin.enums': 'Enum / referans veri',
-    'admin.events': 'Etkinlikler',
+    'admin.coaches': 'Coach certificates',
+    'admin.enums': 'Enum / reference data',
+    'admin.events': 'Events',
     'admin.blogs': 'Blogs',
     'admin.news': 'News',
     'admin.videos': 'Videos',
-    'admin.notifications': 'Bildirimler',
-    'admin.legal': 'Yasal metinler',
-    'admin.contract_acceptances': 'Sözleşme kabul kayıtları',
-    'admin.static_pages': 'Statik sayfalar',
-    'admin.dashboard_hero': 'Ana sayfa hero',
-    'admin.suggestions': 'Öneriler',
+    'admin.notifications': 'Notifications',
+    'admin.legal': 'Legal documents',
+    'admin.contract_acceptances': 'Contract acceptance log',
+    'admin.static_pages': 'Static pages',
+    'admin.dashboard_hero': 'Homepage hero',
+    'admin.suggestions': 'Suggestions',
     'admin.reports': 'Reports',
 };
 

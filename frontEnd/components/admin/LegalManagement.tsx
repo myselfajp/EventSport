@@ -6,7 +6,7 @@ import { EP } from "../../app/lib/endpoints";
 import LegalContentModal from "../auth/LegalContentModal";
 import {
   CATEGORY_LABELS,
-  DEFAULT_TITLES_TR,
+  DEFAULT_TITLES,
   DOC_TYPE_LABELS,
   type ContractCategory,
   type LegalDocType,
@@ -85,7 +85,7 @@ export default function LegalManagement({
     const docType = docTypeFromFilter(filter, allowedDocTypes);
     setFormData({
       docType,
-      title: DEFAULT_TITLES_TR[docType],
+      title: DEFAULT_TITLES[docType],
       content: "",
     });
     setShowModal(true);
@@ -168,8 +168,8 @@ export default function LegalManagement({
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500 dark:text-slate-400">
-        {CATEGORY_LABELS[category]} — yalnızca <strong>aktif</strong> sürüm sitede ve kayıtta
-        gösterilir. Tekil URL:{" "}
+        {CATEGORY_LABELS[category]} — only the <strong>active</strong> version is shown on the site and during registration.
+        Individual URL:{" "}
         {allowedDocTypes.map((dt) => (
           <code
             key={dt}
@@ -313,7 +313,7 @@ export default function LegalManagement({
                         const docType = e.target.value as LegalDocType;
                         setFormData({
                           docType,
-                          title: DEFAULT_TITLES_TR[docType],
+                          title: DEFAULT_TITLES[docType],
                           content: formData.content,
                         });
                       }}
@@ -348,7 +348,7 @@ export default function LegalManagement({
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     rows={12}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 resize-y"
-                    placeholder="Plain text veya HTML içerik…"
+                    placeholder="Plain text or HTML content…"
                   />
                 </div>
               </div>

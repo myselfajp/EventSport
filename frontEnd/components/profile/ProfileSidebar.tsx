@@ -1063,6 +1063,16 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           </button>
         )}
 
+        {(hasCoachProfile || hasPerformanceProfile) && user?.role !== 0 && (
+          <button
+            type="button"
+            onClick={() => setIsApplyChoiceOpen(true)}
+            className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            Switch provider role (Coach ↔ Performance Team)
+          </button>
+        )}
+
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
           <button
             type="button"
@@ -1189,42 +1199,60 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             </p>
             <div className="grid gap-3">
               {!hasCoachProfile && !hasPerformanceProfile && (
-                <button
-                  type="button"
-                  onClick={handleOpenCoachModal}
-                  className="rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-500 dark:border-gray-700"
-                >
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    Coach
-                  </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Send sport branch certificates for admin approval.
-                  </div>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenCoachModal}
+                    className="rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-500 dark:border-gray-700"
+                  >
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      Coach
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Send sport branch certificates for admin approval.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenPerformanceModal}
+                    className="rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-500 dark:border-gray-700"
+                  >
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      Performance Team
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Apply as manager, psychologist, dietitian, or psychotherapist.
+                    </div>
+                  </button>
+                </>
               )}
-              {!hasCoachProfile && !hasPerformanceProfile && (
+              {hasCoachProfile && (
                 <button
                   type="button"
                   onClick={handleOpenPerformanceModal}
-                  className="rounded-lg border border-gray-200 p-4 text-left hover:border-cyan-500 dark:border-gray-700"
+                  className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/30"
                 >
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    Performance Team
+                  <div className="font-medium text-amber-900 dark:text-amber-100">
+                    Switch to Performance Team
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Apply as manager, psychologist, dietitian, or psychotherapist.
+                  <div className="text-sm text-amber-800 dark:text-amber-200">
+                    If you become a Performance Team member, your coach profile and branches will be removed.
                   </div>
                 </button>
               )}
-              {hasCoachProfile && (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                  You are already a coach. Coach and Performance Team roles cannot be combined.
-                </p>
-              )}
               {hasPerformanceProfile && !hasCoachProfile && (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                  You are already on the Performance Team. Coach and Performance Team roles cannot be combined.
-                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenCoachModal}
+                  className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/30"
+                >
+                  <div className="font-medium text-amber-900 dark:text-amber-100">
+                    Switch to Coach
+                  </div>
+                  <div className="text-sm text-amber-800 dark:text-amber-200">
+                    If you become a coach, your Performance Team profile will be removed.
+                  </div>
+                </button>
               )}
             </div>
           </div>

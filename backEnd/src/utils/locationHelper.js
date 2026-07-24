@@ -43,7 +43,7 @@ export async function buildAddressString(location) {
     if (parts.length === 0) return '';
     const districtName = parts[0];
     const rest = parts.slice(1).join(', ');
-    return rest ? `${districtName}, ${rest}` : `${districtName}, İstanbul`;
+    return rest ? `${districtName}, ${rest}` : `${districtName}, Istanbul`;
 }
 
 /** Turkish-aware slug used to match province / district names regardless of case or diacritics. */
@@ -116,7 +116,7 @@ export async function resolveLocationKey(loc = {}) {
     if (country !== 'US' && loc.district) {
         const doc = await District.findById(loc.district).select('name').lean();
         if (doc?.name) {
-            return buildLocationKey({ country: 'TR', city: 'İstanbul', districtName: doc.name });
+            return buildLocationKey({ country: 'TR', city: 'Istanbul', districtName: doc.name });
         }
     }
     return '';

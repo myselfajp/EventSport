@@ -17,7 +17,7 @@ export const requireAdminPermission =
             }
             const ok = requiredKeys.some((k) => perms.has(k));
             if (!ok) {
-                throw new AppError(403, 'Bu işlem için yetkiniz yok.');
+                throw new AppError(403, 'You do not have permission for this action.');
             }
             next();
         } catch (err) {
@@ -29,7 +29,7 @@ export const requireFullAdmin = (req, res, next) => {
     try {
         const perms = req.adminPermissions;
         if (!perms || !perms.has(ADMIN_PERMISSION_STAR)) {
-            throw new AppError(403, 'Bu işlem yalnızca tam yetkili yöneticiler içindir.');
+            throw new AppError(403, 'This action is only available to full-access administrators.');
         }
         next();
     } catch (err) {

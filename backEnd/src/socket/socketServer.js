@@ -12,7 +12,7 @@ import {
     sanitizeMessageForClient,
 } from '../controllers/messageController.js';
 
-// Express app'ten ayrı bir HTTP server: socket.io bu server'a bağlanır.
+// Separate HTTP server from Express app: socket.io attaches to this server.
 const httpServer = http.createServer(app);
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -65,14 +65,14 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket) => {
-    // Her kullanıcı kendi userId'siyle bir room'a katılır.
+    // Each user joins a room named after their userId.
     socket.join(socket.userId);
     console.log(`🔌 Socket connected: user=${socket.userId} (${socket.id})`);
 
     /**
      * send_message: { conversationId, content }
-     * Mesajı DB'ye kaydeder, Conversation.lastMessage günceller ve karşı tarafın
-     * (ve gönderenin diğer cihazlarının) room'una "new_message" emit eder.
+     * Persists the message, updates Conversation.lastMessage, and emits "new_message"
+     * to the recipient (and the sender's other devices).
      */
     socket.on('send_message', async (payload = {}, ack) => {
         try {
@@ -179,7 +179,7 @@ io.on('connection', (socket) => {
 
     /**
      * mark_read: { conversationId }
-     * İlgili konuşmadaki, kullanıcının göndermediği mesajların readBy alanına userId ekler.
+     * Adds userId to readBy on messages in the conversation that the user did not send.
      */
     socket.on('mark_read', async (payload = {}) => {
         try {
@@ -205,7 +205,7 @@ io.on('connection', (socket) => {
                 { $addToSet: { readBy: socket.userId } }
             );
 
-            // Karşı tarafa okundu bilgisini ilet.
+            // Notify the other party that messages were read.
             conversation.participants.forEach((participantId) => {
                 io.to(String(participantId)).emit('messages_read', {
                     conversationId: String(conversationId),
@@ -262,7 +262,7 @@ io.on('connection', (socket) => {
 
     /**
      * delete_conversation: { conversationId }
-     * Sohbeti yalnızca istek yapan kullanıcıdan gizler.
+     * Hides the conversation only for the requesting user.
      */
     socket.on('delete_conversation', async (payload = {}, ack) => {
         try {

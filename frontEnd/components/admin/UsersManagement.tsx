@@ -424,7 +424,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       if (response?.success) {
         fetchUsers();
       } else {
-        setError(response?.message || response?.error || "Güncellenemedi");
+        setError(response?.message || response?.error || "Update failed");
       }
     } catch (err: any) {
       setError(err.message || "Failed to update user");
@@ -1572,10 +1572,10 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
               {isFullAdmin && formData.role === 0 && loadedPermissionGroups.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
-                    Admin izin grupları
+                    Admin permission groups
                   </label>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">
-                    Boş bırakılırsa tam yetki (varsayılan). Grup seçilirse yalnızca seçilen izinler geçerli olur.
+                    Leave empty for full access (default). When a group is selected, only those permissions apply.
                   </p>
                   <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded-lg p-2 space-y-1">
                     {loadedPermissionGroups.map((g) => (

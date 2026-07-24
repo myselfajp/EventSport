@@ -1,8 +1,8 @@
 "use client";
 
 import React, { Dispatch, SetStateAction, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
 import { useSignIn } from "@/app/hooks/useAuth";
+import PasswordInput from "./PasswordInput";
 
 interface LoginFormProps {
   onToggleForm: () => void;
@@ -17,7 +17,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
 }) => {
   const [email, setEmail] = useState("admin@eventsport.com");
   const [password, setPassword] = useState("Admin123!@#");
-  const [showPassword, setShowPassword] = useState(false);
   const { mutate: signIn, isPending, error, data } = useSignIn();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -84,29 +83,13 @@ const LoginForm: React.FC<LoginFormProps> = ({
               </span>
             </div>
             <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
+              <PasswordInput
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 placeholder="Enter your password"
-                className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-200 dark:border-slate-600 rounded-lg 
-                           bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
-                           placeholder:text-gray-400 dark:placeholder:text-slate-500
-                           focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 
-                           transition-colors"
+                autoComplete="current-password"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
             </div>
           </div>
 

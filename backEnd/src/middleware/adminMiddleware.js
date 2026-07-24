@@ -17,7 +17,7 @@ export const adminMiddleware = async (req, res, next) => {
             throw new AppError(404, 'User not found');
         }
         if (fresh.isActive === false) {
-            throw new AppError(403, 'Hesabınız pasif edilmiştir.');
+            throw new AppError(403, 'Your account has been deactivated.');
         }
 
         req.adminPermissions = await resolveAdminPermissionSet(fresh);

@@ -478,6 +478,7 @@ export const EP = {
     inviteCandidates: `${COACH_DATA_API}/invite-candidates`,
     editEvent: (eventId: string) => `${COACH_DATA_API}/edit-event/${eventId}`,
     cancelEvent: (eventId: string) => `${COACH_DATA_API}/cancel-event/${eventId}`,
+    deleteEvent: (eventId: string) => `${COACH_DATA_API}/delete-event/${eventId}`,
     listingQuote: (sessionCount: number) =>
       `${COACH_DATA_API}/listing-quote?sessionCount=${sessionCount}`,
     getCurrentBranches: `${COACH_DATA_API}/current-branches`,

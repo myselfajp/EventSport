@@ -6,12 +6,12 @@ const REGION = 'istanbul';
 
 // The product only supports Turkey and the United States.
 const SUPPORTED_COUNTRIES = [
-    { code: 'TR', name: 'Türkiye' },
+    { code: 'TR', name: 'Turkey' },
     { code: 'US', name: 'United States' },
 ];
 
 const COUNTRY_NAMES = {
-    TR: 'Türkiye',
+    TR: 'Turkey',
     US: 'United States',
 };
 

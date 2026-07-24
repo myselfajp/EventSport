@@ -23,7 +23,7 @@ const HEADER_LOGO_ALLOWED_MIME_TYPES = [
 
 router.get('/panel', adminController.getAdminPanel);
 
-// Permission groups (tam yetki)
+// Permission groups (full access)
 router.get(
     '/permission-catalog',
     requireFullAdmin,

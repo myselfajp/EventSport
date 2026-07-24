@@ -66,5 +66,5 @@ export function isValidPageSlug(slug: string): boolean {
 }
 
 export function publicPagePath(slug: string): string {
-  return `/sayfa/${slug}`;
+  return `/page/${slug}`;
 }

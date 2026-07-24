@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const conversationSchema = new mongoose.Schema(
     {
-        // Her zaman tam olarak 2 katılımcı (1-1 DM).
+        // Always exactly 2 participants (1-1 DM).
         participants: [
             {
                 type: mongoose.Schema.Types.ObjectId,
@@ -19,7 +19,7 @@ const conversationSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
-        /** Kullanıcı bazlı sohbet gizleme — listede görünmez, yeni mesaj gelince açılır. */
+        /** Per-user conversation hide — hidden from list until a new message arrives. */
         hiddenFor: [
             {
                 type: mongoose.Schema.Types.ObjectId,
@@ -30,16 +30,16 @@ const conversationSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-// Katılımcı dizisi üzerinde hızlı sorgulama (kullanıcının konuşmaları).
+// Fast lookup by participant (user's conversations).
 conversationSchema.index({ participants: 1 });
-// Konuşma listesini en yeni mesaja göre sıralama.
+// Sort conversation list by newest message.
 conversationSchema.index({ lastMessageAt: -1 });
 
 /**
- * İki kullanıcı arasında yalnızca tek bir Conversation olabilir.
- * Katılımcılar her zaman artan ObjectId sırasıyla saklanır; böylece
- * (A,B) ve (B,A) aynı sıralanmış diziye eşlenir ve bu compound unique
- * index ikinci bir kaydın oluşmasını engeller.
+ * Only one Conversation may exist between two users.
+ * Participants are always stored in ascending ObjectId order so
+ * (A,B) and (B,A) map to the same sorted array and this compound unique
+ * index prevents a second record.
  */
 conversationSchema.index(
     { 'participants.0': 1, 'participants.1': 1 },

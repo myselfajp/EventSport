@@ -6,8 +6,8 @@ import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import {
   CATEGORY_LABELS,
+  CONTRACTS_SECTION_ANCHORS,
   DOC_TYPE_LABELS,
-  SOZLESMELER_SECTION_ANCHORS,
   type ContractCategory,
   type LegalDocType,
 } from "@/app/lib/contract-documents";
@@ -30,13 +30,13 @@ type CatalogData = {
 const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach"];
 
 const PROSE_CLASS =
-  "text-sm text-gray-700 dark:text-slate-300 sozlesmeler-prose max-w-none [&_a]:text-cyan-600 dark:[&_a]:text-cyan-400 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6";
+  "text-sm text-gray-700 dark:text-slate-300 contracts-prose max-w-none [&_a]:text-cyan-600 dark:[&_a]:text-cyan-400 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6";
 
 function SectionBody({ html }: { html: string }) {
   return <div className={PROSE_CLASS} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export default function SozlesmelerContent() {
+export default function ContractsContent() {
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
@@ -77,7 +77,7 @@ export default function SozlesmelerContent() {
     for (const cat of CATEGORY_ORDER) {
       for (const doc of catalog[cat] ?? []) {
         tocEntries.push({
-          anchor: SOZLESMELER_SECTION_ANCHORS[doc.docType],
+          anchor: CONTRACTS_SECTION_ANCHORS[doc.docType],
           label: doc.title || DOC_TYPE_LABELS[doc.docType],
         });
       }
@@ -113,7 +113,7 @@ export default function SozlesmelerContent() {
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-cyan-600 dark:text-cyan-400">
                   {docs.map((doc) => {
-                    const anchor = SOZLESMELER_SECTION_ANCHORS[doc.docType];
+                    const anchor = CONTRACTS_SECTION_ANCHORS[doc.docType];
                     const label = doc.title || DOC_TYPE_LABELS[doc.docType];
                     return (
                       <li key={doc.docType}>
@@ -161,7 +161,7 @@ export default function SozlesmelerContent() {
                     {CATEGORY_LABELS[cat]}
                   </h2>
                   {docs.map((doc) => {
-                    const anchor = SOZLESMELER_SECTION_ANCHORS[doc.docType];
+                    const anchor = CONTRACTS_SECTION_ANCHORS[doc.docType];
                     const title = doc.title || DOC_TYPE_LABELS[doc.docType];
                     return (
                       <article

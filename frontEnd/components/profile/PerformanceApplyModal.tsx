@@ -89,10 +89,10 @@ export default function PerformanceApplyModal({
     setError("");
 
     if (user?.coach) {
-      setError(
-        "Coaches cannot apply to the Performance Team. These roles are mutually exclusive."
+      const confirmed = window.confirm(
+        "You are currently a coach. If you apply to the Performance Team, your coach profile and sport branches will be removed. Do you want to continue?"
       );
-      return;
+      if (!confirmed) return;
     }
 
     if (!profile && !certificate) {
@@ -103,7 +103,15 @@ export default function PerformanceApplyModal({
     try {
       setSaving(true);
       const fd = new FormData();
-      fd.append("data", JSON.stringify({ branch, title, about }));
+      fd.append(
+        "data",
+        JSON.stringify({
+          branch,
+          title,
+          about,
+          ...(user?.coach ? { confirmRoleSwitch: true } : {}),
+        })
+      );
       if (certificate) {
         fd.append("performance-certificate", certificate);
       }
@@ -156,6 +164,12 @@ export default function PerformanceApplyModal({
             <div className="py-8 text-center text-sm text-gray-500">Loading...</div>
           ) : (
             <>
+              {user?.coach && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  You are currently a coach. If you continue, your coach profile and sport branches will be removed when your Performance Team application is submitted.
+                </div>
+              )}
+
               {profile?.status === "Rejected" && profile.rejectionReason && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
                   {profile.rejectionReason}

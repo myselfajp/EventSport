@@ -450,7 +450,7 @@ const EventsDashboard = () => {
         onEventCreated={fetchEvents}
       />
 
-      {/* Anasayfadan Create Event akışı: koçlar için tab başlığındaki butona bağlı modal. */}
+      {/* Create Event flow from homepage: modal tied to tab header button for coaches. */}
       <AddEventModal
         isOpen={isAddEventModalOpen}
         onClose={() => setIsAddEventModalOpen(false)}

@@ -6,7 +6,7 @@ export const FOOTER_ABOUT_ROUTE = { slug: "about", label: "About" } as const;
 export const FOOTER_FAQ_ROUTE = { slug: "faq", label: "FAQ" } as const;
 export const FOOTER_CONTACT_ROUTE = { slug: "contact", label: "Contact" } as const;
 export const FOOTER_CONTRACTS_ROUTE = {
-  href: "/sozlesmeler",
+  href: "/contracts",
   label: "Agreements",
 } as const;
 export const FOOTER_FEEDBACK_ROUTE = {

@@ -22,7 +22,7 @@ type Props = {
 };
 
 const COUNTRY_OPTIONS = [
-  { code: "TR", label: "Türkiye" },
+  { code: "TR", label: "Turkey" },
   { code: "US", label: "United States" },
 ];
 
@@ -184,7 +184,7 @@ export default function CascadingLocationFields({
       {country === "TR" ? (
         <>
           <div>
-            <label className={labelClass}>Şehir (İl)</label>
+            <label className={labelClass}>City (Province)</label>
             <select
               value={value.provinceSlug || ""}
               onChange={(e) => handleProvinceChange(e.target.value)}
@@ -192,7 +192,7 @@ export default function CascadingLocationFields({
               className={inputClass}
               required
             >
-              <option value="">Şehir seçin</option>
+              <option value="">Select city</option>
               {provinces.map((p) => (
                 <option key={p.slug} value={p.slug}>
                   {p.name}
@@ -201,7 +201,7 @@ export default function CascadingLocationFields({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Semt / İlçe</label>
+            <label className={labelClass}>District</label>
             <select
               value={value.districtName || ""}
               onChange={(e) => patch({ districtName: e.target.value })}
@@ -211,10 +211,10 @@ export default function CascadingLocationFields({
             >
               <option value="">
                 {!value.provinceSlug
-                  ? "Önce şehir seçin"
+                  ? "Select city first"
                   : districtsLoading
-                    ? "Yükleniyor..."
-                    : "İlçe seçin"}
+                    ? "Loading..."
+                    : "Select district"}
               </option>
               {districts.map((d) => (
                 <option key={d} value={d}>

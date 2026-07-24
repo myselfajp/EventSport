@@ -30,7 +30,7 @@ import {
 import * as zodValidation from '../utils/validation.js';
 import argon2 from 'argon2';
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
-import { notifyCertificateApproved, notifyCertificateRejected } from '../utils/notificationHelper.js';
+import { notifyCertificateApproved, notifyCertificateRejected, notifyPerformanceApplicationApproved, notifyPerformanceApplicationRejected } from '../utils/notificationHelper.js';
 import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
 import { isValidHeroCtaHref } from '../utils/heroCtaHref.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
@@ -497,11 +497,11 @@ export const createUser = async (req, res, next) => {
         let groupIds = [];
         if (userData.role === 0 && adminPermissionGroups?.length) {
             if (!req.adminPermissions?.has(ADMIN_PERMISSION_STAR)) {
-                throw new AppError(403, 'Yalnızca tam yetkili yönetici izin grubu atayabilir.');
+                throw new AppError(403, 'Only a full-access administrator can assign permission groups.');
             }
             const n = await AdminPermissionGroup.countDocuments({ _id: { $in: adminPermissionGroups } });
             if (n !== adminPermissionGroups.length) {
-                throw new AppError(400, 'Geçersiz izin grubu');
+                throw new AppError(400, 'Invalid permission group');
             }
             groupIds = adminPermissionGroups;
         }
@@ -572,11 +572,11 @@ export const updateUser = async (req, res, next) => {
         const hasFull = req.adminPermissions?.has(ADMIN_PERMISSION_STAR);
 
         if (result.isActive === false && userId.toString() === req.user._id.toString()) {
-            throw new AppError(400, 'Kendi hesabınızı pasifleştiremezsiniz.');
+            throw new AppError(400, 'You cannot deactivate your own account.');
         }
 
         if (result.adminPermissionGroups !== undefined && !hasFull) {
-            throw new AppError(403, 'İzin grubu ataması için tam yetki gerekir.');
+            throw new AppError(403, 'Full access is required to assign permission groups.');
         }
 
         if (result.role === 1) {
@@ -586,7 +586,7 @@ export const updateUser = async (req, res, next) => {
             if (ids.length) {
                 const n = await AdminPermissionGroup.countDocuments({ _id: { $in: ids } });
                 if (n !== ids.length) {
-                    throw new AppError(400, 'Geçersiz izin grubu');
+                    throw new AppError(400, 'Invalid permission group');
                 }
             }
         }
@@ -795,6 +795,17 @@ export const approvePerformanceApplication = async (req, res, next) => {
             performanceMember: application._id,
         });
 
+        const userId = application.user._id ?? application.user;
+        try {
+            await notifyPerformanceApplicationApproved(
+                userId,
+                application._id,
+                application.branch
+            );
+        } catch (notifErr) {
+            console.error('Failed to create notification:', notifErr);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Performance Team application approved successfully',
@@ -821,6 +832,18 @@ export const rejectPerformanceApplication = async (req, res, next) => {
 
         if (!application) {
             throw new AppError(404, 'Performance application not found');
+        }
+
+        const userId = application.user._id ?? application.user;
+        try {
+            await notifyPerformanceApplicationRejected(
+                userId,
+                application._id,
+                application.branch,
+                application.rejectionReason
+            );
+        } catch (notifErr) {
+            console.error('Failed to create notification:', notifErr);
         }
 
         res.status(200).json({

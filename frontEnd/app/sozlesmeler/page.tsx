@@ -1,5 +1,5 @@
-import SozlesmelerContent from "./SozlesmelerContent";
+import { redirect } from "next/navigation";
 
-export default function SozlesmelerPage() {
-  return <SozlesmelerContent />;
+export default function LegacyContractsRedirect() {
+  redirect("/contracts");
 }

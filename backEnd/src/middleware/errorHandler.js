@@ -159,7 +159,7 @@ export default (err, req, res, next) => {
     res.status(statusCode).json({
         success: false,
         error: message,
-        // Bazı istemciler `message` alanını okuyor; tutarlı ve açıklayıcı hata için ikisini de gönderiyoruz.
+        // Some clients read `message`; send both fields for consistent errors.
         message,
     });
 };

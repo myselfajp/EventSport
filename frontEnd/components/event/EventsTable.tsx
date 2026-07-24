@@ -428,7 +428,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
             {activeTab === "participated" ? `(${pagination.total})` : ""}
           </button>
         </div>
-        {/* Create Event butonu sadece koçlar için anlamlı; uygunsa burada gösterilir. */}
+        {/* Create Event button is only meaningful for coaches; shown here when appropriate. */}
         {canCreateOrManageEvents && onCreateEventClick && (
           <button
             onClick={onCreateEventClick}

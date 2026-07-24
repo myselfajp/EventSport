@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { tokenStore } from "../lib/token-store";
 
-/** NEXT_PUBLIC_API_V1_BASE'ten sadece origin kısmını çıkarır (…/api/v1 atılır). */
+/** Extract origin from NEXT_PUBLIC_API_V1_BASE (strips …/api/v1). */
 function getSocketOrigin(): string {
   const base = (process.env.NEXT_PUBLIC_API_V1_BASE || "").replace(/\/+$/, "");
   const origin = base.replace(/\/api\/v1\/?$/i, "");
@@ -13,7 +13,7 @@ function getSocketOrigin(): string {
   return "";
 }
 
-// Singleton: uygulama boyunca tek socket instance.
+// Singleton: one socket instance for the app lifetime.
 let socketSingleton: Socket | null = null;
 
 function getSocket(): Socket | null {
@@ -23,7 +23,7 @@ function getSocket(): Socket | null {
   if (!token) return null;
 
   if (socketSingleton) {
-    // Token rotate olmuşsa handshake auth'ı güncelle.
+    // Update handshake auth when the token rotates.
     socketSingleton.auth = { token };
     if (!socketSingleton.connected) {
       socketSingleton.connect();
@@ -50,8 +50,8 @@ export interface UseSocketResult {
 }
 
 /**
- * Singleton socket bağlantısını yönetir.
- * Dışarıya socket instance'ı ve canlı bağlantı durumunu döndürür.
+ * Manages the singleton socket connection.
+ * Returns the socket instance and live connection state.
  */
 export function useSocket(): UseSocketResult {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -85,7 +85,7 @@ export function useSocket(): UseSocketResult {
   return { socket, isConnected };
 }
 
-/** Oturum kapanışında singleton'ı temizlemek için (isteğe bağlı). */
+/** Optional: clear singleton on sign-out. */
 export function disconnectSocket() {
   if (socketSingleton) {
     socketSingleton.disconnect();

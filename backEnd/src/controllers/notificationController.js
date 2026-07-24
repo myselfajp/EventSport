@@ -49,13 +49,9 @@ export const getNotifications = async (req, res, next) => {
         }).select('notification');
 
         const readGlobalIds = globalReadStatus.map((r) => r.notification.toString());
-        let unreadGlobal = globalNotifications.filter(
+        const unreadGlobal = globalNotifications.filter(
             (n) => !readGlobalIds.includes(n._id.toString())
         );
-
-        if (unreadOnly) {
-            unreadGlobal = unreadGlobal;
-        }
 
         // 3. Role-based notifications
         const roleNotifications = await Notification.find({
@@ -74,13 +70,9 @@ export const getNotifications = async (req, res, next) => {
         }).select('notification');
 
         const readRoleIds = roleReadStatus.map((r) => r.notification.toString());
-        let unreadRole = roleNotifications.filter(
+        const unreadRole = roleNotifications.filter(
             (n) => !readRoleIds.includes(n._id.toString())
         );
-
-        if (unreadOnly) {
-            unreadRole = unreadRole;
-        }
 
         // 4. Group notifications
         const groupNotifications = await Notification.find({
@@ -99,20 +91,20 @@ export const getNotifications = async (req, res, next) => {
         }).select('notification');
 
         const readGroupIds = groupReadStatus.map((r) => r.notification.toString());
-        let unreadGroup = groupNotifications.filter(
+        const unreadGroup = groupNotifications.filter(
             (n) => !readGroupIds.includes(n._id.toString())
         );
 
-        if (unreadOnly) {
-            unreadGroup = unreadGroup;
-        }
+        const scopedNotifications = unreadOnly
+            ? [...unreadGlobal, ...unreadRole, ...unreadGroup]
+            : [...globalNotifications, ...roleNotifications, ...groupNotifications];
 
         // Combine all notifications
         const allNotifications = [
-            ...personalNotifications,
-            ...unreadGlobal,
-            ...unreadRole,
-            ...unreadGroup,
+            ...(unreadOnly
+                ? personalNotifications.filter((n) => !n.isRead)
+                : personalNotifications),
+            ...scopedNotifications,
         ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         // Add read status for each notification

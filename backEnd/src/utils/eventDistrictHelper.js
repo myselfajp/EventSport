@@ -98,7 +98,7 @@ export async function resolveEventLocation({
 
     if (istanbulDistrictId) {
         const dDoc = await District.findById(istanbulDistrictId).select('name').lean();
-        const loc = { country: 'TR', state: '', city: 'İstanbul', districtName: dDoc?.name || '' };
+        const loc = { country: 'TR', state: '', city: 'Istanbul', districtName: dDoc?.name || '' };
         return { district: istanbulDistrictId, ...loc, locationKey: buildLocationKey(loc) };
     }
 

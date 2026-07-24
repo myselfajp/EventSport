@@ -288,7 +288,7 @@ export const submitSuggestion = async (req, res, next) => {
 
         res.status(201).json({
             success: true,
-            message: 'Öneriniz alındı. Teşekkür ederiz.',
+            message: 'Thank you — your suggestion has been received.',
         });
     } catch (err) {
         next(err);

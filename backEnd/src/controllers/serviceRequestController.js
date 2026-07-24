@@ -112,9 +112,13 @@ function questionsForTarget(targetType) {
 const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
 
-const serviceRequestActionUrl = (tab) => `/?serviceRequests=${tab}`;
-const serviceRequestFocusUrl = (requestId) =>
-    `/?serviceRequests=mine&requestId=${requestId}`;
+const serviceRequestActionUrl = (tab, requestId = null) => {
+    const params = new URLSearchParams({ serviceRequests: tab });
+    if (requestId) params.set('requestId', String(requestId));
+    return `/?${params.toString()}`;
+};
+const serviceRequestFocusUrl = (requestId, tab = 'mine') =>
+    serviceRequestActionUrl(tab, requestId);
 
 function normalizeAnswers(input, targetType) {
     const catalog = questionsForTarget(targetType);
@@ -229,7 +233,7 @@ async function notifyProvidersOfServiceRequest(request) {
         targetUsers: providerUserIds,
         priority: 'normal',
         icon: 'users',
-        actionUrl: serviceRequestActionUrl('incoming'),
+        actionUrl: serviceRequestActionUrl('incoming', request._id),
         createdBy: request.requester,
     });
 }

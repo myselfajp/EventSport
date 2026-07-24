@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { parseSecureEventLink } from './eventLinkSecurity.js';
 
 const passwordMin = 8;
-// Yalnızca aşırı uzunluk / istismar (DoS) saldırılarına karşı sert tavan; ürün açısından "üst sınır yok" kabul edilebilir.
+// Hard upper bound against abuse/DoS; product treats "no practical upper limit" as acceptable below this cap.
 const passwordMax = 1024;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 const PASSWORD_RULE_MESSAGE =
-    'Şifre en az 8 karakter olmalı ve en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir.';
+    'Password must be at least 8 characters and include at least one uppercase letter, one lowercase letter, one digit, and one symbol.';
 const hexRegex = /^#([0-9A-F]{6}|[0-9A-F]{3})$/i;
 const MongoObjectIdRegex = /^[a-fA-F\d]{24}$/;
 const CountryCodeRegex = /^[A-Z]{2}$/;
@@ -151,11 +151,11 @@ export const signupSchema = z.object({
         .string({
             error: (iss) =>
                 iss.input === undefined
-                    ? { message: 'Şifre alanı zorunludur.' }
-                    : { message: 'Geçersiz şifre.' },
+                    ? { message: 'Password is required.' }
+                    : { message: 'Invalid password.' },
         })
         .min(passwordMin, PASSWORD_RULE_MESSAGE)
-        .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+        .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
         .regex(passwordRegex, PASSWORD_RULE_MESSAGE),
 
     age: z.date({
@@ -176,11 +176,11 @@ export const signupSchema = z.object({
         .string({
             error: (iss) =>
                 iss.input === undefined
-                    ? { message: 'Doğrulama kodu gerekli.' }
-                    : { message: 'Geçersiz doğrulama kodu.' },
+                    ? { message: 'Verification code is required.' }
+                    : { message: 'Invalid verification code.' },
         })
-        .length(6, 'Doğrulama kodu 6 haneli olmalıdır.')
-        .regex(/^\d{6}$/, 'Doğrulama kodu 6 haneli olmalıdır.'),
+        .length(6, 'Verification code must be 6 digits.')
+        .regex(/^\d{6}$/, 'Verification code must be 6 digits.'),
 
     /** Optional IYS / commercial electronic messages opt-in at signup. */
     marketingConsent: z.boolean().optional().default(false),
@@ -252,7 +252,7 @@ export const sendRegistrationOtpSchema = z.object({
         .string()
         .trim()
         .toLowerCase()
-        .email('Geçerli bir e-posta adresi girin.'),
+        .email('Please enter a valid email address.'),
     firstName: z.string().trim().optional(),
 });
 
@@ -287,11 +287,11 @@ export const adminCreateUserSchema = z.object({
         .string({
             error: (iss) =>
                 iss.input === undefined
-                    ? { message: 'Şifre alanı zorunludur.' }
-                    : { message: 'Geçersiz şifre.' },
+                    ? { message: 'Password is required.' }
+                    : { message: 'Invalid password.' },
         })
         .min(passwordMin, PASSWORD_RULE_MESSAGE)
-        .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+        .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
         .regex(passwordRegex, PASSWORD_RULE_MESSAGE),
     age: z.date({
         error: (iss) =>
@@ -305,17 +305,17 @@ export const adminCreateUserSchema = z.object({
 export const loginSchema = z.object({
     email: z
         .string({
-            error: (iss) => (iss.input === undefined ? 'E-posta zorunludur.' : 'Geçersiz e-posta.'),
+            error: (iss) => (iss.input === undefined ? 'Email is required.' : 'Invalid email.'),
         })
-        .email('Geçerli bir e-posta adresi giriniz.'),
+        .email('Please enter a valid email address.'),
 
     password: z
         .string({
             error: (iss) =>
-                iss.input === undefined ? 'Şifre zorunludur.' : 'Geçersiz şifre.',
+                iss.input === undefined ? 'Password is required.' : 'Invalid password.',
         })
-        .min(1, 'Şifre zorunludur.')
-        .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`),
+        .min(1, 'Password is required.')
+        .max(passwordMax, `Password must be at most ${passwordMax} characters.`),
 });
 
 export const editUserSchema = z
@@ -365,22 +365,22 @@ export const editUserSchema = z
             .string({
                 error: (iss) =>
                     iss.input === undefined
-                        ? { message: 'Yeni şifre zorunludur.' }
-                        : { message: 'Geçersiz yeni şifre.' },
+                        ? { message: 'New password is required.' }
+                        : { message: 'Invalid new password.' },
             })
             .min(passwordMin, PASSWORD_RULE_MESSAGE)
-            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
             .regex(passwordRegex, PASSWORD_RULE_MESSAGE)
             .optional(),
         oldPassword: z
             .string({
                 error: (iss) =>
                     iss.input === undefined
-                        ? { message: 'Mevcut şifre zorunludur.' }
-                        : { message: 'Geçersiz mevcut şifre.' },
+                        ? { message: 'Current password is required.' }
+                        : { message: 'Invalid current password.' },
             })
-            .min(1, 'Mevcut şifre zorunludur.')
-            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .min(1, 'Current password is required.')
+            .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
             .optional(),
         photo: z
             .string()
@@ -500,22 +500,22 @@ export const adminEditUserSchema = z
             .string({
                 error: (iss) =>
                     iss.input === undefined
-                        ? { message: 'Yeni şifre zorunludur.' }
-                        : { message: 'Geçersiz yeni şifre.' },
+                        ? { message: 'New password is required.' }
+                        : { message: 'Invalid new password.' },
             })
             .min(passwordMin, PASSWORD_RULE_MESSAGE)
-            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
             .regex(passwordRegex, PASSWORD_RULE_MESSAGE)
             .optional(),
         oldPassword: z
             .string({
                 error: (iss) =>
                     iss.input === undefined
-                        ? { message: 'Mevcut şifre zorunludur.' }
-                        : { message: 'Geçersiz mevcut şifre.' },
+                        ? { message: 'Current password is required.' }
+                        : { message: 'Invalid current password.' },
             })
-            .min(1, 'Mevcut şifre zorunludur.')
-            .max(passwordMax, `Şifre en fazla ${passwordMax} karakter olabilir.`)
+            .min(1, 'Current password is required.')
+            .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
             .optional(),
         photo: z.string().optional(),
         deletePhoto: z.string().optional(),
@@ -742,6 +742,7 @@ export const coachProfilePayloadSchema = z
             .string()
             .regex(MongoObjectIdRegex, 'Invalid commercial messages version ID.')
             .optional(),
+        confirmRoleSwitch: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
         if (data.marketingConsent && !data.commercialMessagesVersionId) {
@@ -772,6 +773,7 @@ export const parseCoachProfileFormData = (dataString) => {
         agreeCoachAgreement: obj.agreeCoachAgreement,
         marketingConsent: obj.marketingConsent,
         commercialMessagesVersionId: obj.commercialMessagesVersionId,
+        confirmRoleSwitch: obj.confirmRoleSwitch,
     };
 };
 
@@ -1698,13 +1700,13 @@ export const suggestionSubmitSchema = z.object({
     message: z
         .string({
             error: (iss) =>
-                iss.input === undefined ? { message: 'Mesaj zorunludur.' } : { message: 'Geçersiz mesaj.' },
+                iss.input === undefined ? { message: 'Message is required.' } : { message: 'Invalid message.' },
         })
         .trim()
-        .min(10, 'Mesaj en az 10 karakter olmalıdır.')
-        .max(4000, 'Mesaj en fazla 4000 karakter olabilir.'),
-    email: z.string().email('Geçerli bir e-posta girin.').optional(),
-    contactName: z.string().trim().max(120, 'İsim en fazla 120 karakter olabilir.').optional(),
+        .min(10, 'Message must be at least 10 characters.')
+        .max(4000, 'Message must be at most 4000 characters.'),
+    email: z.string().email('Please enter a valid email.').optional(),
+    contactName: z.string().trim().max(120, 'Name must be at most 120 characters.').optional(),
 });
 
 export const REPORT_REASONS = [

@@ -561,7 +561,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         state: initialData.state || "",
         city:
           initialData.city ||
-          (initCountry === "TR" && initDistrictName ? "İstanbul" : ""),
+          (initCountry === "TR" && initDistrictName ? "Istanbul" : ""),
         districtName: initDistrictName,
       });
 

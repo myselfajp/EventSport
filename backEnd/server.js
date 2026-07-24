@@ -12,7 +12,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 const startServer = async () => {
     try {
-        // httpServer hem Express app'i hem socket.io'yu barındırır.
+        // httpServer hosts both the Express app and socket.io.
         httpServer.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });

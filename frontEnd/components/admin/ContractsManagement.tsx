@@ -37,7 +37,7 @@ export default function ContractsManagement({
   if (visible.length === 0) {
     return (
       <p className="text-sm text-gray-500 dark:text-slate-400">
-        Bu bölüm için izniniz yok.
+        You do not have permission for this section.
       </p>
     );
   }
@@ -45,13 +45,13 @@ export default function ContractsManagement({
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500 dark:text-slate-400 max-w-3xl leading-relaxed">
-        Tüm sözleşme metinleri tek kaynaktan yönetilir (Legal API). Anahtarlar İngilizce (
+        All contract texts are managed from a single source (Legal API). Keys are English (
         <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">docType</code>
-        ); site başlıkları Türkçe olabilir. Kamu sayfası:{" "}
-        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">/sozlesmeler</code>
-        ; tekil belge:{" "}
+        ). Public page:{" "}
+        <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">/contracts</code>
+        ; individual document:{" "}
         <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">/legal/[docType]</code>
-        . Eski statik slug&apos;lar otomatik yönlendirilir.
+        . Legacy static slugs redirect automatically.
       </p>
 
       <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-slate-700 pb-2">

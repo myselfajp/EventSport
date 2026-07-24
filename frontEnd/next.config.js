@@ -7,6 +7,12 @@ const nextConfig = {
         domains: [],
     },
     output: 'standalone',
+    async redirects() {
+        return [
+            { source: '/sozlesmeler', destination: '/contracts', permanent: true },
+            { source: '/sayfa/:slug', destination: '/page/:slug', permanent: true },
+        ];
+    },
 }
 
 // Load environment variables from root .env file

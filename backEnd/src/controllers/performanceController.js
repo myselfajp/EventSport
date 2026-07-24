@@ -2,6 +2,7 @@ import { unlink } from 'fs/promises';
 import { AppError } from '../utils/appError.js';
 import User from '../models/userModel.js';
 import PerformanceMember, { PERFORMANCE_BRANCHES } from '../models/performanceMemberModel.js';
+import { removeCoachProfileForUser } from '../utils/providerRoleSwitch.js';
 
 const normalizeText = (value, max = 2000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -34,15 +35,20 @@ export const createOrUpdateProfile = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
 
+        const payload = parseProfilePayload(req.body?.data || req.body);
+        const confirmRoleSwitch = payload.confirmRoleSwitch === true;
+
         const freshUser = await User.findById(req.user._id).select('coach performanceMember').lean();
         if (freshUser?.coach) {
-            throw new AppError(
-                403,
-                'Coaches cannot apply to the Performance Team. Coach and Performance Team roles are mutually exclusive.'
-            );
+            if (!confirmRoleSwitch) {
+                throw new AppError(
+                    409,
+                    'You are currently a coach. Applying to the Performance Team will remove your coach profile. Confirm the role switch to continue.'
+                );
+            }
+            await removeCoachProfileForUser(req.user._id);
         }
 
-        const payload = parseProfilePayload(req.body?.data || req.body);
         const branch = normalizeText(payload.branch, 64);
         if (!PERFORMANCE_BRANCHES.includes(branch)) {
             throw new AppError(400, 'Invalid performance branch.');

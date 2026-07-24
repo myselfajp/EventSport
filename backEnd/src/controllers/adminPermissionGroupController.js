@@ -42,7 +42,7 @@ export const createPermissionGroup = async (req, res, next) => {
         res.status(201).json({ success: true, data: group });
     } catch (err) {
         if (err.code === 11000) {
-            return next(new AppError(409, 'Bu slug zaten kullanılıyor.'));
+            return next(new AppError(409, 'This slug is already in use.'));
         }
         next(err);
     }
@@ -53,10 +53,10 @@ export const updatePermissionGroup = async (req, res, next) => {
         const id = mongoObjectId.parse(req.params.groupId);
         const group = await AdminPermissionGroup.findById(id);
         if (!group) {
-            throw new AppError(404, 'Grup bulunamadı');
+            throw new AppError(404, 'Group not found');
         }
         if (group.isSystem) {
-            throw new AppError(403, 'Sistem grubu düzenlenemez');
+            throw new AppError(403, 'System group cannot be edited');
         }
 
         const { name, slug, permissions, description } = req.body || {};
@@ -79,7 +79,7 @@ export const updatePermissionGroup = async (req, res, next) => {
         res.status(200).json({ success: true, data: group });
     } catch (err) {
         if (err.code === 11000) {
-            return next(new AppError(409, 'Bu slug zaten kullanılıyor.'));
+            return next(new AppError(409, 'This slug is already in use.'));
         }
         next(err);
     }
@@ -90,16 +90,16 @@ export const deletePermissionGroup = async (req, res, next) => {
         const id = mongoObjectId.parse(req.params.groupId);
         const group = await AdminPermissionGroup.findById(id);
         if (!group) {
-            throw new AppError(404, 'Grup bulunamadı');
+            throw new AppError(404, 'Group not found');
         }
         if (group.isSystem) {
-            throw new AppError(403, 'Sistem grubu silinemez');
+            throw new AppError(403, 'System group cannot be deleted');
         }
 
         await User.updateMany({ adminPermissionGroups: id }, { $pull: { adminPermissionGroups: id } });
 
         await AdminPermissionGroup.deleteOne({ _id: id });
-        res.status(200).json({ success: true, message: 'Grup silindi' });
+        res.status(200).json({ success: true, message: 'Group deleted' });
     } catch (err) {
         next(err);
     }

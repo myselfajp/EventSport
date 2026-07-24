@@ -8,10 +8,10 @@ export async function initAdminPermissionGroups() {
             return;
         }
         await AdminPermissionGroup.create({
-            name: 'Tam yetki (sistem)',
+            name: 'Full access (system)',
             slug: 'full-access',
             permissions: [ADMIN_PERMISSION_STAR],
-            description: 'Tüm admin alanları. Yeni kurulumda otomatik oluşturulur.',
+            description: 'All admin areas. Created automatically on fresh installs.',
             isSystem: true,
         });
         console.log('✅ Default admin permission group "full-access" created');

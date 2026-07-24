@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { fetchJSON } from "../../app/lib/api";
+import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
 import { useMe } from "../../app/hooks/useAuth";
 import { Edit, Trash2, Calendar, Filter } from "lucide-react";
@@ -210,6 +210,8 @@ const EventsManagement: React.FC = () => {
     );
   };
 
+  const canDeleteEvent = (event: Event) => isAdmin || isEventOwner(event);
+
   const handleEdit = async (event: Event) => {
     if (!isEventOwner(event) || event.status === "cancelled") return;
     try {
@@ -240,22 +242,32 @@ const EventsManagement: React.FC = () => {
   };
 
   const handleDelete = async (eventId: string, event: Event) => {
-    if (!isEventOwner(event)) return;
-    if (!confirm("Are you sure you want to delete this event?")) {
+    if (!canDeleteEvent(event)) return;
+    const ownerName = event.owner
+      ? `${event.owner.firstName} ${event.owner.lastName}`.trim()
+      : "unknown owner";
+    const message = isAdmin && !isEventOwner(event)
+      ? `Permanently delete "${event.name}" (owner: ${ownerName})? This cannot be undone.`
+      : `Are you sure you want to delete "${event.name}"?`;
+    if (!confirm(message)) {
       return;
     }
 
     try {
       setError("");
-      const COACH_DATA_API = EP.COACH.createEvent.replace('/create-event', '');
-      const response = await fetchJSON(
-        `${COACH_DATA_API}/delete-event/${eventId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const res = await apiFetch(EP.COACH.deleteEvent(eventId), {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      const txt = await res.text();
+      let response: { success?: boolean; message?: string; error?: string } = {};
+      try {
+        response = txt ? JSON.parse(txt) : {};
+      } catch {
+        /* ignore parse errors */
+      }
 
-      if (response?.success) {
+      if (res.ok || response?.success) {
         fetchEvents();
       } else {
         setError(response?.message || response?.error || "Failed to delete event");
@@ -555,22 +567,27 @@ const EventsManagement: React.FC = () => {
                         </code>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {isEventOwner(event) && event.status !== "cancelled" ? (
+                        {(isEventOwner(event) && event.status !== "cancelled") ||
+                        canDeleteEvent(event) ? (
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => void handleEdit(event)}
-                              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                              title="Edit"
-                            >
-                              <Edit className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => void handleDelete(event._id, event)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
+                            {isEventOwner(event) && event.status !== "cancelled" && (
+                              <button
+                                onClick={() => void handleEdit(event)}
+                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                title="Edit"
+                              >
+                                <Edit className="w-5 h-5" />
+                              </button>
+                            )}
+                            {canDeleteEvent(event) && (
+                              <button
+                                onClick={() => void handleDelete(event._id, event)}
+                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-slate-500">—</span>

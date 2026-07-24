@@ -1,7 +1,7 @@
 import LegalDocument from '../models/legalDocumentModel.js';
 import StaticPage from '../models/staticPageModel.js';
 import {
-    DEFAULT_TITLES_TR,
+    DEFAULT_TITLES,
     LEGACY_STATIC_TO_DOC_TYPE,
     COACH_DOC_TYPES,
 } from '../constants/contractDocuments.js';
@@ -25,7 +25,7 @@ export async function migrateStaticContractsToLegal() {
         await LegalDocument.create({
             docType,
             version,
-            title: (page.title || DEFAULT_TITLES_TR[docType] || docType).trim(),
+            title: (page.title || DEFAULT_TITLES[docType] || docType).trim(),
             content: typeof page.content === 'string' ? page.content : '',
             isActive: true,
         });
@@ -41,8 +41,8 @@ export async function migrateStaticContractsToLegal() {
         await LegalDocument.create({
             docType,
             version,
-            title: DEFAULT_TITLES_TR[docType],
-            content: `<p>${DEFAULT_TITLES_TR[docType]} metni Admin panel → Contracts → Coach bölümünden düzenlenebilir.</p>`,
+            title: DEFAULT_TITLES[docType],
+            content: `<p>${DEFAULT_TITLES[docType]} text can be edited in Admin panel → Contracts → Coach.</p>`,
             isActive: true,
         });
         console.log(`✅ Default coach legal doc ${docType} (v${version}) created.`);

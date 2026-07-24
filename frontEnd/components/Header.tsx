@@ -115,14 +115,19 @@ const Header: React.FC<HeaderProps> = ({
           const params = new URLSearchParams(url.slice(url.indexOf("?")));
           const tab = params.get("serviceRequests");
           const requestId = params.get("requestId");
+          const detail = {
+            tab: tab === "incoming" ? "incoming" : "mine",
+            requestId: requestId || undefined,
+            autoWizard: false,
+          };
+
+          if (pathname !== "/") {
+            router.push(url);
+            return;
+          }
+
           window.dispatchEvent(
-            new CustomEvent("eventsport:open-service-requests", {
-              detail: {
-                tab: tab === "incoming" ? "incoming" : "mine",
-                requestId: requestId || undefined,
-                autoWizard: false,
-              },
-            })
+            new CustomEvent("eventsport:open-service-requests", { detail })
           );
           return;
         }

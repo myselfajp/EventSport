@@ -257,7 +257,7 @@ export default function StaticPagesManagement() {
               <ul className="list-disc list-inside text-cyan-800/90 dark:text-cyan-200/90 space-y-0.5 text-xs">
                 <li>
                   <strong>URL slug</strong> becomes{" "}
-                  <code className="bg-white/60 dark:bg-slate-900/50 px-1 rounded">/sayfa/[slug]</code>
+                  <code className="bg-white/60 dark:bg-slate-900/50 px-1 rounded">/page/[slug]</code>
                 </li>
                 <li>Typing a title auto-fills the slug (e.g. &quot;About&quot; → <code>about</code>, not <code>about-us</code>)</li>
                 <li>Use the quick-start buttons below for footer-linked pages</li>
@@ -271,8 +271,8 @@ export default function StaticPagesManagement() {
             <FileWarning className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 dark:text-amber-100">
               Do not create contract pages here. Old contract URLs redirect to{" "}
-              <Link href="/sozlesmeler" className="underline font-medium" target="_blank">
-                /sozlesmeler
+              <Link href="/contracts" className="underline font-medium" target="_blank">
+                /contracts
               </Link>
               . Edit contracts in <strong>Contracts</strong>.
             </p>
@@ -352,7 +352,7 @@ export default function StaticPagesManagement() {
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-slate-400">
           Footer shows About, FAQ, Feedback, and Contact only. Legal texts are under{" "}
-          <strong>Contracts</strong> and <code className="px-1 rounded bg-gray-100 dark:bg-slate-700">/sozlesmeler</code>.
+          <strong>Contracts</strong> and <code className="px-1 rounded bg-gray-100 dark:bg-slate-700">/contracts</code>.
         </p>
       </div>
 
@@ -555,7 +555,7 @@ export default function StaticPagesManagement() {
                 </label>
                 <div className="flex rounded-lg border border-gray-300 dark:border-slate-600 overflow-hidden focus-within:ring-2 focus-within:ring-cyan-500/40">
                   <span className="inline-flex items-center px-3 bg-gray-100 dark:bg-slate-900 text-gray-500 dark:text-slate-400 text-sm border-r border-gray-300 dark:border-slate-600 shrink-0">
-                    /sayfa/
+                    /page/
                   </span>
                   <input
                     type="text"

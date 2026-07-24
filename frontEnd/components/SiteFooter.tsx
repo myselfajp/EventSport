@@ -5,7 +5,7 @@ const linkClass =
   "px-2 py-1 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 transition-colors duration-200";
 
 function footerHref(item: (typeof FOOTER_NAV_LINKS)[number]): string {
-  return item.kind === "static" ? `/sayfa/${item.slug}` : item.href;
+  return item.kind === "static" ? `/page/${item.slug}` : item.href;
 }
 
 export default function SiteFooter() {

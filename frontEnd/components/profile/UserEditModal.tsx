@@ -52,7 +52,7 @@ function locationFromUser(user: {
 
   // Legacy Istanbul users: only the district ObjectId is set.
   const city =
-    loc.city || (country === "TR" && districtDocName ? "İstanbul" : "");
+    loc.city || (country === "TR" && districtDocName ? "Istanbul" : "");
   const districtName = loc.districtName || districtDocName || "";
 
   return {
@@ -139,15 +139,15 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose }) => {
     const country = normalizeCountry(locationValue.country);
     if (country === "TR") {
       if (!locationValue.city) {
-        setError("Lütfen şehir (il) seçin.");
+        setError("Please select a city (province).");
         return;
       }
       if (!locationValue.districtName) {
-        setError("Lütfen ilçe seçin.");
+        setError("Please select a district.");
         return;
       }
       if (!locationValue.postalCode?.trim()) {
-        setError("Lütfen posta kodunu girin.");
+        setError("Please enter your postal code.");
         return;
       }
     } else {

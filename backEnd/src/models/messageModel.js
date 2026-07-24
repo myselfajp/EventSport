@@ -28,7 +28,7 @@ const messageSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
-        /** Kullanıcı bazlı "benden sil" — bu listedeki kullanıcılar mesajı görmez. */
+        /** Per-user "delete for me" — users in this list do not see the message. */
         hiddenFor: [
             {
                 type: mongoose.Schema.Types.ObjectId,
@@ -39,7 +39,7 @@ const messageSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-// Bir konuşmanın mesajlarını kronolojik olarak sayfalamak için.
+// Paginate a conversation's messages chronologically.
 messageSchema.index({ conversation: 1, createdAt: -1 });
 
 const Message = mongoose.model('Message', messageSchema);

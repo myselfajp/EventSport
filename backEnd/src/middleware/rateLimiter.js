@@ -2,7 +2,7 @@ import rateLimit from 'express-rate-limit';
 
 export const authRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: 50,
     message: 'Too many login attempts, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
@@ -14,7 +14,7 @@ export const authRateLimiter = rateLimit({
 
 export const signupRateLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
-    max: 5,
+    max: 100,
     message: 'Too many signup attempts, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
@@ -51,7 +51,7 @@ export const heroClickRateLimiter = rateLimit({
 export const publicSuggestionRateLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: 25,
-    message: 'Çok fazla öneri gönderdiniz. Lütfen daha sonra tekrar deneyin.',
+    message: 'Too many suggestions submitted. Please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
 });

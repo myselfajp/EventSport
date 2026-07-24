@@ -1871,13 +1871,12 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
             </p>
             {legalVersionsLoading && (
               <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
-                Sözleşme sürümleri yükleniyor…
+                Loading contract versions…
               </p>
             )}
             {!legalVersionsLoading && !legalVersionsReady && (
               <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 mb-3">
-                Mesafeli satış veya etkinlik sözleşmesi için aktif Legal belgesi yok. Admin → Legal
-                bölümünden yayına alın.
+                No active Legal document for distance selling or event agreement. Publish one in Admin → Legal.
               </p>
             )}
             <div className="space-y-3 text-sm text-gray-800 dark:text-slate-200 mb-6">
@@ -1937,7 +1936,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 <span>
                   I accept the{" "}
                   <a
-                    href="/sozlesmeler#mesafeli-satis"
+                    href="/contracts#distance-selling"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-cyan-600 dark:text-cyan-400 underline font-medium"
@@ -1959,7 +1958,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 <span>
                   I accept the{" "}
                   <a
-                    href="/sozlesmeler#etkinlik-satin-alma"
+                    href="/contracts#event-contract"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-cyan-600 dark:text-cyan-400 underline font-medium"

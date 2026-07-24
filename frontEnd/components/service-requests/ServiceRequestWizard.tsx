@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Check, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { CONTRACTS_SECTION_ANCHORS } from "@/app/lib/contract-documents";
 import { useMe } from "@/app/hooks/useAuth";
 import { getLevelDefinition } from "@/app/lib/level-definitions";
 import {
@@ -144,6 +146,10 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
   const [multiValues, setMultiValues] = useState<Record<string, string[]>>({});
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [emailConsent, setEmailConsent] = useState(false);
+  const [coachMeConsentDoc, setCoachMeConsentDoc] = useState<{
+    title: string;
+    content: string;
+  } | null>(null);
   const [budgetAmount, setBudgetAmount] = useState("");
 
   const answerSteps = useMemo(() => questionsForTarget(targetType), [targetType]);
@@ -162,6 +168,25 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
         if (res?.success && Array.isArray(res.data)) setSportGroups(res.data);
       }
     );
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchJSON(EP.PUBLIC.contractsCatalog, { method: "GET" }, { skipAuth: true }).then((res) => {
+      if (cancelled || !res?.success || !res?.data?.legal) return;
+      const doc = (res.data.legal as Array<{ docType?: string; title?: string; content?: string }>).find(
+        (item) => item.docType === "coach_me_consent"
+      );
+      if (doc) {
+        setCoachMeConsentDoc({
+          title: doc.title || "Coach Me Email Contact Consent",
+          content: doc.content || "",
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -529,17 +554,41 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
         );
       case "consent":
         return (
-          <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-            <input
-              type="checkbox"
-              checked={emailConsent}
-              onChange={(event) => setEmailConsent(event.target.checked)}
-              className="mt-1"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-200">
-              I allow sports coaches and providers to contact me via email about this request.
-            </span>
-          </label>
+          <div className="space-y-4">
+            {coachMeConsentDoc?.content ? (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200">
+                <div
+                  className="max-h-48 overflow-y-auto contracts-prose [&_a]:text-cyan-600 dark:[&_a]:text-cyan-400"
+                  dangerouslySetInnerHTML={{ __html: coachMeConsentDoc.content }}
+                />
+                <Link
+                  href={`/contracts#${CONTRACTS_SECTION_ANCHORS.coach_me_consent}`}
+                  target="_blank"
+                  className="mt-3 inline-block text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
+                >
+                  Read full document on Agreements page
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                By continuing, you allow sports coaches and providers to contact you via email about
+                this request. The full consent text can be managed in Admin → Contracts → Legal
+                documents.
+              </p>
+            )}
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+              <input
+                type="checkbox"
+                checked={emailConsent}
+                onChange={(event) => setEmailConsent(event.target.checked)}
+                className="mt-1"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-200">
+                {coachMeConsentDoc?.title ||
+                  "I allow sports coaches and providers to contact me via email about this request."}
+              </span>
+            </label>
+          </div>
         );
       default:
         return null;

@@ -351,6 +351,51 @@ export const notifyCertificateRejected = async (userId, branchId, sportName, lev
     });
 };
 
+const PERFORMANCE_BRANCH_LABELS = {
+    manager: 'Manager',
+    psychologist: 'Psychologist',
+    dietitian: 'Dietitian',
+    psychotherapist: 'Psychotherapist',
+};
+
+function performanceBranchLabel(branch) {
+    return PERFORMANCE_BRANCH_LABELS[branch] || branch || 'Performance Team';
+}
+
+export const notifyPerformanceApplicationApproved = async (userId, applicationId, branch) => {
+    const label = performanceBranchLabel(branch);
+    return createNotification({
+        scope: 'user',
+        type: 'performance_application_approved',
+        title: 'Performance Team Application Approved',
+        message: `Your ${label} application has been approved. You can now operate as a Performance Team member.`,
+        data: { applicationId, branch },
+        userId,
+        priority: 'high',
+        icon: 'check-circle',
+    });
+};
+
+export const notifyPerformanceApplicationRejected = async (
+    userId,
+    applicationId,
+    branch,
+    reason = ''
+) => {
+    const label = performanceBranchLabel(branch);
+    const reasonSuffix = reason ? ` Reason: ${reason}` : '';
+    return createNotification({
+        scope: 'user',
+        type: 'performance_application_rejected',
+        title: 'Performance Team Application Rejected',
+        message: `Your ${label} application has been rejected.${reasonSuffix}`,
+        data: { applicationId, branch, reason: reason || null },
+        userId,
+        priority: 'normal',
+        icon: 'x-circle',
+    });
+};
+
 /* -------------------------------------------------------------------------- */
 /*  Reservation approval / rejection (legacy)                                 */
 /* -------------------------------------------------------------------------- */

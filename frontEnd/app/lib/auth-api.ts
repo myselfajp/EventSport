@@ -44,7 +44,7 @@ export async function sendRegistrationOtp(payload: {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body?.success === false) {
     throw new Error(
-      body?.error || body?.message || "Doğrulama kodu gönderilemedi."
+      body?.error || body?.message || "Could not send verification code."
     );
   }
   return {
@@ -77,7 +77,7 @@ export async function signIn(payload: { email: string; password: string }) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body?.success === false) {
     throw new Error(
-      body?.error || body?.message || `Giriş yapılamadı (HTTP ${res.status}).`
+      body?.error || body?.message || `Sign-in failed (HTTP ${res.status}).`
     );
   }
   return body?.data ?? body?.user ?? null;
@@ -106,7 +106,7 @@ export async function signUp(payload: Record<string, any>) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body?.success === false) {
     throw new Error(
-      body?.error || body?.message || `Kayıt oluşturulamadı (HTTP ${res.status}).`
+      body?.error || body?.message || `Registration failed (HTTP ${res.status}).`
     );
   }
   return body?.data ?? body?.user ?? null;
@@ -126,7 +126,7 @@ export async function editUserPhoto(formData?: FormData) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body?.success === false) {
     throw new Error(
-      body?.error || body?.message || `İşlem başarısız (HTTP ${res.status}).`
+      body?.error || body?.message || `Operation failed (HTTP ${res.status}).`
     );
   }
   return body?.data ?? null;

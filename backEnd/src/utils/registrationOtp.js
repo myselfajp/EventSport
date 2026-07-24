@@ -3,8 +3,8 @@ import RegistrationOtp from '../models/registrationOtpModel.js';
 import { AppError } from './appError.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 5;
-const RESEND_COOLDOWN_MS = 60 * 1000;
+const MAX_ATTEMPTS = 20;
+const RESEND_COOLDOWN_MS = 15 * 1000;
 
 export function generateOtpCode() {
     return String(crypto.randomInt(100000, 1000000));
@@ -34,27 +34,27 @@ export async function assertCanResendOtp(email) {
     const elapsed = Date.now() - new Date(existing.updatedAt).getTime();
     if (elapsed < RESEND_COOLDOWN_MS) {
         const waitSec = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
-        throw new AppError(429, `Yeni kod için ${waitSec} saniye bekleyin.`);
+        throw new AppError(429, `Please wait ${waitSec} seconds before requesting a new code.`);
     }
 }
 
 export async function verifyAndConsumeRegistrationOtp(email, code) {
     const doc = await RegistrationOtp.findOne({ email }).select('+otpHash');
     if (!doc) {
-        throw new AppError(400, 'Önce e-postanıza doğrulama kodu gönderin.');
+        throw new AppError(400, 'Send a verification code to your email first.');
     }
     if (doc.expiresAt < new Date()) {
         await RegistrationOtp.deleteOne({ email });
-        throw new AppError(400, 'Doğrulama kodunun süresi doldu. Yeni kod isteyin.');
+        throw new AppError(400, 'Verification code expired. Request a new code.');
     }
     if (doc.attempts >= MAX_ATTEMPTS) {
         await RegistrationOtp.deleteOne({ email });
-        throw new AppError(400, 'Çok fazla hatalı deneme. Yeni kod isteyin.');
+        throw new AppError(400, 'Too many failed attempts. Request a new code.');
     }
     if (hashOtp(code) !== doc.otpHash) {
         doc.attempts += 1;
         await doc.save();
-        throw new AppError(400, 'Doğrulama kodu hatalı.');
+        throw new AppError(400, 'Incorrect verification code.');
     }
     await RegistrationOtp.deleteOne({ email });
 }

@@ -106,11 +106,11 @@ export default function ContractAcceptanceManagement() {
         setItems(res.data.items ?? []);
         setTotalPages(res.data.pagination?.pages ?? 1);
       } else {
-        setError(res?.message || res?.error || "Liste alınamadı");
+        setError(res?.message || res?.error || "Could not load list");
         setItems([]);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Liste alınamadı");
+      setError(e instanceof Error ? e.message : "Could not load list");
       setItems([]);
     } finally {
       setLoading(false);
@@ -130,9 +130,8 @@ export default function ContractAcceptanceManagement() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600 dark:text-slate-400 max-w-3xl">
-        Kullanıcıların kabul ettiği sözleşmelerin denetim kaydı: kayıt (KVKK / şartlar),
-        etkinlik kaydı (mesafeli satış / etkinlik sözleşmesi), antrenör profili,
-        pazarlama izni ve çerez tercihleri.
+        Audit log of user contract acceptances: sign-up (KVKK / terms), event registration
+        (distance selling / event agreement), coach profile, marketing consent, and cookie preferences.
       </p>
 
       <form
@@ -153,7 +152,7 @@ export default function ContractAcceptanceManagement() {
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-            Sözleşme anahtarı
+            Contract key
           </label>
           <input
             type="text"
@@ -165,14 +164,14 @@ export default function ContractAcceptanceManagement() {
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
-            Bağlam
+            Context
           </label>
           <select
             value={context}
             onChange={(e) => setContext(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
           >
-            <option value="">Tümü</option>
+            <option value="">All</option>
             {Object.entries(CONTEXT_LABELS).map(([k, label]) => (
               <option key={k} value={k}>
                 {label}
@@ -184,7 +183,7 @@ export default function ContractAcceptanceManagement() {
           type="submit"
           className="px-4 py-2 bg-cyan-600 text-white text-sm rounded-lg hover:bg-cyan-700"
         >
-          Filtrele
+          Filter
         </button>
       </form>
 
@@ -196,22 +195,22 @@ export default function ContractAcceptanceManagement() {
 
       <div className="border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
         {loading ? (
-          <p className="p-8 text-center text-gray-500">Yükleniyor…</p>
+          <p className="p-8 text-center text-gray-500">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="p-8 text-center text-gray-500">Kayıt bulunamadı.</p>
+          <p className="p-8 text-center text-gray-500">No records found.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-slate-700 text-left">
-                  <th className="p-3">Tarih</th>
-                  <th className="p-3">Kullanıcı</th>
-                  <th className="p-3">Sözleşme</th>
-                  <th className="p-3">Sürüm</th>
-                  <th className="p-3">Kaynak</th>
-                  <th className="p-3">Bağlam</th>
-                  <th className="p-3">Tercihler</th>
-                  <th className="p-3">Etkinlik</th>
+                  <th className="p-3">Date</th>
+                  <th className="p-3">User</th>
+                  <th className="p-3">Contract</th>
+                  <th className="p-3">Version</th>
+                  <th className="p-3">Source</th>
+                  <th className="p-3">Context</th>
+                  <th className="p-3">Preferences</th>
+                  <th className="p-3">Event</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,7 +262,7 @@ export default function ContractAcceptanceManagement() {
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             className="px-3 py-1 text-sm rounded border disabled:opacity-50"
           >
-            Önceki
+            Previous
           </button>
           <span className="text-sm text-gray-600 dark:text-slate-400 py-1">
             {page} / {totalPages}
@@ -274,7 +273,7 @@ export default function ContractAcceptanceManagement() {
             onClick={() => setPage((p) => p + 1)}
             className="px-3 py-1 text-sm rounded border disabled:opacity-50"
           >
-            Sonraki
+            Next
           </button>
         </div>
       )}

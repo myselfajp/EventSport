@@ -55,8 +55,8 @@ export const sendRegistrationOtp = async (req, res, next) => {
         const payload = {
             success: true,
             message: mailResult.sent
-                ? 'Doğrulama kodu e-posta adresinize gönderildi.'
-                : 'SMTP ayarlı değil; geliştirme kodu yanıtta gösterildi.',
+                ? 'Verification code sent to your email address.'
+                : 'SMTP is not configured; development code included in the response.',
             emailSent: mailResult.sent,
         };
 
@@ -394,8 +394,8 @@ export const getUser = async (req, res, next) => {
 
 export const getCurrentUser = async (req, res, next) => {
     try {
-        // Oturum yoksa 401 fırlatmıyoruz: bu uç nokta sayfa açılışında çalışıyor ve
-        // misafir kullanıcılar için 401 hata olarak değerlendirilmemeli.
+        // Do not throw 401 when there is no session: this endpoint runs on page load and
+        // guests should not treat 401 as an error.
         if (!req.user) {
             return res.status(200).json({
                 success: true,
@@ -406,7 +406,7 @@ export const getCurrentUser = async (req, res, next) => {
         const user = await User.findById(req.user._id)
             .select('-__v')
             .populate({ path: 'location.district', select: 'name' });
-        if (!user) throw new AppError(404, 'Kullanıcı bulunamadı.');
+        if (!user) throw new AppError(404, 'User not found.');
 
         res.status(200).json({
             success: true,
@@ -588,7 +588,7 @@ export const updateAccountSettings = async (req, res, next) => {
             .select('-__v -password')
             .populate({ path: 'location.district', select: 'name' });
 
-        if (!updatedUser) throw new AppError(404, 'Kullanıcı bulunamadı.');
+        if (!updatedUser) throw new AppError(404, 'User not found.');
 
         if (marketingConsent && commercialMessagesVersionId) {
             await recordLegalAcceptance(req, req.user._id, {

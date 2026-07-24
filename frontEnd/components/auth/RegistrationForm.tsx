@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import PasswordInput from "./PasswordInput";
 import { useSignUp } from "@/app/hooks/useAuth";
 import { sendRegistrationOtp } from "@/app/lib/auth-api";
 import {
@@ -41,8 +41,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreeKvkk, setAgreeKvkk] = useState(false);
   const [agreeCommercialMessages, setAgreeCommercialMessages] = useState(false);
@@ -113,12 +111,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }
 
     if (password !== confirmPassword) {
-      setValidationError("Şifreler eşleşmiyor.");
+      setValidationError("Passwords do not match.");
       return;
     }
 
     const PASSWORD_RULE_MESSAGE =
-      "Şifre en az 8 karakter olmalı ve en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir.";
+      "Password must be at least 8 characters and include at least one uppercase letter, one lowercase letter, one digit, and one symbol.";
     const passwordRulesValid =
       password.length >= 8 &&
       /[a-z]/.test(password) &&
@@ -133,14 +131,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     const phoneDigits = getPhoneDigits(phoneNumber);
     if (phoneDigits.length < PHONE_DIGITS_LENGTH) {
       setValidationError(
-        `Lütfen tam bir telefon numarası giriniz (${PHONE_PREFIX} sonrası 9 rakam).`
+        `Please enter a complete phone number (9 digits after ${PHONE_PREFIX}).`
       );
       return;
     }
 
     const otpDigits = otp.replace(/\D/g, "");
     if (otpDigits.length !== 6) {
-      setValidationError("E-postanıza gelen 6 haneli doğrulama kodunu girin.");
+      setValidationError("Enter the 6-digit verification code sent to your email.");
       return;
     }
 
@@ -153,15 +151,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
     if (isTurkey) {
       if (!city) {
-        setValidationError("Lütfen şehir (il) seçin.");
+        setValidationError("Please select a city (province).");
         return;
       }
       if (!districtName) {
-        setValidationError("Lütfen ilçe seçin.");
+        setValidationError("Please select a district.");
         return;
       }
       if (!postalCode) {
-        setValidationError("Lütfen posta kodunu girin.");
+        setValidationError("Please enter your postal code.");
         return;
       }
     } else {
@@ -209,7 +207,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     setDevOtpHint("");
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setValidationError("Geçerli bir e-posta adresi girin.");
+      setValidationError("Please enter a valid email address.");
       return;
     }
     setSendingOtp(true);
@@ -220,11 +218,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       });
       setOtpMessage(result.message);
       if (result.devOtp) {
-        setDevOtpHint(`Geliştirme kodu: ${result.devOtp}`);
+        setDevOtpHint(`Development code: ${result.devOtp}`);
       }
     } catch (err: unknown) {
       setValidationError(
-        err instanceof Error ? err.message : "Doğrulama kodu gönderilemedi."
+        err instanceof Error ? err.message : "Could not send verification code."
       );
     } finally {
       setSendingOtp(false);
@@ -396,7 +394,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 disabled={sendingOtp}
                 className="shrink-0 px-3 py-2.5 text-xs font-medium border border-cyan-500 text-cyan-600 dark:text-cyan-400 rounded-lg hover:bg-cyan-50 dark:hover:bg-cyan-900/20 disabled:opacity-60 whitespace-nowrap"
               >
-                {sendingOtp ? "..." : "Kod gönder"}
+                {sendingOtp ? "..." : "Send code"}
               </button>
             </div>
             {otpMessage && (
@@ -409,7 +407,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              E-posta doğrulama kodu <span className="text-red-500">*</span>
+              Email verification code <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -418,7 +416,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               maxLength={6}
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="6 haneli kod"
+              placeholder="6-digit code"
               className="w-full px-3 py-2.5 text-sm tracking-[0.3em] border border-gray-200 dark:border-slate-600 rounded-lg 
                          bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
                          placeholder:tracking-normal placeholder:text-gray-400 dark:placeholder:text-slate-500
@@ -434,32 +432,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
+              <PasswordInput
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 placeholder="Create a strong password"
-                className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-200 dark:border-slate-600 rounded-lg 
-                           bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
-                           placeholder:text-gray-400 dark:placeholder:text-slate-500
-                           focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 
-                           transition-colors"
+                autoComplete="new-password"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-              En az 8 karakter; en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir. Üst sınır yoktur.
+              At least 8 characters with one uppercase letter, one lowercase letter, one digit, and one symbol. No upper limit.
             </p>
           </div>
 
@@ -469,29 +451,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
               Confirm Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
+              <PasswordInput
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={setConfirmPassword}
                 placeholder="Confirm your password"
-                className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-200 dark:border-slate-600 rounded-lg 
-                           bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
-                           placeholder:text-gray-400 dark:placeholder:text-slate-500
-                           focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 
-                           transition-colors"
+                autoComplete="new-password"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-              >
-                {showConfirmPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
             </div>
           </div>
 
@@ -592,7 +558,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded-lg">
               {validationError ||
                 (error as any)?.message ||
-                "Kayıt oluşturulamadı. Lütfen bilgileri kontrol edip tekrar deneyin."}
+                "Registration failed. Please check your details and try again."}
             </div>
           )}
 

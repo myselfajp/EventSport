@@ -95,12 +95,12 @@ const userSchema = new mongoose.Schema(
             type: Number,
             default: 1,
         },
-        /** Hesap pasif: giriş ve korumalı API reddedilir. */
+        /** Account inactive: sign-in and protected APIs are rejected. */
         isActive: {
             type: Boolean,
             default: true,
         },
-        /** Yalnızca role === 0 (admin) için; boş = tam yetki (geriye dönük). */
+        /** Only when role === 0 (admin); empty = full access (legacy). */
         adminPermissionGroups: [
             {
                 type: mongoose.Schema.Types.ObjectId,

@@ -5,15 +5,15 @@ import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
 
-/** Katılımcıları her zaman aynı (artan) sırada tut: tekil index için kritik. */
+/** Keep participants in a stable ascending order for the unique index. */
 export const sortParticipants = (a, b) => {
     const ids = [String(a), String(b)].sort();
     return ids.map((id) => new mongoose.Types.ObjectId(id));
 };
 
 /**
- * İki kullanıcı arasında konuşmayı bulur; yoksa oluşturur.
- * Hem REST endpoint'i hem socket katmanı tarafından kullanılır.
+ * Finds or creates a conversation between two users.
+ * Used by both the REST endpoint and the socket layer.
  */
 export const findOrCreateConversation = async (userIdA, userIdB) => {
     const participants = sortParticipants(userIdA, userIdB);
@@ -26,7 +26,7 @@ export const findOrCreateConversation = async (userIdA, userIdB) => {
     try {
         return await Conversation.create({ participants });
     } catch (err) {
-        // Eşzamanlı oluşturma yarışında tekil index ihlali olursa mevcut kaydı döndür.
+        // On concurrent create race, return the existing row if unique index fails.
         if (err?.code === 11000) {
             const fallback = await Conversation.findOne({
                 participants: { $all: participants, $size: 2 },
@@ -65,7 +65,7 @@ async function getVisibleLastMessage(conversationId, userId) {
 
 /**
  * GET /api/v1/messages/conversations
- * Kullanıcının tüm konuşmaları (karşı taraf bilgisi, son mesaj, okunmamış sayısı).
+ * All conversations for the user (other party, last message, unread count).
  */
 export const getConversations = async (req, res, next) => {
     try {
@@ -119,7 +119,7 @@ export const getConversations = async (req, res, next) => {
 
 /**
  * GET /api/v1/messages/conversations/:conversationId
- * Belirli bir konuşmanın mesajları (sayfalı, createdAt DESC).
+ * Messages for a conversation (paginated, createdAt DESC).
  */
 export const getMessages = async (req, res, next) => {
     try {
@@ -176,7 +176,7 @@ export const getMessages = async (req, res, next) => {
 
 /**
  * POST /api/v1/messages/conversations
- * Body: { recipientId } — konuşma yoksa oluştur, varsa mevcut olanı döndür.
+ * Body: { recipientId } — create conversation if missing, otherwise return existing.
  */
 export const createConversation = async (req, res, next) => {
     try {
@@ -232,7 +232,7 @@ export const createConversation = async (req, res, next) => {
 };
 
 /**
- * Mesaj silme: scope = 'me' (benden sil) | 'everyone' (herkesten sil).
+ * Delete message: scope = 'me' (hide for me) | 'everyone' (delete for all).
  */
 export const deleteMessageForUser = async (
     userId,
@@ -299,7 +299,7 @@ export const deleteMessageForUser = async (
 };
 
 /**
- * Sohbeti yalnızca istek yapan kullanıcıdan gizler (WhatsApp tarzı).
+ * Hides the conversation only for the requesting user (WhatsApp-style).
  */
 export const deleteConversationForUser = async (userId, conversationId) => {
     const convId = mongoObjectId.parse(conversationId);
@@ -374,7 +374,7 @@ export const deleteMessage = async (req, res, next) => {
 
 /**
  * DELETE /api/v1/messages/conversations/:conversationId
- * Sohbeti yalnızca istek yapan kullanıcıdan gizler.
+ * Hides the conversation only for the requesting user.
  */
 export const deleteConversation = async (req, res, next) => {
     try {
@@ -390,7 +390,7 @@ export const deleteConversation = async (req, res, next) => {
 
         try {
             const { io } = await import('../socket/socketServer.js');
-            // Yalnızca silen kullanıcıya bildir — karşı taraf etkilenmez.
+            // Notify only the deleting user — the other party is unaffected.
             io.to(String(user._id)).emit('conversation_deleted', {
                 conversationId: result.conversationId,
             });

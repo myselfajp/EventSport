@@ -15,16 +15,16 @@ const DEFAULT_TERMS = {
 
 const DEFAULT_DISTANCE_SELLING = {
     docType: 'distance_selling',
-    title: 'Mesafeli Satış Sözleşmesi',
+    title: 'Distance Selling Agreement',
     content:
-        'Mesafeli satış sözleşmesi metni buraya eklenebilir. Metni Admin panelinden Legal bölümünden düzenleyebilirsiniz.',
+        'Distance selling agreement text can be added here. Edit it in Admin panel → Legal.',
 };
 
 const DEFAULT_EVENT_CONTRACT = {
     docType: 'event_contract',
-    title: 'Etkinlik Sözleşmesi',
+    title: 'Event Agreement',
     content:
-        'Etkinlik sözleşmesi metni buraya eklenebilir. Metni Admin panelinden Legal bölümünden düzenleyebilirsiniz.',
+        'Event agreement text can be added here. Edit it in Admin panel → Legal.',
 };
 
 const DEFAULT_COMMERCIAL_MESSAGES = {
@@ -69,7 +69,7 @@ export const initLegal = async () => {
                 version,
                 isActive: true,
             });
-            console.log('✅ Default Mesafeli Satış Sözleşmesi (v' + version + ') created and set active.');
+            console.log('✅ Default Distance Selling Agreement (v' + version + ') created and set active.');
         }
 
         const hasEvent = await LegalDocument.findOne({ docType: 'event_contract', isActive: true });
@@ -81,7 +81,7 @@ export const initLegal = async () => {
                 version,
                 isActive: true,
             });
-            console.log('✅ Default Etkinlik Sözleşmesi (v' + version + ') created and set active.');
+            console.log('✅ Default Event Agreement (v' + version + ') created and set active.');
         }
 
         const hasCommercial = await LegalDocument.findOne({

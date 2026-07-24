@@ -1,13 +1,13 @@
 /**
- * Sunucu tarafı son güvenlik ağı.
- * Zod tarafında detaylı kurallar olduğu için burada sadece taban kontroller var; mesaj kullanıcıya net yansıtılır.
+ * Server-side safety net for password strength.
+ * Zod handles detailed rules; this layer returns clear messages to the client.
  */
 const PASSWORD_RULE_MESSAGE =
-    'Şifre en az 8 karakter olmalı ve en az bir büyük harf, bir küçük harf, bir rakam ve bir sembol içermelidir.';
+    'Password must be at least 8 characters and include at least one uppercase letter, one lowercase letter, one digit, and one symbol.';
 
 export const checkPasswordStrength = (password) => {
     if (!password) {
-        return { valid: false, message: 'Şifre alanı zorunludur.' };
+        return { valid: false, message: 'Password is required.' };
     }
 
     if (password.length < 8) {
@@ -24,4 +24,3 @@ export const checkPasswordStrength = (password) => {
 
     return { valid: true };
 };
-

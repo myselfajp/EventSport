@@ -1,6 +1,6 @@
-// İstanbul'un 39 ilçesi — initLocations.js referans verisi.
-// Not: bu dosya daha önce kök .gitignore'daki geniş `data/` kuralı yüzünden
-// repoya girmiyordu; kural `/data/` olarak daraltıldı ve bu dosya eklendi.
+// Istanbul's 39 districts — reference data for initLocations.js.
+// Note: this file was previously excluded by a broad root `data/` gitignore rule;
+// the rule was narrowed to `/data/` and this file was added.
 export const ISTANBUL_DISTRICTS = [
     'Adalar',
     'Arnavutköy',

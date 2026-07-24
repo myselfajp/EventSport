@@ -17,6 +17,7 @@ import {
   Save,
   Search,
   X,
+  Trash2,
 } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -82,6 +83,7 @@ export default function NewsManagement() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => { return () => { if (coverPreviewUrl.startsWith("blob:")) URL.revokeObjectURL(coverPreviewUrl); }; }, [coverPreviewUrl]);
 
@@ -163,9 +165,12 @@ export default function NewsManagement() {
       if (!confirm("Unpublish this news article? It will no longer be visible publicly.")) return;
       try {
         setTogglingId(item._id); setError(""); setSuccess("");
-        const r = await fetchJSON(newsApi.delete(item._id), { method: "DELETE" });
-        if (r?.success) { setSuccess("News unpublished."); await loadNews(); }
-        else setError(r?.message || r?.error || "Failed to unpublish news");
+        const body = new FormData();
+        body.append("data", JSON.stringify({ status: "draft", isActive: false }));
+        const res = await apiFetch(newsApi.update(item._id), { method: "PUT", headers: { Accept: "application/json" }, body });
+        const resp = await parseResp<NewsItem>(res);
+        if (!res.ok || resp.success === false) { setError(getMsg(resp, "Failed to unpublish news")); return; }
+        setSuccess("News unpublished."); await loadNews();
       } catch (e) { setError(e instanceof Error ? e.message : "Failed to unpublish news"); }
       finally { setTogglingId(null); }
       return;
@@ -182,6 +187,17 @@ export default function NewsManagement() {
       setSuccess("News published."); await loadNews();
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to publish news"); }
     finally { setTogglingId(null); }
+  };
+
+  const handleDelete = async (item: NewsItem) => {
+    if (!confirm(`Delete "${item.title}" permanently? This action cannot be undone.`)) return;
+    try {
+      setDeletingId(item._id); setError(""); setSuccess("");
+      const r = await fetchJSON(newsApi.delete(item._id), { method: "DELETE" });
+      if (r?.success) { setSuccess("News deleted."); await loadNews(); }
+      else setError(r?.message || r?.error || "Failed to delete news");
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed to delete news"); }
+    finally { setDeletingId(null); }
   };
 
   return (
@@ -268,6 +284,10 @@ export default function NewsManagement() {
                     <button type="button" onClick={()=>void handleTogglePublish(item)} disabled={togglingId===item._id} className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm disabled:opacity-50 ${isPublicNews(item) ? "border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30" : "border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"}`}>
                       {togglingId===item._id ? <Loader2 className="w-4 h-4 animate-spin" /> : isPublicNews(item) ? <EyeOff className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                       {isPublicNews(item) ? "Unpublish" : "Publish"}
+                    </button>
+                    <button type="button" onClick={()=>void handleDelete(item)} disabled={deletingId===item._id} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 text-sm disabled:opacity-50">
+                      {deletingId===item._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      Delete
                     </button>
                   </div>
                 </article>

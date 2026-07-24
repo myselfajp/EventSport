@@ -23,6 +23,7 @@ import {
     recordMarketingConsent,
     recordCoachProfileLegalAcceptances,
 } from '../utils/contractAcceptanceHelper.js';
+import { removePerformanceProfileForUser } from '../utils/providerRoleSwitch.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import {
     resolveEventLocation,
@@ -242,20 +243,27 @@ export const createBranch = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
 
-        const user = req.user;
-        if (user.performanceMember) {
-            throw new AppError(
-                403,
-                'Performance Team members cannot apply as coaches. Coach and Performance Team roles are mutually exclusive.'
-            );
-        }
-
+        let user = req.user;
         const {
             branches: result,
             agreeCoachAgreement,
             marketingConsent,
             commercialMessagesVersionId,
+            confirmRoleSwitch,
         } = zodValidation.parseCoachProfileFormData(req.body.data);
+
+        const freshUser = await User.findById(user._id).select('coach performanceMember').lean();
+        if (freshUser?.performanceMember) {
+            if (confirmRoleSwitch !== true) {
+                throw new AppError(
+                    409,
+                    'You are currently on the Performance Team. Applying as a coach will remove your Performance Team profile. Confirm the role switch to continue.'
+                );
+            }
+            await removePerformanceProfileForUser(user._id);
+            user = await User.findById(user._id);
+            if (!user) throw new AppError(404);
+        }
 
         const isFirstCoachProfile = !user.coach;
         if (isFirstCoachProfile && agreeCoachAgreement !== true) {
@@ -942,13 +950,17 @@ export const deleteEvent = async (req, res, next) => {
         const eventExists = await Event.findById(eventId);
         if (!eventExists) throw new AppError(404, 'Event not found');
         
-        if (!eventExists.owner.equals(user._id)) {
+        const isAdmin = user.role === 0;
+        if (
+            !isAdmin &&
+            (!eventExists.owner || !eventExists.owner.equals(user._id))
+        ) {
             throw new AppError(403, 'Only the event creator can delete this event');
         }
 
         await Event.findByIdAndDelete(eventId);
 
-        res.status(204).json({
+        res.status(200).json({
             success: true,
             message: 'Event deleted successfully',
         });

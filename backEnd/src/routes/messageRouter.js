@@ -3,7 +3,7 @@ import * as messageController from '../controllers/messageController.js';
 
 const router = express.Router();
 
-// Tüm route'lar app.js'te authMiddleware arkasında mount edilir.
+// All routes are mounted behind authMiddleware in app.js.
 router.get('/conversations', messageController.getConversations);
 router.get('/conversations/:conversationId', messageController.getMessages);
 router.post('/conversations', messageController.createConversation);

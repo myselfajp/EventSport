@@ -359,11 +359,10 @@ export const deleteAdminNews = async (req, res, next) => {
         const row = await News.findById(newsId);
         if (!row) throw new AppError(404, 'News not found');
 
-        row.isActive = false;
-        row.status = 'draft';
-        await row.save();
+        await removeFileIfPresent(row.coverImage);
+        await News.findByIdAndDelete(newsId);
 
-        res.status(200).json({ success: true, message: 'News unpublished' });
+        res.status(200).json({ success: true, message: 'News deleted' });
     } catch (err) {
         next(err);
     }

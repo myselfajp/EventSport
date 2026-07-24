@@ -7,6 +7,7 @@ export type LegalDocType =
   | "terms"
   | "commercial_messages"
   | "cookie_policy"
+  | "coach_me_consent"
   | "distance_selling"
   | "event_contract"
   | "coach_agreement"
@@ -19,6 +20,7 @@ export const LEGAL_DOC_TYPES: LegalDocType[] = [
   "terms",
   "commercial_messages",
   "cookie_policy",
+  "coach_me_consent",
 ];
 
 export const GAMER_DOC_TYPES: LegalDocType[] = [
@@ -44,6 +46,7 @@ export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
   terms: "Terms & Conditions",
   commercial_messages: "Commercial Electronic Messages Consent (IYS)",
   cookie_policy: "Cookie Policy",
+  coach_me_consent: "Coach Me Email Contact Consent",
   distance_selling: "Distance Selling Agreement",
   event_contract: "Event Agreement",
   coach_agreement: "Coach Agreement",
@@ -52,19 +55,23 @@ export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
   coach_privacy: "Coach Privacy Agreement",
 };
 
-/** Turkish titles shown on site when admin title is empty. */
-export const DEFAULT_TITLES_TR: Record<LegalDocType, string> = {
-  kvkk: "KVKK Aydınlatma Metni",
-  terms: "Kullanım Şartları",
-  commercial_messages: "Ticari Elektronik İleti Onayı (IYS)",
-  cookie_policy: "Çerez Politikası",
-  distance_selling: "Mesafeli Satış Sözleşmesi",
-  event_contract: "Etkinlik Sözleşmesi",
-  coach_agreement: "Antrenör Sözleşmesi",
-  coach_penalties: "Cezai Şartlar",
-  coach_equipment: "Antrenör Donanımları",
-  coach_privacy: "Antrenör Gizlilik Sözleşmesi",
+/** Default titles shown on site when admin title is empty. */
+export const DEFAULT_TITLES: Record<LegalDocType, string> = {
+  kvkk: "KVKK Privacy Notice",
+  terms: "Terms of Use",
+  commercial_messages: "Commercial Electronic Messages Consent (IYS)",
+  cookie_policy: "Cookie Policy",
+  coach_me_consent: "Coach Me Email Contact Consent",
+  distance_selling: "Distance Selling Agreement",
+  event_contract: "Event Agreement",
+  coach_agreement: "Coach Agreement",
+  coach_penalties: "Penalty Terms",
+  coach_equipment: "Coach Equipment",
+  coach_privacy: "Coach Privacy Agreement",
 };
+
+/** @deprecated Use DEFAULT_TITLES */
+export const DEFAULT_TITLES_TR = DEFAULT_TITLES;
 
 export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   legal: "Legal documents",
@@ -72,18 +79,12 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   coach: "Coach agreements",
 };
 
-/** Public /sozlesmeler section headings (Turkish). */
-export const CATEGORY_LABELS_TR: Record<ContractCategory, string> = {
-  legal: "Yasal metinler",
-  gamer: "Oyuncu ve etkinlik sözleşmeleri",
-  coach: "Antrenör sözleşmeleri",
-};
-
-export const SOZLESMELER_SECTION_ANCHORS: Record<LegalDocType, string> = {
+export const CONTRACTS_SECTION_ANCHORS: Record<LegalDocType, string> = {
   kvkk: "kvkk",
   terms: "terms",
   commercial_messages: "commercial-messages",
   cookie_policy: "cookie-policy",
+  coach_me_consent: "coach-me-consent",
   distance_selling: "distance-selling",
   event_contract: "event-contract",
   coach_agreement: "coach-agreement",
@@ -92,14 +93,17 @@ export const SOZLESMELER_SECTION_ANCHORS: Record<LegalDocType, string> = {
   coach_privacy: "coach-privacy",
 };
 
-/** Legacy static slugs → redirect to /sozlesmeler section */
+/** @deprecated Use CONTRACTS_SECTION_ANCHORS */
+export const SOZLESMELER_SECTION_ANCHORS = CONTRACTS_SECTION_ANCHORS;
+
+/** Legacy static slugs → redirect to /contracts section */
 export const LEGACY_STATIC_CONTRACT_REDIRECTS: Record<string, string> = {
-  "sozlesmeler-antrenor": "/sozlesmeler#coach-agreement",
-  "sozlesmeler-ek-1": "/sozlesmeler#coach-equipment",
-  "sozlesmeler-ek-2": "/sozlesmeler#coach-penalties",
-  "sozlesmeler-ek-3": "/sozlesmeler#coach-privacy",
-  "mesafeli-satis-sozlesmesi": "/sozlesmeler#distance-selling",
-  "etkinlik-satin-alma-kosullari": "/sozlesmeler#event-contract",
+  "sozlesmeler-antrenor": "/contracts#coach-agreement",
+  "sozlesmeler-ek-1": "/contracts#coach-equipment",
+  "sozlesmeler-ek-2": "/contracts#coach-penalties",
+  "sozlesmeler-ek-3": "/contracts#coach-privacy",
+  "mesafeli-satis-sozlesmesi": "/contracts#distance-selling",
+  "etkinlik-satin-alma-kosullari": "/contracts#event-contract",
 };
 
 export function isLegalDocType(v: string): v is LegalDocType {
