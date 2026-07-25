@@ -1,30 +1,41 @@
 import nodemailer from 'nodemailer';
+import { AppError } from './appError.js';
 
-function isSmtpConfigured() {
-    return Boolean(process.env.SMTP_HOST?.trim());
+export function isSmtpConfigured() {
+    return Boolean(
+        process.env.SMTP_HOST?.trim() &&
+            process.env.SMTP_USER?.trim() &&
+            process.env.SMTP_PASS?.trim()
+    );
 }
 
 function createTransporter() {
     const port = Number(process.env.SMTP_PORT) || 587;
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
-    const options = {
+    return nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port,
         secure,
-    };
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        options.auth = {
+        auth: {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
-        };
-    }
-    return nodemailer.createTransport(options);
+        },
+    });
 }
 
 /**
- * Sends 6-digit registration OTP. Requires SMTP_HOST (and usually USER/PASS).
+ * Sends 6-digit registration OTP via SMTP.
+ * Throws if SMTP is not configured or delivery fails.
+ * Never returns the OTP to the client.
  */
 export async function sendRegistrationOtpEmail({ to, firstName, otp }) {
+    if (!isSmtpConfigured()) {
+        throw new AppError(
+            503,
+            'Email delivery is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS.'
+        );
+    }
+
     const from =
         process.env.SMTP_FROM || process.env.SMTP_USER || 'EventSport <noreply@eventsport.local>';
     const name = firstName?.trim() || 'User';
@@ -37,16 +48,18 @@ export async function sendRegistrationOtpEmail({ to, firstName, otp }) {
       <p style="font-size:12px;color:#666;">This code is valid for 10 minutes.</p>
     `;
 
-    if (!isSmtpConfigured()) {
-        console.log('\n--- Registration OTP (SMTP not configured) ---');
-        console.log(`To: ${to}`);
-        console.log(`Code: ${otp}\n`);
-        return { sent: false };
+    try {
+        const transporter = createTransporter();
+        await transporter.sendMail({ from, to, subject, text, html });
+        return { sent: true };
+    } catch (err) {
+        console.error('Registration OTP email failed:', err?.message || err);
+        throw new AppError(
+            502,
+            'Could not send verification email. Please try again later.',
+            err
+        );
     }
-
-    const transporter = createTransporter();
-    await transporter.sendMail({ from, to, subject, text, html });
-    return { sent: true };
 }
 
 function escapeHtml(str) {

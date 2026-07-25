@@ -52,7 +52,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [legalLoading, setLegalLoading] = useState(true);
   const [otp, setOtp] = useState("");
   const [otpMessage, setOtpMessage] = useState("");
-  const [devOtpHint, setDevOtpHint] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const [locationValue, setLocationValue] = useState<LocationValue>(emptyLocationValue());
 
@@ -204,7 +203,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const handleSendOtp = async () => {
     setValidationError("");
     setOtpMessage("");
-    setDevOtpHint("");
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setValidationError("Please enter a valid email address.");
@@ -217,9 +215,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
         firstName: firstName.trim() || undefined,
       });
       setOtpMessage(result.message);
-      if (result.devOtp) {
-        setDevOtpHint(`Development code: ${result.devOtp}`);
-      }
     } catch (err: unknown) {
       setValidationError(
         err instanceof Error ? err.message : "Could not send verification code."
@@ -399,9 +394,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             </div>
             {otpMessage && (
               <p className="text-xs text-cyan-700 dark:text-cyan-400 mt-1">{otpMessage}</p>
-            )}
-            {devOtpHint && (
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{devOtpHint}</p>
             )}
           </div>
 

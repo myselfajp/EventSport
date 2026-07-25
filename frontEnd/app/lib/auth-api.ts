@@ -50,7 +50,6 @@ export async function sendRegistrationOtp(payload: {
   return {
     message: body.message as string,
     emailSent: Boolean(body.emailSent),
-    devOtp: body.devOtp as string | undefined,
   };
 }
 

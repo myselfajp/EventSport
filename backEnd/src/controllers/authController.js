@@ -20,19 +20,27 @@ import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '.
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { recordLegalAcceptance, recordCookieConsent } from '../utils/contractAcceptanceHelper.js';
-import { sendRegistrationOtpEmail } from '../utils/emailService.js';
+import { isSmtpConfigured, sendRegistrationOtpEmail } from '../utils/emailService.js';
 import {
     assertCanResendOtp,
     generateOtpCode,
     saveRegistrationOtp,
     verifyAndConsumeRegistrationOtp,
 } from '../utils/registrationOtp.js';
+import RegistrationOtp from '../models/registrationOtpModel.js';
 import { assertNotBlacklisted } from '../utils/blacklistHelper.js';
 import { resolveIstanbulDistrictId, buildLocationKey } from '../utils/locationHelper.js';
 
 export const sendRegistrationOtp = async (req, res, next) => {
     try {
         const { email, firstName } = sendRegistrationOtpSchema.parse(req.body || {});
+
+        if (!isSmtpConfigured()) {
+            throw new AppError(
+                503,
+                'Email delivery is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS.'
+            );
+        }
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -46,25 +54,22 @@ export const sendRegistrationOtp = async (req, res, next) => {
         const otp = generateOtpCode();
         await saveRegistrationOtp(email, otp);
 
-        const mailResult = await sendRegistrationOtpEmail({
-            to: email,
-            firstName,
-            otp,
-        });
-
-        const payload = {
-            success: true,
-            message: mailResult.sent
-                ? 'Verification code sent to your email address.'
-                : 'SMTP is not configured; development code included in the response.',
-            emailSent: mailResult.sent,
-        };
-
-        if (!mailResult.sent) {
-            payload.devOtp = otp;
+        try {
+            await sendRegistrationOtpEmail({
+                to: email,
+                firstName,
+                otp,
+            });
+        } catch (mailErr) {
+            await RegistrationOtp.deleteOne({ email });
+            throw mailErr;
         }
 
-        res.status(200).json(payload);
+        res.status(200).json({
+            success: true,
+            message: 'Verification code sent to your email address.',
+            emailSent: true,
+        });
     } catch (err) {
         next(err);
     }
