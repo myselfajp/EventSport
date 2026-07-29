@@ -5,16 +5,37 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/frontEnd"
 
-# Load .env from project root so Next.js build sees NEXT_PUBLIC_* vars
-[ -f "$ROOT/.env" ] && set -a && . "$ROOT/.env" && set +a
-
-echo "API base for build: ${NEXT_PUBLIC_API_V1_BASE:-<not set>}"
-if [ -z "$NEXT_PUBLIC_API_V1_BASE" ] || [ "$NEXT_PUBLIC_API_V1_BASE" = "http://localhost:3000/api/v1" ]; then
-  echo "WARNING: Set NEXT_PUBLIC_API_V1_BASE in $ROOT/.env to your server URL (e.g. http://143.198.141.222:3000/api/v1) before building."
+# Export only the NEXT_PUBLIC_* vars the build needs, read literally from .env.
+#
+# Do NOT `source` this file. Values are unquoted, and SMTP_FROM is of the form
+# `EventSport <addr@host>` — the `<` is a shell redirect, so sourcing aborts at
+# that line. Everything defined below it (including NEXT_PUBLIC_API_V1_BASE) is
+# then silently missing, and NODE_ENV=production from above it stays exported,
+# which makes the `npm ci` below skip devDependencies. Without typescript,
+# Next.js cannot resolve the `@/*` tsconfig path aliases and the build dies with
+# a wall of "Module not found".
+if [ -f "$ROOT/.env" ]; then
+  while IFS= read -r line; do
+    export "$line"
+  done < <(grep -E '^NEXT_PUBLIC_[A-Za-z0-9_]+=' "$ROOT/.env")
 fi
 
+echo "API base for build: ${NEXT_PUBLIC_API_V1_BASE:-<not set>}"
+# This is baked into the client bundle at build time. Building without it yields
+# a site that loads and then fails every request, so stop instead.
+if [ -z "$NEXT_PUBLIC_API_V1_BASE" ]; then
+  echo "ERROR: NEXT_PUBLIC_API_V1_BASE is not set in $ROOT/.env." >&2
+  echo "       It is baked into the bundle at build time; refusing to build." >&2
+  exit 1
+fi
+if [ "$NEXT_PUBLIC_API_V1_BASE" = "http://localhost:3000/api/v1" ]; then
+  echo "WARNING: NEXT_PUBLIC_API_V1_BASE still points at localhost — set your server URL for a production build."
+fi
+
+# devDependencies (typescript, tailwind, postcss) are required to build, so the
+# install must not run in production mode regardless of the ambient NODE_ENV.
 echo "Installing dependencies..."
-npm ci
+NODE_ENV=development npm ci --include=dev
 
 echo "Building Next.js (on host)..."
 npm run build
