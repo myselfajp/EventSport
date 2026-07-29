@@ -7,6 +7,11 @@ import ServiceRequest from '../models/serviceRequestModel.js';
 import ServiceRequestResponse from '../models/serviceRequestResponseModel.js';
 import { findOrCreateConversation } from './messageController.js';
 import { createNotification } from '../utils/notificationHelper.js';
+import {
+    MAX_OFFERS_PER_SERVICE_REQUEST,
+    consumeCoachCredit,
+    refundCoachCredit,
+} from '../utils/subscriptionPlanHelper.js';
 
 const SPORTS_GOAL_OPTIONS = [
     'Just started, I don\'t have any idea what to do',
@@ -397,6 +402,12 @@ export const respondToRequest = async (req, res, next) => {
 
         const request = await ServiceRequest.findById(requestId);
         if (!request) throw new AppError(404, 'Service request not found.');
+        if (request.status === 'inactive') {
+            throw new AppError(
+                400,
+                'This request already has the maximum number of offers and is no longer accepting responses.'
+            );
+        }
         if (request.status !== 'open') throw new AppError(400, 'Service request is not open.');
         if (request.expiresAt && request.expiresAt < new Date()) {
             throw new AppError(400, 'Service request has expired.');
@@ -417,23 +428,72 @@ export const respondToRequest = async (req, res, next) => {
             providerUser: req.user._id,
         }).lean();
 
-        const response = await ServiceRequestResponse.findOneAndUpdate(
-            { serviceRequest: request._id, providerUser: req.user._id },
-            {
+        const isNewOffer = !existingResponse;
+
+        if (isNewOffer) {
+            const offerCount = await ServiceRequestResponse.countDocuments({
                 serviceRequest: request._id,
-                providerUser: req.user._id,
-                providerType: provider.providerType,
-                coach: provider.coach,
-                performanceMember:
-                    provider.providerType === 'performance'
-                        ? provider.performanceMember._id
-                        : null,
-                message: trim(req.body?.message, 1000) || '',
-                status: 'interested',
-                selectedAt: null,
-            },
-            { new: true, upsert: true, setDefaultsOnInsert: true }
-        );
+                status: { $in: ['interested', 'selected'] },
+            });
+            if (offerCount >= MAX_OFFERS_PER_SERVICE_REQUEST) {
+                if (request.status === 'open') {
+                    request.status = 'inactive';
+                    await request.save();
+                }
+                throw new AppError(
+                    400,
+                    `This request already has ${MAX_OFFERS_PER_SERVICE_REQUEST} offers and cannot accept more.`
+                );
+            }
+        }
+
+        // Coaches spend 1 reply credit only when submitting a new offer (not message updates).
+        const coachIdForCredits =
+            provider.providerType === 'coach'
+                ? provider.coach?._id || provider.coach || req.user.coach?._id || req.user.coach
+                : null;
+        let consumedReplyCredit = false;
+        if (isNewOffer && coachIdForCredits) {
+            await consumeCoachCredit(coachIdForCredits, 'replyCredits');
+            consumedReplyCredit = true;
+        }
+
+        let response;
+        try {
+            response = await ServiceRequestResponse.findOneAndUpdate(
+                { serviceRequest: request._id, providerUser: req.user._id },
+                {
+                    serviceRequest: request._id,
+                    providerUser: req.user._id,
+                    providerType: provider.providerType,
+                    coach: provider.coach,
+                    performanceMember:
+                        provider.providerType === 'performance'
+                            ? provider.performanceMember._id
+                            : null,
+                    message: trim(req.body?.message, 1000) || '',
+                    status: 'interested',
+                    selectedAt: null,
+                },
+                { new: true, upsert: true, setDefaultsOnInsert: true }
+            );
+        } catch (writeErr) {
+            if (consumedReplyCredit) {
+                await refundCoachCredit(coachIdForCredits, 'replyCredits');
+            }
+            throw writeErr;
+        }
+
+        if (isNewOffer) {
+            const offerCountAfter = await ServiceRequestResponse.countDocuments({
+                serviceRequest: request._id,
+                status: { $in: ['interested', 'selected'] },
+            });
+            if (offerCountAfter >= MAX_OFFERS_PER_SERVICE_REQUEST) {
+                request.status = 'inactive';
+                await request.save();
+            }
+        }
 
         if (!existingResponse || existingResponse.status !== 'interested') {
             void notifyRequesterOfProviderInterest(request, req.user).catch((notifErr) =>
@@ -441,7 +501,11 @@ export const respondToRequest = async (req, res, next) => {
             );
         }
 
-        res.status(200).json({ success: true, data: response });
+        res.status(200).json({
+            success: true,
+            data: response,
+            requestStatus: request.status,
+        });
     } catch (err) {
         next(err);
     }

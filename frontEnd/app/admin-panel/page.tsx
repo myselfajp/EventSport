@@ -14,6 +14,7 @@ import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
 import ContractsManagement from "../../components/admin/ContractsManagement";
 import StaticPagesManagement from "../../components/admin/StaticPagesManagement";
+import SubscriptionPlansManagement from "../../components/admin/SubscriptionPlansManagement";
 import SuggestionsManagement from "../../components/admin/SuggestionsManagement";
 import ReportsManagement from "../../components/admin/ReportsManagement";
 import DashboardHeroManagement from "../../components/admin/DashboardHeroManagement";
@@ -36,6 +37,7 @@ type TabType =
   | "notifications"
   | "contracts"
   | "site-pages"
+  | "subscription-plans"
   | "suggestions"
   | "reports"
   | "dashboard-hero"
@@ -54,6 +56,7 @@ const TAB_ORDER: TabType[] = [
   "notifications",
   "contracts",
   "site-pages",
+  "subscription-plans",
   "dashboard-hero",
   "suggestions",
   "reports",
@@ -73,6 +76,7 @@ const TAB_LABEL: Record<TabType, string> = {
   notifications: "Notifications",
   contracts: "Contracts",
   "site-pages": "Site Pages",
+  "subscription-plans": "Subscription Plans",
   "dashboard-hero": "Dashboard Hero",
   suggestions: "Suggestions",
   reports: "Reports",
@@ -93,6 +97,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   notifications: "admin.notifications",
   contracts: ["admin.legal", "admin.contract_acceptances"],
   "site-pages": "admin.static_pages",
+  "subscription-plans": "admin.subscription_plans",
   "dashboard-hero": "admin.dashboard_hero",
   suggestions: "admin.suggestions",
   reports: "admin.reports",
@@ -257,6 +262,7 @@ export default function AdminPanelPage() {
               />
             )}
             {activeTab === "site-pages" && <StaticPagesManagement />}
+            {activeTab === "subscription-plans" && <SubscriptionPlansManagement />}
             {activeTab === "dashboard-hero" && <DashboardHeroManagement />}
             {activeTab === "suggestions" && <SuggestionsManagement />}
             {activeTab === "reports" && <ReportsManagement />}

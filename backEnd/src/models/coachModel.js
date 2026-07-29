@@ -39,6 +39,39 @@ const coachSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        /**
+         * Paid membership tier (separate from legacy membershipLevel badge).
+         * basic | active | frequent | power
+         */
+        subscriptionTier: {
+            type: String,
+            default: 'basic',
+            enum: {
+                values: ['basic', 'active', 'frequent', 'power'],
+                message: 'Invalid subscription tier',
+            },
+        },
+        /** Remaining event-create credits (carry-over on upgrade; not monthly reset). */
+        eventCredits: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        /** Remaining service-request reply credits. */
+        replyCredits: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        /** Stripe ids — filled when payment is wired. */
+        stripeCustomerId: {
+            type: String,
+            default: null,
+        },
+        stripeSubscriptionId: {
+            type: String,
+            default: null,
+        },
     },
     { timestamps: true }
 );

@@ -1,5 +1,6 @@
 import express from 'express';
 import * as publicContentController from '../controllers/publicContentController.js';
+import * as subscriptionPlanController from '../controllers/subscriptionPlanController.js';
 import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
 import * as videoController from '../controllers/videoController.js';
@@ -12,6 +13,7 @@ import {
 const router = express.Router();
 
 router.get('/public/contracts', publicContentController.getPublicContractsCatalog);
+router.get('/public/subscription-plans', subscriptionPlanController.listPublicPlans);
 router.get(
     '/public/static-pages/active',
     publicContentController.getPublicActiveStaticPages

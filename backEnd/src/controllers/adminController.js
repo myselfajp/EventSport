@@ -1044,6 +1044,7 @@ export const getCoachDetails = async (req, res, next) => {
             startTime: { $lte: today },
         });
 
+        const coachDoc = user.coach;
         res.status(200).json({
             success: true,
             data: {
@@ -1051,6 +1052,11 @@ export const getCoachDetails = async (req, res, next) => {
                 sports,
                 eventsCount,
                 branches,
+                subscription: {
+                    subscriptionTier: coachDoc.subscriptionTier || 'basic',
+                    eventCredits: coachDoc.eventCredits ?? 0,
+                    replyCredits: coachDoc.replyCredits ?? 0,
+                },
             },
         });
     } catch (err) {

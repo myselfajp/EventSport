@@ -23,6 +23,7 @@ import {
   Newspaper,
   Video,
   Sparkles,
+  ArrowUpCircle,
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { fetchJSON } from "../app/lib/api";
@@ -331,6 +332,21 @@ const Header: React.FC<HeaderProps> = ({
               <Video className="w-5 h-5 shrink-0" strokeWidth={1.75} />
               <span className="hidden sm:inline text-sm font-medium">Videos</span>
             </button>
+            {user?.coach ? (
+              <button
+                type="button"
+                onClick={() => router.push("/upgrade")}
+                className={`inline-flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${
+                  pathname === "/upgrade"
+                    ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300"
+                    : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                }`}
+                aria-label="Open upgrade plans"
+              >
+                <ArrowUpCircle className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+                <span className="hidden sm:inline text-sm font-medium">Upgrade</span>
+              </button>
+            ) : null}
           </div>
 
           <div className="header-logo-wrap flex-1 min-w-0 px-2">

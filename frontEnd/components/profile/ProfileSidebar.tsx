@@ -22,6 +22,7 @@ import {
   Heart,
   BookOpen,
   Briefcase,
+  ArrowUpCircle,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -1001,25 +1002,45 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       </div>
 
       {hasCoachProfile && (
-        <button
-          type="button"
-          onClick={handleOpenCoachModal}
-          className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors text-left"
-        >
-          <div className="p-1.5 rounded-md bg-green-100 dark:bg-green-900/50">
-            <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-gray-800 dark:text-white text-sm">
-              Edit Coach Profile
+        <>
+          <button
+            type="button"
+            onClick={handleOpenCoachModal}
+            className="w-full mb-2 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors text-left"
+          >
+            <div className="p-1.5 rounded-md bg-green-100 dark:bg-green-900/50">
+              <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
             </div>
-            <div className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-              <Check className="w-3 h-3" />
-              Coach profile active
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-800 dark:text-white text-sm">
+                Edit Coach Profile
+              </div>
+              <div className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Coach profile active
+              </div>
             </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-        </button>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/upgrade")}
+            className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left"
+          >
+            <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50">
+              <ArrowUpCircle className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-800 dark:text-white text-sm">
+                Upgrade
+              </div>
+              <div className="text-xs text-cyan-700 dark:text-cyan-400">
+                Membership plans & credits
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+        </>
       )}
 
       {hasPerformanceProfile && (

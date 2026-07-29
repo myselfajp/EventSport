@@ -29,6 +29,7 @@ import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner"
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { resolveCoachProfileId } from "@/app/lib/coach-profile-utils";
 import EventLikeButton from "@/components/favorite/EventLikeButton";
+import { showAppToast } from "@/app/lib/app-toast";
 
 interface Event {
   _id: string;
@@ -618,9 +619,10 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
       if (response.ok && data.success) {
         setShowJoinConsentModal(false);
         if (joinMode === "series") {
-          alert(
+          showAppToast(
             data.message ||
-              `Enrolled in ${data.data?.reservationCount ?? ""} session(s).`
+              `Enrolled in ${data.data?.reservationCount ?? ""} session(s).`,
+            "success"
           );
           setSeriesEnrollment({
             _id: String(data.data?.enrollmentId ?? ""),
@@ -654,7 +656,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               isPaid: true,
               qr: data.qrToken,
             });
-            alert("Successfully joined and checked in!");
+            showAppToast("Successfully joined and checked in.", "success");
             return;
           }
 
@@ -675,14 +677,14 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               setHasEndPhotoSubmission(!!statusData.hasEndPhotoSubmission);
               const message = statusData.reservation?.isWaitListed
                 ? "You have been added to the waitlist."
-                : "Successfully joined the event!";
-              alert(message);
+                : "Successfully joined the event.";
+              showAppToast(message, "success");
             } else {
               setJoinStatus({
                 qr: data.qrToken,
                 _id: data.reservationId ? String(data.reservationId) : undefined,
               });
-              alert("Successfully joined the event!");
+              showAppToast("Successfully joined the event.", "success");
             }
           } catch (statusError) {
             console.error("Error fetching reservation status:", statusError);
@@ -690,15 +692,15 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               qr: data.qrToken,
               _id: data.reservationId ? String(data.reservationId) : undefined,
             });
-            alert("Successfully joined the event!");
+            showAppToast("Successfully joined the event.", "success");
           }
         }
       } else {
-        alert(data.error || data.message || "Failed to join event");
+        showAppToast(data.error || data.message || "Failed to join event", "error");
       }
     } catch (error) {
       console.error("Error joining event:", error);
-      alert("An error occurred while joining the event");
+      showAppToast("An error occurred while joining the event.", "error");
     } finally {
       setIsJoining(false);
       setEnrollingInSeries(false);
@@ -724,13 +726,13 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 
       if (response.ok && data.success) {
         setJoinStatus((prev) => prev ? { ...prev, isCheckedIn: true } : null);
-        alert("Successfully checked in!");
+        showAppToast("Successfully checked in.", "success");
       } else {
-        alert(data.error || data.message || "Failed to check in");
+        showAppToast(data.error || data.message || "Failed to check in", "error");
       }
     } catch (error) {
       console.error("Error checking in:", error);
-      alert("An error occurred while checking in");
+      showAppToast("An error occurred while checking in.", "error");
     } finally {
       setIsCheckingIn(false);
     }
@@ -788,11 +790,11 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           setShowCheckInConfirm(true);
         }
       } else {
-        alert(data.error || data.message || "Payment failed");
+        showAppToast(data.error || data.message || "Payment failed", "error");
       }
     } catch (error) {
       console.error("Error processing payment:", error);
-      alert("An error occurred while processing payment");
+      showAppToast("An error occurred while processing payment.", "error");
     } finally {
       setIsPaying(false);
     }
@@ -821,11 +823,11 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
         setJoinStatus((prev) => prev ? { ...prev, isCheckedIn: true } : null);
         setShowSuccessModal(true);
       } else {
-        alert(data.error || data.message || "Failed to check in");
+        showAppToast(data.error || data.message || "Failed to check in", "error");
       }
     } catch (error) {
       console.error("Error checking in:", error);
-      alert("An error occurred while checking in");
+      showAppToast("An error occurred while checking in.", "error");
     } finally {
       setIsCheckingIn(false);
     }
@@ -833,7 +835,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 
   const handleSkipCheckIn = () => {
     setShowCheckInConfirm(false);
-    alert("Payment confirmed! You can check-in later.");
+    showAppToast("Payment confirmed. You can check in later.", "success");
   };
 
   const handleEndPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

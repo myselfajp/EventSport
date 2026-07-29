@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { X, Upload, ImageIcon, ChevronDown, Search, Mail, UserPlus } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -14,6 +15,13 @@ import CascadingLocationFields, {
 } from "@/components/location/CascadingLocationFields";
 import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
 import LevelDefinitions from "@/components/LevelDefinitions";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMe } from "@/app/hooks/useAuth";
+import {
+  coachHasEventCredits,
+  notifyNoEventCreditsAndGoUpgrade,
+} from "@/app/lib/subscription-credits";
+import { showAppToast } from "@/app/lib/app-toast";
 
 // Custom hook for debounce
 function useDebounce<T>(value: T, delay: number): T {
@@ -162,7 +170,20 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   onSuccess,
   initialData,
 }) => {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: user } = useMe();
   const isEditMode = !!initialData;
+
+  // Block create flow early if coach has no event credits left
+  useEffect(() => {
+    if (!isOpen || isEditMode) return;
+    if (coachHasEventCredits(user) === false) {
+      onClose();
+      notifyNoEventCreditsAndGoUpgrade(router);
+    }
+  }, [isOpen, isEditMode, user, onClose, router]);
+
   const [formData, setFormData] = useState({
     name: "",
     club: "",
@@ -1156,23 +1177,42 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       if (result.success) {
         const msg =
           !isEditMode && formData.isRecurring && result.sessions
-            ? `🎉 Series created with ${result.sessions.length} sessions! Listing: ${result.listing?.totalAmount ?? 0} TRY`
+            ? `Series created with ${result.sessions.length} sessions. Listing: ${result.listing?.totalAmount ?? 0} TRY`
             : isEditMode
-              ? "🎉 Event updated successfully!"
-              : "🎉 Event created successfully!";
-        alert(msg);
+              ? "Event updated successfully."
+              : "Event created successfully.";
+        showAppToast(msg, "success");
+        if (!isEditMode) {
+          void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+        }
         handleClose();
         if (onSuccess) {
           onSuccess();
         }
       } else {
-        setError(result.message || (isEditMode ? "There was a problem updating the event" : "There was a problem creating the event"));
+        const apiMsg =
+          result.message ||
+          result.error ||
+          (isEditMode
+            ? "There was a problem updating the event"
+            : "There was a problem creating the event");
+        setError(apiMsg);
+        showAppToast(apiMsg, "error");
+        if (
+          !isEditMode &&
+          typeof apiMsg === "string" &&
+          apiMsg.toLowerCase().includes("event credits")
+        ) {
+          onClose();
+          notifyNoEventCreditsAndGoUpgrade(router);
+        }
       }
     } catch (err: any) {
       setError(
-        isEditMode
-          ? "There was a problem updating the event"
-          : "There was a problem creating the event"
+        err?.message ||
+          (isEditMode
+            ? "There was a problem updating the event"
+            : "There was a problem creating the event")
       );
       console.error(isEditMode ? "Error updating event:" : "Error creating event:", err);
     } finally {

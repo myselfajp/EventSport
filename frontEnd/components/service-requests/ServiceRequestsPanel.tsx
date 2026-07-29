@@ -192,8 +192,10 @@ export default function ServiceRequestsPanel({
         method: "POST",
         body: { message: interestMessage[requestId] || "" },
       });
-      if (res?.success === false) {
-        throw new Error(res?.message || "Interest could not be sent.");
+      if (!res?.success) {
+        throw new Error(
+          res?.message || res?.error || "Interest could not be sent."
+        );
       }
       await loadData();
     } catch (err) {

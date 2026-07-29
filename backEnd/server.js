@@ -4,6 +4,7 @@ import { initAdmin } from './src/utils/initAdmin.js';
 import { initAdminPermissionGroups } from './src/utils/initAdminPermissionGroups.js';
 import { initLegal } from './src/utils/initLegal.js';
 import { initLocations } from './src/utils/initLocations.js';
+import { initSubscriptionPlans } from './src/utils/initSubscriptionPlans.js';
 import { startCheckInReminderScheduler } from './src/utils/checkInReminderJob.js';
 import { startAccountAnonymizationScheduler } from './src/utils/accountAnonymizationJob.js';
 
@@ -31,6 +32,7 @@ const connectDB = async () => {
         await initAdminPermissionGroups();
         await initLegal();
         await initLocations();
+        await initSubscriptionPlans();
         startCheckInReminderScheduler();
         startAccountAnonymizationScheduler();
     } catch (err) {

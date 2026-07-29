@@ -51,7 +51,8 @@ const serviceRequestSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['open', 'in_conversation', 'closed', 'cancelled'],
+            // inactive = max offers reached (no more coach/performance replies)
+            enum: ['open', 'inactive', 'in_conversation', 'closed', 'cancelled'],
             default: 'open',
         },
         selectedResponse: {

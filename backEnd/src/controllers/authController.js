@@ -410,7 +410,12 @@ export const getCurrentUser = async (req, res, next) => {
 
         const user = await User.findById(req.user._id)
             .select('-__v')
-            .populate({ path: 'location.district', select: 'name' });
+            .populate({ path: 'location.district', select: 'name' })
+            .populate({
+                path: 'coach',
+                select:
+                    'name membershipLevel isVerified subscriptionTier eventCredits replyCredits ratingAverage ratingCount about',
+            });
         if (!user) throw new AppError(404, 'User not found.');
 
         res.status(200).json({

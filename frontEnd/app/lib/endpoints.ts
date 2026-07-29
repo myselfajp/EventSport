@@ -71,6 +71,7 @@ export const EP = {
       `${API_V1_BASE}/public/static-page/${encodeURIComponent(name)}`,
     activeStaticPages: `${API_V1_BASE}/public/static-pages/active`,
     contractsCatalog: `${API_V1_BASE}/public/contracts`,
+    subscriptionPlans: `${API_V1_BASE}/public/subscription-plans`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
     dashboardHeaderLogo: `${API_V1_BASE}/public/dashboard-header-logo`,
     dashboardHeroSlides: (context?: "home" | "blog" | "news" | "videos") => {
@@ -265,6 +266,13 @@ export const EP = {
       create: `${ADMIN_API}/static-pages`,
       update: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
       delete: (pageId: string) => `${ADMIN_API}/static-pages/${pageId}`,
+    },
+    subscriptionPlans: {
+      list: `${ADMIN_API}/subscription-plans`,
+      getById: (planId: string) => `${ADMIN_API}/subscription-plans/${planId}`,
+      update: (planId: string) => `${ADMIN_API}/subscription-plans/${planId}`,
+      applyToUser: (userId: string) =>
+        `${ADMIN_API}/users/${userId}/apply-subscription-plan`,
     },
     blogs: {
       list: (params?: {

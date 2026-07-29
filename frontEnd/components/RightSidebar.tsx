@@ -8,7 +8,9 @@ import {
   Calendar,
   X,
   Clock,
+  ArrowUpCircle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import AddEventModal from "./event/AddEventModal";
 import ViewEventModal from "./event/ViewEventModal";
 import CoachDetailModal from "./CoachDetailModal";
@@ -19,6 +21,10 @@ import { useMe } from "@/app/hooks/useAuth";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { Facility } from "@/app/lib/types";
+import {
+  coachHasEventCredits,
+  notifyNoEventCreditsAndGoUpgrade,
+} from "@/app/lib/subscription-credits";
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -39,10 +45,22 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   events,
   onEventCreated,
 }) => {
+  const router = useRouter();
   const { data: user, isLoading: userLoading } = useMe();
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const isCoach = user?.coach != null;
+  const coachSub =
+    user?.coach && typeof user.coach === "object" ? user.coach : null;
   const canManageEvents = isCoach || user?.role === 0;
+
+  const tryOpenCreateEvent = () => {
+    if (coachHasEventCredits(user) === false) {
+      notifyNoEventCreditsAndGoUpgrade(router);
+      return;
+    }
+    setIsAddEventModalOpen(true);
+  };
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedDateEvents, setSelectedDateEvents] = useState<any[]>([]);
@@ -284,7 +302,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
             <div className="w-28 h-10 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
           ) : canManageEvents ? (
             <button
-              onClick={() => setIsAddEventModalOpen(true)}
+              onClick={tryOpenCreateEvent}
               className="bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
@@ -459,6 +477,44 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
           </div>
         </div>
 
+        {/* Membership credits (Coach Only) */}
+        {isCoach && coachSub && (
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md border border-cyan-100 dark:border-cyan-900/40">
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-400">
+                  Membership
+                </p>
+                <p className="text-base font-semibold text-gray-900 dark:text-slate-100 capitalize">
+                  {coachSub.subscriptionTier || "basic"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/upgrade")}
+                className="inline-flex items-center gap-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold px-2.5 py-1.5 transition-colors"
+              >
+                <ArrowUpCircle className="w-3.5 h-3.5" />
+                Upgrade
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-lg bg-gray-50 dark:bg-slate-900/60 px-2.5 py-2">
+                <p className="text-xs text-gray-500 dark:text-slate-400">Events left</p>
+                <p className="font-semibold text-gray-900 dark:text-slate-100">
+                  {coachSub.eventCredits ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gray-50 dark:bg-slate-900/60 px-2.5 py-2">
+                <p className="text-xs text-gray-500 dark:text-slate-400">Replies left</p>
+                <p className="font-semibold text-gray-900 dark:text-slate-100">
+                  {coachSub.replyCredits ?? 0}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Earnings Card (Coach Only) */}
         {isCoach && (
           <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md border border-gray-100 dark:border-slate-700">
@@ -619,7 +675,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                         setShowEventModal(false);
                         setSelectedDate(null);
                         setSelectedDateEvents([]);
-                        setIsAddEventModalOpen(true);
+                        tryOpenCreateEvent();
                       }}
                       className="bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors mx-auto"
                     >

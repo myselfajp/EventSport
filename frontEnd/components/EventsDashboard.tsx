@@ -33,6 +33,10 @@ import {
   readServiceRequestFocusFromUrl,
   readServiceRequestsTabFromUrl,
 } from "@/app/lib/service-request-url";
+import {
+  coachHasEventCredits,
+  notifyNoEventCreditsAndGoUpgrade,
+} from "@/app/lib/subscription-credits";
 
 const EventsDashboard = () => {
   const router = useRouter();
@@ -429,7 +433,15 @@ const EventsDashboard = () => {
                   onPrivateToggle={handlePrivateToggle}
                   isPrivateFilter={filters.private}
                   onCreateEventClick={
-                    canManageEvents ? () => setIsAddEventModalOpen(true) : undefined
+                    canManageEvents
+                      ? () => {
+                          if (coachHasEventCredits(user) === false) {
+                            notifyNoEventCreditsAndGoUpgrade(router);
+                            return;
+                          }
+                          setIsAddEventModalOpen(true);
+                        }
+                      : undefined
                   }
                   onEventsChanged={fetchEvents}
                 />

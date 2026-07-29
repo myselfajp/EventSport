@@ -11,6 +11,7 @@ import * as contractAcceptanceController from '../controllers/contractAcceptance
 import * as adminPermissionGroupController from '../controllers/adminPermissionGroupController.js';
 import * as blacklistController from '../controllers/blacklistController.js';
 import * as reportController from '../controllers/reportController.js';
+import * as subscriptionPlanController from '../controllers/subscriptionPlanController.js';
 import { requireAdminPermission, requireFullAdmin } from '../middleware/requireAdminPermission.js';
 
 const HEADER_LOGO_MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -187,6 +188,28 @@ router.get(
     '/users/:userId/contract-acceptances',
     requireAdminPermission('admin.contract_acceptances'),
     contractAcceptanceController.listByUserForAdmin
+);
+
+// Coach subscription plans (prices & credit limits — Stripe later)
+router.get(
+    '/subscription-plans',
+    requireAdminPermission('admin.subscription_plans'),
+    subscriptionPlanController.listAdminPlans
+);
+router.get(
+    '/subscription-plans/:planId',
+    requireAdminPermission('admin.subscription_plans'),
+    subscriptionPlanController.getAdminPlanById
+);
+router.put(
+    '/subscription-plans/:planId',
+    requireAdminPermission('admin.subscription_plans'),
+    subscriptionPlanController.updateAdminPlan
+);
+router.post(
+    '/users/:userId/apply-subscription-plan',
+    requireAdminPermission('admin.subscription_plans'),
+    subscriptionPlanController.applyPlanToUserCoach
 );
 
 // Static Pages

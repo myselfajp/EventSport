@@ -33,6 +33,11 @@ import {
     notifyFacilityOwnerOfNewEvent,
 } from '../utils/eventDistrictHelper.js';
 import { createRecurringEventSeries, cancelEventsWithScope, applyEventEditWithScope } from '../utils/eventSeriesService.js';
+import {
+    getBasicPlanAssignmentFields,
+    consumeCoachCredit,
+    refundCoachCredit,
+} from '../utils/subscriptionPlanHelper.js';
 import { getListingPricePerSlot } from '../utils/recurrenceHelper.js';
 import EventSeries from '../models/eventSeriesModel.js';
 import {
@@ -285,11 +290,13 @@ export const createBranch = async (req, res, next) => {
             );
         }
 
-        // Get or create coach
+        // Get or create coach (new coaches start on free Basic plan with credits)
         let coach = user.coach;
         if (!coach) {
+            const basicFields = await getBasicPlanAssignmentFields();
             coach = await Coach.create({
                 name: `${user.firstName} ${user.lastName}`,
+                ...basicFields,
             });
             const addToUser = await User.findByIdAndUpdate(
                 user._id,
@@ -590,6 +597,15 @@ export const createEvent = async (req, res, next) => {
 
         const coachName = coachDisplayName(user);
 
+        // Coaches spend 1 event credit per create (one-off or series). Admins without a coach skip.
+        const coachIdForCredits = user.coach?._id || user.coach || null;
+        let consumedEventCredit = false;
+        if (coachIdForCredits) {
+            await consumeCoachCredit(coachIdForCredits, 'eventCredits');
+            consumedEventCredit = true;
+        }
+
+        try {
         if (eventFields.isRecurring && recurrence) {
             const seriesResult = await createRecurringEventSeries({
                 user,
@@ -646,6 +662,12 @@ export const createEvent = async (req, res, next) => {
             data: event,
             invites: inviteSummary,
         });
+        } catch (createErr) {
+            if (consumedEventCredit) {
+                await refundCoachCredit(coachIdForCredits, 'eventCredits');
+            }
+            throw createErr;
+        }
     } catch (err) {
         next(err);
     }
