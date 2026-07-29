@@ -1,3 +1,8 @@
+# Project name is pinned so the compose project prefix never drifts with the
+# directory name. Renaming the checkout must not change which resources compose
+# considers "ours".
+name: eventsport
+
 services:
   mongodb:
     image: mongo:7
@@ -95,6 +100,17 @@ services:
       - eventsport_network
     restart: unless-stopped
 
+# !!! DO NOT EDIT THIS BLOCK !!!
+# The production database lives in the pre-existing volume named below.
+# `external: true` means compose only ever attaches to it: it will not create it,
+# and `docker compose down -v` will not delete it.
+#
+# Dropping `external`/`name` makes compose silently create a NEW EMPTY volume
+# (<project>_mongodb_data) and mount that instead. The old data is not deleted,
+# but the app comes up blank — this already happened once on 2026-06-16 and left
+# an orphan volume `eventsport_mongodb_data` behind.
+#
+# scripts/deploy.sh asserts this pairing before every deploy.
 volumes:
   mongodb_data:
     external: true
