@@ -765,6 +765,51 @@ export const notifySystemAnnouncement = async (
     });
 };
 
+const REPORT_TARGET_LABELS = {
+    user: 'user',
+    coach: 'coach',
+    event: 'event',
+    facility: 'facility',
+    company: 'company',
+    club: 'club',
+    community: 'community',
+};
+
+export const notifyAdminsOfNewReport = async ({
+    reportId,
+    targetType,
+    reporterName,
+    adminUserIds,
+    createdBy,
+}) => {
+    if (!adminUserIds?.length) return [];
+
+    const targetLabel = REPORT_TARGET_LABELS[targetType] || 'item';
+    const who = reporterName?.trim() || 'A user';
+    const title = 'New report submitted';
+    const message = `${who} reported a ${targetLabel}. Review it in the admin panel.`;
+    const payload = {
+        type: 'report_submitted',
+        title,
+        message,
+        data: { reportId: String(reportId), targetType },
+        priority: 'high',
+        icon: 'alert',
+        actionUrl: '/admin-panel?tab=reports',
+        createdBy,
+    };
+
+    return Promise.all(
+        adminUserIds.map((userId) =>
+            createNotification({
+                ...payload,
+                scope: 'user',
+                userId,
+            })
+        )
+    );
+};
+
 export const notifySegmentAnnouncement = async ({
     userIds,
     title,

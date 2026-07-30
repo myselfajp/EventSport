@@ -9,6 +9,7 @@ import {
   RefreshCcw,
   UserCheck,
 } from "lucide-react";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { useMe } from "@/app/hooks/useAuth";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -330,7 +331,7 @@ const ActivityContent: React.FC = () => {
                 <p className="text-sm text-gray-500 dark:text-slate-400 px-1">
                   {hasParticipant
                     ? "No completed joined events yet."
-                    : "Create a gamer profile to join events."}
+                    : ATHLETE_LABELS.createProfileToJoinEvents}
                 </p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

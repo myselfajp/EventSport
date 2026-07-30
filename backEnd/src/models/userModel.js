@@ -142,6 +142,11 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        /** When this admin last opened the Reports tab (for unread badge). */
+        reportsLastViewedAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true }
 );

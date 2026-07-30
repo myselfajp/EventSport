@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Search, User, ChevronLeft, ChevronRight } from "lucide-react";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import {
@@ -296,7 +297,7 @@ const UserSearch: React.FC<UserSearchProps> = ({
                       <div className="flex gap-1 mt-1">
                         {user.participant && (
                           <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            Gamer
+                            {ATHLETE_LABELS.singular}
                           </span>
                         )}
                         {user.coach && (

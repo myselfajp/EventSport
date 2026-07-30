@@ -192,7 +192,45 @@ export const getCoachList = async (req, res, next) => {
 
         // Build coach query filters
         if (search && search.trim()) {
-            coachQuery.name = { $regex: search.trim(), $options: 'i' };
+            const trimmed = search.trim();
+            const coachesByName = await Coach.find({
+                name: { $regex: trimmed, $options: 'i' },
+            })
+                .select('_id')
+                .lean();
+            const usersByName = await User.find({
+                coach: { $ne: null },
+                $or: [
+                    { firstName: { $regex: trimmed, $options: 'i' } },
+                    { lastName: { $regex: trimmed, $options: 'i' } },
+                ],
+            })
+                .select('coach')
+                .lean();
+
+            const coachIds = [
+                ...new Set([
+                    ...coachesByName.map((coach) => coach._id.toString()),
+                    ...usersByName
+                        .map((user) => user.coach?.toString())
+                        .filter(Boolean),
+                ]),
+            ].map((id) => new mongoose.Types.ObjectId(id));
+
+            if (coachIds.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    data: [],
+                    pagination: {
+                        page: pageNumber,
+                        perPage,
+                        total: 0,
+                        totalPages: 0,
+                    },
+                });
+            }
+
+            coachQuery._id = { $in: coachIds };
         }
 
         if (typeof isVerified === 'boolean') {
@@ -301,7 +339,24 @@ export const getParticipantList = async (req, res, next) => {
             ) {
                 query._id = new mongoose.Types.ObjectId(trimmed);
             } else {
-                query.name = { $regex: trimmed, $options: 'i' };
+                const usersByName = await User.find({
+                    participant: { $ne: null },
+                    $or: [
+                        { firstName: { $regex: trimmed, $options: 'i' } },
+                        { lastName: { $regex: trimmed, $options: 'i' } },
+                    ],
+                })
+                    .select('participant')
+                    .lean();
+                const participantIdsFromUsers = usersByName
+                    .map((user) => user.participant)
+                    .filter(Boolean);
+
+                const orConditions = [{ name: { $regex: trimmed, $options: 'i' } }];
+                if (participantIdsFromUsers.length > 0) {
+                    orConditions.push({ _id: { $in: participantIdsFromUsers } });
+                }
+                query.$or = orConditions;
             }
         }
 
@@ -328,9 +383,25 @@ export const getParticipantList = async (req, res, next) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        const participantIds = participants.map((participant) => participant._id);
+        const users = participantIds.length
+            ? await User.find({ participant: { $in: participantIds } })
+                  .select('participant photo')
+                  .lean()
+            : [];
+
+        const photoByParticipantId = new Map(
+            users.map((user) => [user.participant.toString(), user.photo || null])
+        );
+
+        const data = participants.map((participant) => ({
+            ...participant,
+            photo: photoByParticipantId.get(participant._id.toString()) || null,
+        }));
+
         res.status(200).json({
             success: true,
-            data: participants,
+            data,
             pagination: {
                 page: pageNumber,
                 perPage,

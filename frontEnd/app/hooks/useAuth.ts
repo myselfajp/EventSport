@@ -7,6 +7,11 @@ export function useMe() {
     return useQuery<User | null>({
         queryKey: ["auth", "me"],
         queryFn: getMe,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        retry: false,
+        refetchOnWindowFocus: true,
+        placeholderData: (previous: User | null | undefined) => previous,
     });
 }
 

@@ -77,10 +77,6 @@ export async function apiFetch(
     tokenStore.set(rotated);
   }
 
-  if (res.status === 401 && sendAuth) {
-    tokenStore.clear();
-  }
-
   return res;
 }
 

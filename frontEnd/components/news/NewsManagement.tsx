@@ -359,6 +359,11 @@ export default function NewsManagement() {
                       </div>
                       <div className="p-3 border-t border-gray-200 dark:border-slate-700">
                         <input type="file" accept="image/*" onChange={handleCoverChange} className="block w-full text-sm text-gray-600 dark:text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" />
+                        <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                          Recommended size: <strong>1600×900 px</strong> (16:9, landscape).
+                          JPG or PNG. Other sizes are accepted and will be fitted
+                          automatically.
+                        </p>
                       </div>
                     </div>
                   </div>

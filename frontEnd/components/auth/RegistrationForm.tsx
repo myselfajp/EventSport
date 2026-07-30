@@ -423,15 +423,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Password <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <PasswordInput
-                value={password}
-                onChange={setPassword}
-                placeholder="Create a strong password"
-                autoComplete="new-password"
-                required
-              />
-            </div>
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              placeholder="Create a strong password"
+              autoComplete="new-password"
+              required
+            />
             <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
               At least 8 characters with one uppercase letter, one lowercase letter, one digit, and one symbol. No upper limit.
             </p>
@@ -442,15 +440,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Confirm Password <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <PasswordInput
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                placeholder="Confirm your password"
-                autoComplete="new-password"
-                required
-              />
-            </div>
+            <PasswordInput
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              placeholder="Confirm your password"
+              autoComplete="new-password"
+              required
+            />
           </div>
 
           {/* Terms and Conditions */}

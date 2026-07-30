@@ -1065,16 +1065,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
                     >
                       Coach Agreement
                     </Link>
-                    . (Penalty Terms, Coach Equipment, Privacy — all on{" "}
-                    <Link
-                      href="/contracts"
-                      className="text-cyan-600 dark:text-cyan-400 underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Agreements
-                    </Link>{" "}
-                    page.)
+                    .
                   </span>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
@@ -1088,7 +1079,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
                   <span>
                     {activeCommercialMessages ? (
                       <>
-                        I consent to receiving commercial electronic messages (SMS, email, phone).
+                        I consent to receiving commercial electronic messages.
                         I have read the{" "}
                         <button
                           type="button"
@@ -1103,7 +1094,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
                         >
                           Commercial Electronic Messages Consent (IYS)
                         </button>
-                        . (Optional)
+                        .
                       </>
                     ) : (
                       <>Commercial messages opt-in is unavailable until an active consent text is published in Admin → Legal.</>

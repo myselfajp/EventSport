@@ -233,7 +233,7 @@ export const searchInviteCandidates = async (req, res, next) => {
             success: true,
             data: users.map((user) => ({
                 _id: user._id,
-                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Gamer',
+                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Athlete',
                 email: user.email,
                 photo: user.photo ?? null,
                 participantId: user.participant,
@@ -524,7 +524,7 @@ export const createEvent = async (req, res, next) => {
         if (invitedUserIds.length > 0 && !user.coach) {
             throw new AppError(
                 400,
-                'A coach profile is required to invite gamers while creating an event.'
+                'A coach profile is required to invite athletes while creating an event.'
             );
         }
 
@@ -1699,13 +1699,13 @@ async function resolveCoachProfileContext(idParam) {
 
     if (coach) {
         user = await User.findOne({ coach: coach._id }).select(
-            '-password -isEmailVerified -isPhoneVerified'
+            '-password -isEmailVerified -isPhoneVerified -email -phone'
         );
         return { coach, user };
     }
 
     user = await User.findById(parsedId).select(
-        '-password -isEmailVerified -isPhoneVerified'
+        '-password -isEmailVerified -isPhoneVerified -email -phone'
     );
     if (!user?.coach) {
         throw new AppError(404, 'Coach not found');
@@ -1759,6 +1759,17 @@ export const getCoachDetails = async (req, res, next) => {
             branch,
             event,
         };
+
+        if (
+            allData.user &&
+            String(allData.user._id) !== String(req.user._id)
+        ) {
+            const userData = allData.user.toObject
+                ? allData.user.toObject()
+                : { ...allData.user };
+            delete userData.age;
+            allData.user = userData;
+        }
 
         res.status(200).json({
             success: true,

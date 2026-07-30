@@ -12,6 +12,7 @@ import {
   useEventLikes,
   useRemoveFavorite,
 } from "@/app/hooks/useFavorites";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { useMe } from "@/app/hooks/useAuth";
 import { EP } from "@/app/lib/endpoints";
 import { useCoachProfileModal } from "@/app/hooks/useCoachProfileModal";
@@ -135,7 +136,7 @@ const FavoritesContent: React.FC = () => {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-slate-700">
         <p className="text-gray-700 dark:text-gray-200">
-          Create a gamer profile to like events.
+          {ATHLETE_LABELS.createProfileToLike}
         </p>
       </div>
     );

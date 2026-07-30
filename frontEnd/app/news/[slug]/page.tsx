@@ -69,8 +69,10 @@ export default function NewsDetailPage() {
             ) : (
               <article className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
                 {newsItem.coverImage?.path && (
-                  <div className="aspect-[16/7] bg-gray-100 dark:bg-slate-700">
-                    <img src={EP.assetUrl(newsItem.coverImage.path)} alt={newsItem.title} className="w-full h-full object-cover" />
+                  <div className="relative aspect-[16/7] bg-gray-100 dark:bg-slate-700 overflow-hidden">
+                    {/* Blurred fill so non-16:7 images still cover the area nicely */}
+                    <img src={EP.assetUrl(newsItem.coverImage.path)} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-60" />
+                    <img src={EP.assetUrl(newsItem.coverImage.path)} alt={newsItem.title} className="relative w-full h-full object-contain" />
                   </div>
                 )}
                 <div className="p-5 sm:p-8 space-y-6">

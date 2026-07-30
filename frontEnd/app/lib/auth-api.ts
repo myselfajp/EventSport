@@ -13,13 +13,17 @@ async function ensureCsrfCookie() {
 //-----------get current user
 export async function getMe(): Promise<User | null> {
   const res = await apiFetch(EP.AUTH.me, { method: "GET" });
-  
+
   const token = extractTokenFromResponse(res);
   if (token) {
     tokenStore.set(token);
   }
-  
+
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    tokenStore.clear();
+    return null;
+  }
   if (!res.ok || body?.success === false) return null;
   return body?.data ?? null;
 }
@@ -50,6 +54,62 @@ export async function sendRegistrationOtp(payload: {
   return {
     message: body.message as string,
     emailSent: Boolean(body.emailSent),
+  };
+}
+
+export async function sendPasswordResetOtp(payload: { email: string }) {
+  await ensureCsrfCookie();
+  const res = await apiFetch(
+    EP.AUTH.sendPasswordResetOtp,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+    { skipAuth: true }
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.success === false) {
+    throw new Error(
+      body?.error || body?.message || "Could not send password reset code."
+    );
+  }
+  return {
+    message: body.message as string,
+    emailSent: Boolean(body.emailSent),
+  };
+}
+
+export async function resetPassword(payload: {
+  email: string;
+  otp: string;
+  password: string;
+  confirmPassword: string;
+}) {
+  await ensureCsrfCookie();
+  const res = await apiFetch(
+    EP.AUTH.resetPassword,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+    { skipAuth: true }
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.success === false) {
+    throw new Error(
+      body?.error || body?.message || "Could not reset password."
+    );
+  }
+  return {
+    message: body.message as string,
   };
 }
 

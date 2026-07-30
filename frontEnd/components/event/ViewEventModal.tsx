@@ -30,6 +30,10 @@ import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { resolveCoachProfileId } from "@/app/lib/coach-profile-utils";
 import EventLikeButton from "@/components/favorite/EventLikeButton";
 import { showAppToast } from "@/app/lib/app-toast";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
+
+/** Temporarily hide event Pay button; flip to true when payment UI is needed again. */
+const SHOW_EVENT_PAY_BUTTON = false;
 
 interface Event {
   _id: string;
@@ -290,6 +294,11 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
     !!user?._id &&
     String(backupCoachId) === String(user._id);
   const isCancelled = event?.status === "cancelled";
+  const eventEnded =
+    !!event?.endTime && new Date(event.endTime).getTime() <= Date.now();
+  const eventStarted =
+    !!event?.startTime && new Date(event.startTime).getTime() <= Date.now();
+  const registrationClosed = eventEnded || eventStarted || isCancelled;
   const seriesId =
     typeof event?.series === "object" && event?.series !== null
       ? String(event.series._id)
@@ -576,7 +585,8 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
       isJoining ||
       enrollingInSeries ||
       !allRegistrationConsentsChecked ||
-      !legalVersionsReady
+      !legalVersionsReady ||
+      registrationClosed
     ) {
       return;
     }
@@ -906,8 +916,6 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
     }
   };
 
-  const eventEnded =
-    !!event?.endTime && new Date(event.endTime).getTime() <= Date.now();
   const showPhotoMemories =
     eventEnded || endPhotosGallery.length > 0 || loadingEndPhotos;
   const canCheckIn = !!(
@@ -1280,7 +1288,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Gamer Fee
+                  {ATHLETE_LABELS.fee}
                 </label>
                 <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
                   {event.participationFee ? `$${event.participationFee}` : "-"}
@@ -1459,7 +1467,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                       const authorLabel =
                         item.author.kind === "gamer"
                           ? `${item.author.firstName ?? ""} ${(item.author.lastName ?? "").charAt(0)}.`.trim() ||
-                            "Gamer"
+                            ATHLETE_LABELS.fallbackName
                           : item.author.kind === "coach"
                             ? `Coach · ${item.author.name ?? "Staff"}`
                             : "Participant";
@@ -1587,13 +1595,22 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
             )}
             {!isEventStaff && isParticipant && (
               <div className="flex flex-wrap gap-2">
+                {registrationClosed && !hasJoined && (
+                  <p className="w-full text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 rounded-lg px-3 py-2">
+                    {isCancelled
+                      ? "This event has been cancelled."
+                      : eventEnded
+                        ? "This event has ended. Registration is closed."
+                        : "This event has already started. Registration is closed."}
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     setJoinMode("single");
                     setShowJoinConsentModal(true);
                   }}
-                  disabled={hasJoined || isJoining || isCancelled}
+                  disabled={hasJoined || isJoining || registrationClosed}
                   className="px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
                 >
                   <UserPlus className="w-4 h-4" />
@@ -1603,11 +1620,13 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                       ? "Joined"
                       : isJoining
                         ? "Joining…"
-                        : "Join this session"}
+                        : registrationClosed
+                          ? "Registration closed"
+                          : "Join this session"}
                 </button>
                 {isPartOfSeries &&
                   !seriesEnrollment &&
-                  !isCancelled && (
+                  !registrationClosed && (
                     <button
                       type="button"
                       onClick={() => {
@@ -1650,7 +1669,9 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   Waitlisted
                 </div>
               )}
-              {hasJoined &&
+              {/* Hidden for now — set SHOW_EVENT_PAY_BUTTON to true when payment UI is needed again */}
+              {SHOW_EVENT_PAY_BUTTON &&
+                hasJoined &&
                 joinStatus &&
                 !joinStatus.isPaid &&
                 !joinStatus.isWaitListed &&
@@ -1868,9 +1889,6 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
-              Tick all boxes to register. Opening a contract link does not count as acceptance—you must check each box.
-            </p>
             {legalVersionsLoading && (
               <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
                 Loading contract versions…

@@ -74,9 +74,9 @@ export const DEFAULT_TITLES: Record<LegalDocType, string> = {
 export const DEFAULT_TITLES_TR = DEFAULT_TITLES;
 
 export const CATEGORY_LABELS: Record<ContractCategory, string> = {
-  legal: "Legal documents",
-  gamer: "Player and event agreements",
-  coach: "Coach agreements",
+  legal: "Legal Documents",
+  gamer: "Athlete Agreements",
+  coach: "Coach Agreements",
 };
 
 export const CONTRACTS_SECTION_ANCHORS: Record<LegalDocType, string> = {

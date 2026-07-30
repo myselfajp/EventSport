@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   X,
   Search,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import {
   User as UserType,
   UserSearchFilters,
@@ -100,7 +101,11 @@ const SEARCH_TYPE_LABELS: Record<
   { singular: string; plural: string; placeholder: string }
 > = {
   coach: { singular: "Coach", plural: "coaches", placeholder: "coach" },
-  participant: { singular: "Gamer", plural: "gamers", placeholder: "gamer" },
+  participant: {
+    singular: ATHLETE_LABELS.singular,
+    plural: ATHLETE_LABELS.lowercasePlural,
+    placeholder: ATHLETE_LABELS.lowercase,
+  },
   performance: {
     singular: "Performance Team",
     plural: "Performance Team members",
@@ -200,6 +205,17 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
   const [favoriteAnimatingId, setFavoriteAnimatingId] = useState<string | null>(
     null
   );
+  const searchGenerationRef = useRef(0);
+
+  const beginSearch = useCallback(() => {
+    searchGenerationRef.current += 1;
+    return searchGenerationRef.current;
+  }, []);
+
+  const isLatestSearch = useCallback(
+    (generation: number) => generation === searchGenerationRef.current,
+    []
+  );
 
   const followKey = (type: FollowType, id?: string) => `${type}:${id || ""}`;
 
@@ -271,7 +287,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     e.stopPropagation();
     if (!id) return;
     if (!canFollow) {
-      alert("Create a gamer profile to follow.");
+      alert(ATHLETE_LABELS.createProfileToFollow);
       return;
     }
 
@@ -368,13 +384,16 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const searchCoaches = async (filters: {
-    search?: string;
-    sport?: string;
-    pageNumber?: number;
-    perPage?: number;
-    isVerified?: boolean;
-  }) => {
+  const searchCoaches = async (
+    filters: {
+      search?: string;
+      sport?: string;
+      pageNumber?: number;
+      perPage?: number;
+      isVerified?: boolean;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(!!filters.search);
@@ -402,6 +421,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         body: payload,
       });
 
+      if (!isLatestSearch(generation)) return;
+
       if (response?.success && response?.data) {
         setSearchResults(response.data);
         setPagination({
@@ -416,20 +437,26 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         setSearchResults([]);
       }
     } catch (err) {
+      if (!isLatestSearch(generation)) return;
       setError("An error occurred while searching coaches");
       setSearchResults([]);
       console.error("Error searching coaches:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const searchParticipants = async (filters: {
-    search?: string;
-    sport?: string;
-    pageNumber?: number;
-    perPage?: number;
-  }) => {
+  const searchParticipants = async (
+    filters: {
+      search?: string;
+      sport?: string;
+      pageNumber?: number;
+      perPage?: number;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(!!filters.search);
@@ -453,6 +480,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         body: payload,
       });
 
+      if (!isLatestSearch(generation)) return;
+
       if (response?.success && response?.data) {
         setSearchResults(response.data);
         setPagination({
@@ -463,24 +492,30 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
           perPage: response.pagination?.perPage || response.perPage || 5,
         });
       } else {
-        setError(response?.message || "Failed to search gamers");
+        setError(response?.message || ATHLETE_LABELS.searchFailed);
         setSearchResults([]);
       }
     } catch (err) {
-      setError("An error occurred while searching gamers");
+      if (!isLatestSearch(generation)) return;
+      setError(ATHLETE_LABELS.searchError);
       setSearchResults([]);
       console.error("Error searching participants:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const searchPerformanceMembers = async (filters: {
-    search?: string;
-    branch?: string;
-    pageNumber?: number;
-    perPage?: number;
-  }) => {
+  const searchPerformanceMembers = async (
+    filters: {
+      search?: string;
+      branch?: string;
+      pageNumber?: number;
+      perPage?: number;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(!!filters.search);
@@ -499,6 +534,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         { method: "GET" }
       );
 
+      if (!isLatestSearch(generation)) return;
+
       if (response?.success && Array.isArray(response?.data)) {
         setSearchResults(response.data);
         setPagination({
@@ -512,23 +549,29 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         setSearchResults([]);
       }
     } catch (err) {
+      if (!isLatestSearch(generation)) return;
       setError("An error occurred while searching Performance Team members");
       setSearchResults([]);
       console.error("Error searching performance members:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const searchFacilities = async (filters: {
-    search?: string;
-    sport?: string;
-    pageNumber?: number;
-    perPage?: number;
-  }) => {
+  const searchFacilities = async (
+    filters: {
+      search?: string;
+      sport?: string;
+      pageNumber?: number;
+      perPage?: number;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
-    setHasSearched(true);
+    setHasSearched(!!filters.search);
 
     try {
       const payload: any = {
@@ -552,36 +595,44 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         }
       );
 
+      if (!isLatestSearch(generation)) return;
+
       if (response?.success && response?.data) {
         setSearchResults(response.data);
         setPagination({
-          currentPage: response.pageNumber || 1,
-          totalPages: response.totalPages || 1,
-          total: response.total || 0,
-          perPage: response.perPage || 5,
+          currentPage: response.pagination?.currentPage || 1,
+          totalPages: response.pagination?.totalPages || 1,
+          total: response.pagination?.total || 0,
+          perPage: response.pagination?.perPage || 5,
         });
       } else {
         setError(response?.message || "Failed to search facilities");
         setSearchResults([]);
       }
     } catch (err) {
+      if (!isLatestSearch(generation)) return;
       setError("An error occurred while searching facilities");
       setSearchResults([]);
       console.error("Error searching facilities:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const searchCompanies = async (filters: {
-    search?: string;
-    sport?: string;
-    pageNumber?: number;
-    perPage?: number;
-  }) => {
+  const searchCompanies = async (
+    filters: {
+      search?: string;
+      sport?: string;
+      pageNumber?: number;
+      perPage?: number;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
-    setHasSearched(true);
+    setHasSearched(!!filters.search);
 
     try {
       const payload: any = {
@@ -605,37 +656,45 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         }
       );
 
+      if (!isLatestSearch(generation)) return;
+
       if (response?.success && response?.data) {
         setSearchResults(response.data);
         setPagination({
-          currentPage: response.pageNumber || 1,
-          totalPages: response.totalPages || 1,
-          total: response.total || 0,
-          perPage: response.perPage || 5,
+          currentPage: response.pagination?.currentPage || 1,
+          totalPages: response.pagination?.totalPages || 1,
+          total: response.pagination?.total || 0,
+          perPage: response.pagination?.perPage || 5,
         });
       } else {
         setError(response?.message || "Failed to search companies");
         setSearchResults([]);
       }
     } catch (err) {
+      if (!isLatestSearch(generation)) return;
       setError("An error occurred while searching companies");
       setSearchResults([]);
       console.error("Error searching companies:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const searchClubs = async (filters: {
-    search?: string;
-    sport?: string;
-    creator?: string;
-    pageNumber?: number;
-    perPage?: number;
-  }) => {
+  const searchClubs = async (
+    filters: {
+      search?: string;
+      sport?: string;
+      creator?: string;
+      pageNumber?: number;
+      perPage?: number;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
-    setHasSearched(true);
+    setHasSearched(!!filters.search);
 
     try {
       const payload: any = {
@@ -660,6 +719,8 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         body: payload,
       });
 
+      if (!isLatestSearch(generation)) return;
+
       if (response?.success && response?.data) {
         setSearchResults(response.data);
         setPagination({
@@ -673,23 +734,29 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         setSearchResults([]);
       }
     } catch (err) {
+      if (!isLatestSearch(generation)) return;
       setError("An error occurred while searching clubs");
       setSearchResults([]);
       console.error("Error searching clubs:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const searchGroups = async (filters: {
-    search?: string;
-    sport?: string;
-    pageNumber?: number;
-    perPage?: number;
-  }) => {
+  const searchGroups = async (
+    filters: {
+      search?: string;
+      sport?: string;
+      pageNumber?: number;
+      perPage?: number;
+    },
+    generation = beginSearch()
+  ) => {
     setIsLoading(true);
     setError(null);
-    setHasSearched(true);
+    setHasSearched(!!filters.search);
 
     try {
       const payload: any = {
@@ -705,10 +772,15 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         payload.mainSport = filters.sport;
       }
 
-      const response: GroupSearchResponse = await fetchJSON(EP.GROUP.getGroup, {
-        method: "POST",
-        body: payload,
-      });
+      const response: GroupSearchResponse = await fetchJSON(
+        EP.CLUB_GROUPS.getClubGroups,
+        {
+          method: "POST",
+          body: payload,
+        }
+      );
+
+      if (!isLatestSearch(generation)) return;
 
       if (response?.success && response?.data) {
         setSearchResults(response.data);
@@ -723,11 +795,14 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
         setSearchResults([]);
       }
     } catch (err) {
+      if (!isLatestSearch(generation)) return;
       setError("An error occurred while searching communities");
       setSearchResults([]);
       console.error("Error searching groups:", err);
     } finally {
-      setIsLoading(false);
+      if (isLatestSearch(generation)) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -740,7 +815,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
     e.stopPropagation();
     if (!id) return;
     if (!canFavorite) {
-      alert("Create a gamer profile to add favorites.");
+      alert(ATHLETE_LABELS.createProfileToFavorites);
       return;
     }
     const currentlyFav = isFavorited(favorites, type, id);
@@ -761,64 +836,88 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim().length < 2 && searchQuery.trim().length > 0) {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length < 2 && trimmedQuery.length > 0) {
       setError("Please enter at least 2 characters to search");
       return;
     }
 
     setError(null);
-    setHasSearched(searchQuery.trim().length >= 2);
+    setHasSearched(trimmedQuery.length >= 2);
+    const generation = beginSearch();
+    const searchTerm = trimmedQuery.length >= 2 ? trimmedQuery : "";
 
     if (selectedType === "coach") {
-      searchCoaches({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-        isVerified: true,
-      });
+      searchCoaches(
+        {
+          search: searchTerm,
+          sport: sportFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+          isVerified: true,
+        },
+        generation
+      );
     } else if (selectedType === "participant") {
-      searchParticipants({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
+      searchParticipants(
+        {
+          search: searchTerm,
+          sport: sportFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        },
+        generation
+      );
     } else if (selectedType === "performance") {
-      searchPerformanceMembers({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        branch: performanceBranchFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
+      searchPerformanceMembers(
+        {
+          search: searchTerm,
+          branch: performanceBranchFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        },
+        generation
+      );
     } else if (selectedType === "facility") {
-      searchFacilities({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
+      searchFacilities(
+        {
+          search: searchTerm,
+          sport: sportFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        },
+        generation
+      );
     } else if (selectedType === "company") {
-      searchCompanies({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
+      searchCompanies(
+        {
+          search: searchTerm,
+          sport: sportFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        },
+        generation
+      );
     } else if (selectedType === "club") {
-      searchClubs({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
+      searchClubs(
+        {
+          search: searchTerm,
+          sport: sportFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        },
+        generation
+      );
     } else if (selectedType === "group") {
-      searchGroups({
-        search: searchQuery.trim().length >= 2 ? searchQuery : "",
-        sport: sportFilter || undefined,
-        pageNumber: 1,
-        perPage: pagination.perPage,
-      });
+      searchGroups(
+        {
+          search: searchTerm,
+          sport: sportFilter || undefined,
+          pageNumber: 1,
+          perPage: pagination.perPage,
+        },
+        generation
+      );
     }
   };
 
@@ -1010,6 +1109,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
 
   // Clear results when type changes to ensure proper filtering
   useEffect(() => {
+    setSearchQuery("");
     setSearchResults([]);
     setPagination({
       currentPage: 1,
@@ -1207,7 +1307,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                       : "text-gray-400"
                   }`}
                 >
-                  Gamer
+                  {SEARCH_TYPE_LABELS.participant.singular}
                 </span>
               </button>
 
@@ -1349,17 +1449,20 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Search {getSearchTypeLabel(selectedType)}
             </label>
-            <div className="relative">
+            <div className="flex items-stretch gap-2">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={`Enter ${SEARCH_TYPE_LABELS[selectedType].placeholder} name...`}
-                className="w-full px-4 py-3 pr-12 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                className="flex-1 min-w-0 px-4 py-3 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
               />
               <button
-                type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors"
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleSearch}
+                aria-label="Search"
+                className="shrink-0 inline-flex items-center justify-center px-3.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors"
               >
                 <Search className="w-4 h-4" />
               </button>
@@ -1499,8 +1602,16 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                         className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/50 rounded-full flex items-center justify-center">
-                            <Users className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                          <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/50 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                            {coach.photo?.path ? (
+                              <img
+                                src={EP.assetUrl(coach.photo.path)}
+                                alt={`${coach.firstName} ${coach.lastName}`}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <Users className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                            )}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium text-gray-900 dark:text-white">
@@ -1611,8 +1722,16 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                         className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/50 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                          <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/50 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                            {participant.photo?.path ? (
+                              <img
+                                src={EP.assetUrl(participant.photo.path)}
+                                alt={participant.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <User className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                            )}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium text-gray-900 dark:text-white">
@@ -1624,7 +1743,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
                             </div>
                             <div className="flex gap-1 mt-1">
                               <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs rounded-full">
-                                Gamer
+                                {SEARCH_TYPE_LABELS.participant.singular}
                               </span>
                               <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 text-xs rounded-full">
                                 {participant.membershipLevel}

@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
-  Mail,
-  Phone,
   Award,
   Calendar,
   ShieldCheck,
@@ -201,18 +199,6 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
 
   const getImageUrl = (path?: string) =>
     path ? EP.assetUrl(path) : null;
-
-  const calculateAge = (dateString?: string) => {
-    if (!dateString) return null;
-    const today = new Date();
-    const birthDate = new Date(dateString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
 
   const formatDate = (isoString: string) => {
     if (!isoString) return "-";
@@ -430,40 +416,12 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-8 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {data.user?.age && (
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          <span>{calculateAge(data.user.age)} years old</span>
-                        </div>
-                      )}
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                         <span>
                           Joined {formatDate(data.coach.createdAt)}
                         </span>
                       </div>
-                      {data.user?.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          <a
-                            href={`mailto:${data.user.email}`}
-                            className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
-                          >
-                            {data.user.email}
-                          </a>
-                        </div>
-                      )}
-                      {data.user?.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                          <a
-                            href={`tel:${data.user.phone}`}
-                            className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
-                          >
-                            {data.user.phone}
-                          </a>
-                        </div>
-                      )}
                     </div>
 
                     {(canViewCoachCalendar || isGamerViewer || !!currentUser) && (

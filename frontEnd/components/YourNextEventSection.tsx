@@ -70,7 +70,7 @@ const YourNextEventSection: React.FC<YourNextEventSectionProps> = ({
     }
 
     const tick = () => {
-      setCountdown(formatCountdownToStart(event.startTime));
+      setCountdown(formatCountdownToStart(event.startTime, Date.now(), 24));
     };
     tick();
     const id = window.setInterval(tick, 60000);
@@ -111,13 +111,13 @@ const YourNextEventSection: React.FC<YourNextEventSectionProps> = ({
             <button
               type="button"
               onClick={() => setViewOpen(true)}
-              className="flex-1 w-full text-left group flex flex-row gap-3 items-start p-4 rounded-xl bg-white/80 dark:bg-slate-900/50 border border-cyan-100 dark:border-cyan-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all min-h-[140px]"
+              className="flex-1 w-full min-w-0 max-w-full overflow-hidden text-left group flex flex-row gap-3 items-start p-4 rounded-xl bg-white/80 dark:bg-slate-900/50 border border-cyan-100 dark:border-cyan-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all min-h-[140px]"
             >
               <div className="flex-1 min-w-0 flex flex-col">
                 {countdown && (
-                  <div className="flex items-center gap-1.5 self-start mb-2 px-2.5 py-1 rounded-full bg-cyan-600 text-white text-xs font-semibold">
-                    <Clock className="w-3.5 h-3.5" />
-                    Starts in {countdown}
+                  <div className="flex items-center gap-1.5 self-start max-w-full mb-2 px-2.5 py-1 rounded-full bg-cyan-600 text-white text-xs font-semibold">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Starts in {countdown}</span>
                   </div>
                 )}
                 <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-cyan-700 dark:group-hover:text-cyan-300">
@@ -130,7 +130,9 @@ const YourNextEventSection: React.FC<YourNextEventSectionProps> = ({
                 )}
                 <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-600 dark:text-slate-300">
                   <Calendar className="w-3.5 h-3.5 shrink-0" />
-                  <span>Starts {formatEventDateTime(event.startTime)}</span>
+                  <span className="min-w-0 break-words">
+                    Starts {formatEventDateTime(event.startTime)}
+                  </span>
                 </div>
                 {event.facility?.name && (
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 truncate">

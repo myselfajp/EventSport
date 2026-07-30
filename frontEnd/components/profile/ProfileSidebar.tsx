@@ -63,6 +63,7 @@ import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner"
 import UserEditModal from "./UserEditModal";
 import SettingsModal from "@/components/settings/SettingsModal";
 import { EP } from "@/app/lib/endpoints";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { primaryBranchCoachBadgeUrl } from "@/app/lib/coach-badge-utils";
 import { useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
@@ -95,6 +96,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const hasCoachProfile = !!user?.coach;
   const hasGamerProfile = !!user?.participant;
   const hasPerformanceProfile = !!user?.performanceMember;
+  const coachSub =
+    user?.coach && typeof user.coach === "object" ? user.coach : null;
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
   const [isApplyChoiceOpen, setIsApplyChoiceOpen] = useState(false);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
@@ -794,7 +797,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   };
 
   const quickActionCard =
-    "flex flex-col items-center py-1.5 px-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center w-full";
+    "flex flex-col items-center py-1 px-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center w-full";
 
   const QuickActionButton = ({
     onClick,
@@ -827,8 +830,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           </span>
         ) : null}
       </div>
-      <div className="flex min-h-[1.25rem] w-full items-start justify-center">
-        <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight text-center px-0.5 line-clamp-2">
+      <div className="flex w-full items-start justify-center">
+        <span className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 leading-tight text-center px-0.5 line-clamp-1">
           {label}
         </span>
       </div>
@@ -910,6 +913,47 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {user?.email || ""}
         </p>
+
+        {hasCoachProfile && coachSub && (
+          <div className="w-full mt-2.5 rounded-lg border border-cyan-100 dark:border-cyan-900/40 bg-white dark:bg-gray-800 px-2 py-1.5 shadow-sm">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-baseline gap-1.5 min-w-0">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-400 shrink-0">
+                  Membership
+                </span>
+                <span className="text-xs font-semibold text-gray-900 dark:text-white capitalize truncate">
+                  {coachSub.subscriptionTier || "basic"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/upgrade")}
+                className="inline-flex items-center gap-0.5 rounded-md bg-cyan-600 hover:bg-cyan-700 text-white text-[10px] font-semibold px-1.5 py-0.5 transition-colors shrink-0"
+              >
+                <ArrowUpCircle className="w-3 h-3" />
+                Upgrade
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-[10px] sm:text-xs">
+              <div className="flex items-center justify-between gap-1 rounded-md bg-gray-50 dark:bg-gray-900/60 px-1.5 py-1">
+                <span className="text-gray-500 dark:text-gray-400 truncate">
+                  Events left
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-white tabular-nums shrink-0">
+                  {coachSub.eventCredits ?? 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-1 rounded-md bg-gray-50 dark:bg-gray-900/60 px-1.5 py-1">
+                <span className="text-gray-500 dark:text-gray-400 truncate">
+                  Replies left
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-white tabular-nums shrink-0">
+                  {coachSub.replyCredits ?? 0}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {!hasGamerProfile && (
@@ -970,12 +1014,12 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           onClick={() => setIsUserEditModalOpen(true)}
           title="Edit Account Info"
           icon={<Edit className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400 shrink-0" />}
-          label="Edit Account Info"
+          label="Edit"
         />
 
         <QuickActionButton
           onClick={() => setIsParticipantModalOpen(true)}
-          title="Gamer Profile"
+          title={ATHLETE_LABELS.profile}
           icon={
             <User
               className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
@@ -985,7 +1029,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               }`}
             />
           }
-          label="Gamer Profile"
+          label="Profile"
           className={
             !hasGamerProfile
               ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30"
@@ -1066,14 +1110,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       )}
 
       <div className="space-y-2 mb-6">
-        <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
-          Need specialized accounts?
-        </h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Add or edit your coach or Performance Team profile and manage
-          facility, salon, club, or sport community resources.
-        </p>
-
         {(!hasCoachProfile && !hasPerformanceProfile) && user?.role !== 0 && (
           <button
             type="button"
@@ -1093,6 +1129,14 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             Switch provider role (Coach ↔ Performance Team)
           </button>
         )}
+
+        <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
+          Need specialized accounts?
+        </h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Add or edit your coach or Performance Team profile and manage
+          facility, salon, club, or sport community resources.
+        </p>
 
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
           <button
@@ -1135,8 +1179,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
               <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
-            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
-              My Clubs
+            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight flex flex-col items-center">
+              <span>My</span>
+              <span>Clubs</span>
             </span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
               {myClubs.length}

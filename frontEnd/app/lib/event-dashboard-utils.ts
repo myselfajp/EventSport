@@ -12,14 +12,27 @@ export function formatEventDateTime(iso: string) {
   }
 }
 
-/** Returns human-readable countdown until start, e.g. "2h 15m" */
-export function formatCountdownToStart(startTime: string, nowMs = Date.now()) {
+/** Returns human-readable countdown until start, e.g. "2h 15m" or "3 days" */
+export function formatCountdownToStart(
+  startTime: string,
+  nowMs = Date.now(),
+  dayThresholdHours?: number
+) {
   const diff = new Date(startTime).getTime() - nowMs;
   if (diff <= 0) return null;
 
   const totalMinutes = Math.floor(diff / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
+
+  if (
+    typeof dayThresholdHours === "number" &&
+    dayThresholdHours >= 0 &&
+    hours > dayThresholdHours
+  ) {
+    const days = Math.ceil(hours / 24);
+    return `${days} day${days === 1 ? "" : "s"}`;
+  }
 
   if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
   if (hours > 0) return `${hours}h`;

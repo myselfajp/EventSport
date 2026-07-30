@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 
 export type EventParticipantRow = {
   _id: string;
@@ -75,7 +76,7 @@ const EventParticipantsModal: React.FC<EventParticipantsModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Event Gamers
+              {ATHLETE_LABELS.eventParticipants}
             </h3>
             {eventName ? (
               <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
@@ -101,7 +102,7 @@ const EventParticipantsModal: React.FC<EventParticipantsModalProps> = ({
           ) : participants.length === 0 ? (
             <div className="text-center py-12 text-gray-500 dark:text-slate-400">
               <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No gamers yet</p>
+              <p>{ATHLETE_LABELS.noParticipantsYet}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -119,7 +120,7 @@ const EventParticipantsModal: React.FC<EventParticipantsModalProps> = ({
                         {p.user?.firstName} {p.user?.lastName}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-slate-400">
-                        {p.participant?.name || "Gamer"}
+                        {p.participant?.name || ATHLETE_LABELS.fallbackName}
                       </div>
                     </div>
                   </div>
@@ -154,7 +155,7 @@ const EventParticipantsModal: React.FC<EventParticipantsModalProps> = ({
 
         <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
           <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
-            <span>Total: {participants.length} gamers</span>
+            <span>{ATHLETE_LABELS.totalCount(participants.length)}</span>
             <span>
               Checked In:{" "}
               {participants.filter((p) => p.isCheckedIn).length}

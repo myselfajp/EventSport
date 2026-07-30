@@ -22,7 +22,7 @@ export const AUDIENCE_SEGMENTS = [
     },
     {
         id: 'all_gamers',
-        label: 'All gamers (have participant profile)',
+        label: 'All athletes (have participant profile)',
     },
     {
         id: 'all_coaches',

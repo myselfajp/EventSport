@@ -35,7 +35,7 @@ type NearbyEventsSectionProps = {
 };
 
 const COLUMN_CARD_CLASS =
-  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all group flex flex-row gap-3 items-start";
+  "snap-center shrink-0 w-full min-w-full max-w-full overflow-hidden text-left p-4 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-900/40 hover:border-cyan-400 dark:hover:border-cyan-500 hover:shadow-md transition-all group flex flex-row gap-3 items-start";
 
 const NearbyEventsSection: React.FC<NearbyEventsSectionProps> = ({
   locationKey,

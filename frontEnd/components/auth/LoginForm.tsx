@@ -6,12 +6,14 @@ import PasswordInput from "./PasswordInput";
 
 interface LoginFormProps {
   onToggleForm: () => void;
+  onForgotPassword: () => void;
   onLogin: Dispatch<SetStateAction<boolean>>;
   loginError: string;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({
   onToggleForm,
+  onForgotPassword,
   onLogin,
   loginError,
 }) => {
@@ -78,19 +80,21 @@ const LoginForm: React.FC<LoginFormProps> = ({
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
                 Password <span className="text-red-500">*</span>
               </label>
-              <span className="text-cyan-500 dark:text-cyan-400 text-sm cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors font-medium">
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-cyan-500 dark:text-cyan-400 text-sm hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors font-medium"
+              >
                 Forgot Password?
-              </span>
+              </button>
             </div>
-            <div className="relative">
-              <PasswordInput
-                value={password}
-                onChange={setPassword}
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                required
-              />
-            </div>
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+            />
           </div>
 
           {error && (

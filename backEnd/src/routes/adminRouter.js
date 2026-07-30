@@ -70,6 +70,16 @@ router.post('/blacklist/from-user/:userId', blacklistPerm, blacklistController.b
 router.delete('/blacklist/:entryId', blacklistPerm, blacklistController.removeBlacklistEntry);
 
 // Reports (moderation queue)
+router.get(
+    '/reports/unread-count',
+    requireAdminPermission('admin.reports'),
+    reportController.getReportsUnreadCount
+);
+router.post(
+    '/reports/mark-viewed',
+    requireAdminPermission('admin.reports'),
+    reportController.markReportsViewed
+);
 router.post('/reports', requireAdminPermission('admin.reports'), reportController.listReports);
 router.put(
     '/reports/:reportId/resolve',
@@ -236,27 +246,10 @@ router.delete(
     adminController.deleteStaticPage
 );
 
-// Blogs
+// Blogs — admin read-only list (coaches create/edit via coach API)
 router.get('/blogs', requireAdminPermission('admin.blogs'), blogController.listAdminBlogs);
-router.post(
-    '/blogs',
-    requireAdminPermission('admin.blogs'),
-    uploadFile({ fieldName: 'blog-cover-image' }),
-    blogController.createAdminBlog
-);
-router.put(
-    '/blogs/:blogId',
-    requireAdminPermission('admin.blogs'),
-    uploadFile({ fieldName: 'blog-cover-image', optional: true }),
-    blogController.updateAdminBlog
-);
-router.delete(
-    '/blogs/:blogId',
-    requireAdminPermission('admin.blogs'),
-    blogController.deleteAdminBlog
-);
 
-// News
+// News — admin only
 router.get('/news', requireAdminPermission('admin.news'), newsController.listAdminNews);
 router.post(
     '/news',

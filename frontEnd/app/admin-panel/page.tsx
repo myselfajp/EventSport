@@ -20,7 +20,6 @@ import ReportsManagement from "../../components/admin/ReportsManagement";
 import DashboardHeroManagement from "../../components/admin/DashboardHeroManagement";
 import AdminPermissionGroupsManagement from "../../components/admin/AdminPermissionGroupsManagement";
 import BlacklistManagement from "../../components/admin/BlacklistManagement";
-import BlogManagement from "../../components/blog/BlogManagement";
 import NewsManagement from "../../components/news/NewsManagement";
 import VideoManagement from "../../components/video/VideoManagement";
 
@@ -31,7 +30,6 @@ type TabType =
   | "performance"
   | "enums"
   | "events"
-  | "blogs"
   | "news"
   | "videos"
   | "notifications"
@@ -50,7 +48,6 @@ const TAB_ORDER: TabType[] = [
   "performance",
   "enums",
   "events",
-  "blogs",
   "news",
   "videos",
   "notifications",
@@ -70,13 +67,12 @@ const TAB_LABEL: Record<TabType, string> = {
   performance: "Performance Team",
   enums: "Enum Management",
   events: "Events",
-  blogs: "Blogs",
   news: "News",
   videos: "Videos",
   notifications: "Notifications",
   contracts: "Contracts",
   "site-pages": "Site Pages",
-  "subscription-plans": "Subscription Plans",
+  "subscription-plans": "Sales",
   "dashboard-hero": "Dashboard Hero",
   suggestions: "Suggestions",
   reports: "Reports",
@@ -91,7 +87,6 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   performance: "admin.coaches",
   enums: "admin.enums",
   events: "admin.events",
-  blogs: "admin.blogs",
   news: "admin.news",
   videos: "admin.videos",
   notifications: "admin.notifications",
@@ -113,6 +108,7 @@ export default function AdminPanelPage() {
   } | null>(null);
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("users");
+  const [unreadReportsCount, setUnreadReportsCount] = useState(0);
 
   const perms = adminData?.permissions ?? [];
   const isFullAdmin = adminData?.isFullAdmin === true;
@@ -130,6 +126,46 @@ export default function AdminPanelPage() {
   );
 
   const visibleTabs = useMemo(() => TAB_ORDER.filter((t) => canTab(t)), [canTab]);
+  const canViewReports = canTab("reports");
+
+  const fetchUnreadReportsCount = useCallback(async () => {
+    if (!canViewReports) return;
+    try {
+      const res = await fetchJSON(EP.ADMIN.reports.unreadCount, { method: "GET" });
+      if (res?.success) {
+        setUnreadReportsCount(res.data?.unreadCount ?? 0);
+      }
+    } catch {
+      /* ignore polling errors */
+    }
+  }, [canViewReports]);
+
+  const markReportsViewed = useCallback(async () => {
+    if (!canViewReports) return;
+    try {
+      await fetchJSON(EP.ADMIN.reports.markViewed, { method: "POST" });
+      setUnreadReportsCount(0);
+    } catch {
+      /* ignore */
+    }
+  }, [canViewReports]);
+
+  useEffect(() => {
+    if (!canViewReports) return;
+    void fetchUnreadReportsCount();
+    const interval = setInterval(() => {
+      if (activeTab !== "reports") {
+        void fetchUnreadReportsCount();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [canViewReports, activeTab, fetchUnreadReportsCount]);
+
+  useEffect(() => {
+    if (activeTab === "reports" && canViewReports) {
+      void markReportsViewed();
+    }
+  }, [activeTab, canViewReports, markReportsViewed]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -228,13 +264,22 @@ export default function AdminPanelPage() {
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap shrink-0 ${
+                  className={`relative py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap shrink-0 ${
                     activeTab === tab
                       ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300"
                   }`}
                 >
-                  {TAB_LABEL[tab]}
+                  <span className="inline-flex items-center gap-1.5">
+                    {TAB_LABEL[tab]}
+                    {tab === "reports" && unreadReportsCount > 0 && (
+                      <span
+                        className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0"
+                        title={`${unreadReportsCount} new report${unreadReportsCount === 1 ? "" : "s"}`}
+                        aria-label={`${unreadReportsCount} unread report${unreadReportsCount === 1 ? "" : "s"}`}
+                      />
+                    )}
+                  </span>
                 </button>
               ))}
             </nav>
@@ -247,7 +292,6 @@ export default function AdminPanelPage() {
             {activeTab === "performance" && <PerformanceTeamApproval />}
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
-            {activeTab === "blogs" && <BlogManagement mode="admin" />}
             {activeTab === "news" && <NewsManagement />}
             {activeTab === "videos" && <VideoManagement mode="admin" />}
             {activeTab === "notifications" && <NotificationManagement />}

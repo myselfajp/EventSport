@@ -184,6 +184,8 @@ export const EP = {
   AUTH: {
     signIn: `${AUTH_API}/sign-in`,
     sendRegistrationOtp: `${AUTH_API}/send-registration-otp`,
+    sendPasswordResetOtp: `${AUTH_API}/send-password-reset-otp`,
+    resetPassword: `${AUTH_API}/reset-password`,
     signUp: `${AUTH_API}/sign-up`,
     signOut: `${AUTH_API}/sign-out`,
     me: `${AUTH_API}/get-current-user`,
@@ -372,6 +374,8 @@ export const EP = {
     suggestions: `${ADMIN_API}/suggestions`,
     reports: {
       list: `${ADMIN_API}/reports`,
+      unreadCount: `${ADMIN_API}/reports/unread-count`,
+      markViewed: `${ADMIN_API}/reports/mark-viewed`,
       resolve: (reportId: string) => `${ADMIN_API}/reports/${reportId}/resolve`,
     },
     dashboardHeaderLogo: {

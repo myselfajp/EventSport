@@ -8,6 +8,8 @@ import Company from '../models/companyModel.js';
 import Club from '../models/clubModel.js';
 import ClubGroup from '../models/clubGroupModel.js';
 import { AppError } from '../utils/appError.js';
+import { getAdminUserIdsWithReportsAccess } from '../utils/adminReportRecipients.js';
+import { notifyAdminsOfNewReport } from '../utils/notificationHelper.js';
 import {
     submitReportSchema,
     adminListReportsSchema,
@@ -18,41 +20,51 @@ import {
 const MAX_REPORTS_PER_DAY = 10;
 const OPEN_STATUSES = ['open'];
 
+async function resolveUserReportTargetId(targetId) {
+    const direct = await User.findById(targetId).select('_id').lean();
+    if (direct) return direct._id;
+
+    const viaParticipant = await User.findOne({ participant: targetId }).select('_id').lean();
+    if (viaParticipant) return viaParticipant._id;
+
+    throw new AppError(404, 'User not found.');
+}
+
 async function assertTargetExists(targetType, targetId) {
     if (targetType === 'event') {
         const exists = await Event.exists({ _id: targetId });
         if (!exists) throw new AppError(404, 'Event not found.');
-        return;
+        return targetId;
     }
     if (targetType === 'user') {
-        const exists = await User.exists({ _id: targetId });
-        if (!exists) throw new AppError(404, 'User not found.');
-        return;
+        return resolveUserReportTargetId(targetId);
     }
     if (targetType === 'coach') {
         const exists = await Coach.exists({ _id: targetId });
         if (!exists) throw new AppError(404, 'Coach not found.');
-        return;
+        return targetId;
     }
     if (targetType === 'facility') {
         const exists = await Facility.exists({ _id: targetId });
         if (!exists) throw new AppError(404, 'Facility not found.');
-        return;
+        return targetId;
     }
     if (targetType === 'company') {
         const exists = await Company.exists({ _id: targetId });
         if (!exists) throw new AppError(404, 'Company not found.');
-        return;
+        return targetId;
     }
     if (targetType === 'club') {
         const exists = await Club.exists({ _id: targetId });
         if (!exists) throw new AppError(404, 'Club not found.');
-        return;
+        return targetId;
     }
     if (targetType === 'community') {
         const exists = await ClubGroup.exists({ _id: targetId });
         if (!exists) throw new AppError(404, 'Community not found.');
+        return targetId;
     }
+    return targetId;
 }
 
 async function assertNotSelfReport(reporterId, targetType, targetId) {
@@ -251,8 +263,8 @@ export const submitReport = async (req, res, next) => {
             throw new AppError(400, 'misleading_event reason is only valid for events.');
         }
 
-        await assertTargetExists(parsed.targetType, targetId);
-        await assertNotSelfReport(req.user._id, parsed.targetType, targetId);
+        const resolvedTargetId = await assertTargetExists(parsed.targetType, targetId);
+        await assertNotSelfReport(req.user._id, parsed.targetType, resolvedTargetId);
 
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const recentCount = await Report.countDocuments({
@@ -266,7 +278,7 @@ export const submitReport = async (req, res, next) => {
         const duplicate = await Report.findOne({
             reporter: req.user._id,
             targetType: parsed.targetType,
-            targetId,
+            targetId: resolvedTargetId,
             status: { $in: OPEN_STATUSES },
         }).lean();
         if (duplicate) {
@@ -284,15 +296,71 @@ export const submitReport = async (req, res, next) => {
             reporter: req.user._id,
             reporterIp: ip,
             targetType: parsed.targetType,
-            targetId,
+            targetId: resolvedTargetId,
             reason: parsed.reason || null,
             details: parsed.details || '',
         });
+
+        try {
+            const adminUserIds = await getAdminUserIdsWithReportsAccess();
+            const reporter = await User.findById(req.user._id)
+                .select('firstName lastName')
+                .lean();
+            const reporterName = `${reporter?.firstName || ''} ${reporter?.lastName || ''}`.trim();
+            if (adminUserIds.length === 0) {
+                console.warn('No admin recipients found for report notification.');
+            } else {
+                await notifyAdminsOfNewReport({
+                    reportId: report._id,
+                    targetType: parsed.targetType,
+                    reporterName,
+                    adminUserIds,
+                    createdBy: req.user._id,
+                });
+            }
+        } catch (notifyErr) {
+            console.error('Failed to notify admins of new report:', notifyErr);
+        }
 
         res.status(201).json({
             success: true,
             message: 'Report submitted. Our team will review it.',
             data: report,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/** Admin: count open reports not yet seen by this admin. */
+export const getReportsUnreadCount = async (req, res, next) => {
+    try {
+        const admin = await User.findById(req.user._id).select('reportsLastViewedAt').lean();
+        const filter = { status: 'open' };
+        if (admin?.reportsLastViewedAt) {
+            filter.createdAt = { $gt: admin.reportsLastViewedAt };
+        }
+        const unreadCount = await Report.countDocuments(filter);
+
+        res.status(200).json({
+            success: true,
+            data: { unreadCount },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/** Admin: mark all current open reports as seen (clears unread badge). */
+export const markReportsViewed = async (req, res, next) => {
+    try {
+        await User.findByIdAndUpdate(req.user._id, {
+            $set: { reportsLastViewedAt: new Date() },
+        });
+
+        res.status(200).json({
+            success: true,
+            data: { unreadCount: 0 },
         });
     } catch (err) {
         next(err);

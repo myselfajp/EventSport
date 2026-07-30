@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import {
   X,
   User,
   Phone,
   Mail,
-  Calendar,
   Trophy,
   Target,
   Award,
@@ -367,21 +367,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   if (!isOpen) return null;
 
+  const resolvedUserId = user?._id ? String(user._id) : null;
+
   const canReportUser =
-    currentUser?._id &&
-    userId &&
-    String(currentUser._id) !== String(userId);
+    !!currentUser?._id &&
+    !!resolvedUserId &&
+    String(currentUser._id) !== resolvedUserId;
 
   const canSendMessage =
     !!currentUser?._id &&
-    !!userId &&
-    String(currentUser._id) !== String(userId);
+    !!resolvedUserId &&
+    String(currentUser._id) !== resolvedUserId;
 
   const handleSendMessage = async () => {
-    if (!userId || isStartingConversation) return;
+    if (!resolvedUserId || isStartingConversation) return;
     setIsStartingConversation(true);
     try {
-      const conversation = await createConversation(userId);
+      const conversation = await createConversation(resolvedUserId);
       onClose();
       router.push(`/messaging?conversationId=${conversation._id}`);
     } catch (err) {
@@ -477,25 +479,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               </div>
 
-              {/* Basic Information */}
-              <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <Calendar className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Date of Birth
-                  </p>
-                  <p className="font-medium dark:text-white">
-                    {formatDate(user.age)}
-                  </p>
-                </div>
-              </div>
 
               {/* Participant Details */}
               {user.participant && (!context || context === "participant") && (
                 <div className="border-t dark:border-gray-700 pt-6">
                   <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                    Gamer Information
+                    {ATHLETE_LABELS.information}
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-3 p-3 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg">
@@ -990,12 +980,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         />
       )}
 
-      {canReportUser && userId && (
+      {canReportUser && resolvedUserId && (
         <ReportModal
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
           targetType="user"
-          targetId={userId}
+          targetId={resolvedUserId}
           targetLabel={reportTargetLabel}
         />
       )}

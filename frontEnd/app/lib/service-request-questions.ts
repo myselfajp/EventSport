@@ -41,7 +41,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     question: "Your level",
     type: "level_confirm",
     targets: ["coach", "performance"],
-    helperText: "Confirm the level from your gamer profile or adjust if needed.",
+    helperText: "Confirm the level from your athlete profile or adjust if needed.",
   },
   {
     key: "sportsGoal",
@@ -55,7 +55,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     question: "Private lesson or group lesson?",
     type: "single_choice",
     options: ["Private lesson", "Group lesson"],
-    targets: ["coach", "performance"],
+    targets: ["coach"],
   },
   {
     key: "instructorGender",
@@ -102,7 +102,14 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     question: "Facility preference",
     type: "single_choice",
     options: ["Private facility", "Open area", "No preference"],
-    targets: ["coach", "performance"],
+    targets: ["coach"],
+  },
+  {
+    key: "facilityPreference",
+    question: "Online or face to face?",
+    type: "single_choice",
+    options: ["Online", "Face to face"],
+    targets: ["performance"],
   },
   {
     key: "additionalDetails",

@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { fetchJSON } from "@/app/lib/api";
+import { getMe } from "@/app/lib/auth-api";
 import { EP } from "@/app/lib/endpoints";
 import {
   CATEGORY_LABELS,
@@ -37,9 +40,29 @@ function SectionBody({ html }: { html: string }) {
 }
 
 export default function ContractsContent() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
+
+  useEffect(() => {
+    void queryClient.prefetchQuery({
+      queryKey: ["auth", "me"],
+      queryFn: getMe,
+    });
+  }, [queryClient]);
+
+  const goHome = () => {
+    void queryClient
+      .prefetchQuery({
+        queryKey: ["auth", "me"],
+        queryFn: getMe,
+      })
+      .finally(() => {
+        router.push("/");
+      });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -89,12 +112,13 @@ export default function ContractsContent() {
       <header className="border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Agreements</h1>
-          <Link
-            href="/"
+          <button
+            type="button"
+            onClick={goHome}
             className="text-sm text-cyan-600 dark:text-cyan-400 hover:underline"
           >
             Home
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -127,10 +151,6 @@ export default function ContractsContent() {
               </div>
             );
           })}
-          <p className="mt-3 text-xs text-gray-500 dark:text-slate-400">
-            All texts are managed via Admin → Contracts. Legacy static URLs redirect to this
-            page.
-          </p>
         </nav>
 
         {fatalError && (

@@ -116,7 +116,7 @@ export default function CoachCertificateApproval() {
       if (response?.success) {
         if (response.revertedToGamer) {
           alert(
-            "Certificate rejected. The user remains a gamer; coach application was removed."
+            "Certificate rejected. The user remains an athlete; coach application was removed."
           );
         }
         fetchPendingBranches();

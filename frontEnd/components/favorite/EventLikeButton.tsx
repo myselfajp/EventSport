@@ -3,6 +3,7 @@
 import React, { useCallback, useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import {
   isEventLiked,
   useAddFavorite,
@@ -43,7 +44,7 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({
       e.stopPropagation();
       if (!id) return;
       if (!canLike) {
-        alert("Create a gamer profile to like events.");
+        alert(ATHLETE_LABELS.createProfileToLike);
         return;
       }
 
@@ -78,7 +79,7 @@ const EventLikeButton: React.FC<EventLikeButtonProps> = ({
       disabled={!canLike || isPending}
       title={
         !canLike
-          ? "Create a gamer profile to like events"
+          ? ATHLETE_LABELS.createProfileToLike
           : isLiked
             ? "Unlike"
             : "Like"

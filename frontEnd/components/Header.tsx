@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Menu,
   Calendar,
@@ -76,6 +77,10 @@ const Header: React.FC<HeaderProps> = ({
   const { data: user, isPending: isUserPending } = useMe();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(
+    null
+  );
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
@@ -102,6 +107,25 @@ const Header: React.FC<HeaderProps> = ({
       return;
     }
     router.push("/?coachMe=1");
+  };
+
+  const updateMenuPosition = useCallback(() => {
+    if (!bellRef.current) return;
+    const rect = bellRef.current.getBoundingClientRect();
+    const menuWidth = 320;
+    let left = rect.right - menuWidth;
+    left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
+    setMenuPosition({ top: rect.bottom + 8, left });
+  }, []);
+
+  const toggleNotifications = () => {
+    setIsNotificationsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        updateMenuPosition();
+      }
+      return next;
+    });
   };
 
   const handleNotificationClick = (notification: any) => {
@@ -237,6 +261,8 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   useEffect(() => {
+    if (!user) return;
+
     fetchNotifications();
     fetchUnreadCount();
     fetchMessageUnreadCount();
@@ -248,7 +274,7 @@ const Header: React.FC<HeaderProps> = ({
     }, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -267,20 +293,33 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isNotificationsOpen) {
-      fetchNotifications();
-    }
-  }, [isNotificationsOpen]);
+    if (!isNotificationsOpen) return;
+    updateMenuPosition();
+    const onScrollOrResize = () => updateMenuPosition();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [isNotificationsOpen, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!isNotificationsOpen || !user) return;
+    fetchNotifications();
+  }, [isNotificationsOpen, user]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        dropdownRef.current?.contains(target) ||
+        bellRef.current?.contains(target)
       ) {
-        setIsNotificationsOpen(false);
+        return;
       }
+      setIsNotificationsOpen(false);
     };
 
     if (isNotificationsOpen) {
@@ -292,15 +331,115 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, [isNotificationsOpen]);
 
+  const notificationDropdown =
+    isNotificationsOpen && menuPosition && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[200] w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg dark:shadow-xl max-h-96 overflow-y-auto"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
+            <div className="p-3 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="font-medium text-gray-800 dark:text-slate-100 text-sm">
+                Notifications
+              </h3>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-slate-700">
+              {loading ? (
+                <div className="p-4 text-center text-gray-500 dark:text-slate-400 text-sm">
+                  Loading...
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 dark:text-slate-400 text-sm">
+                  No notifications yet
+                </div>
+              ) : (
+                notifications.map((notification) => {
+                  const Icon = getNotificationIcon(notification.icon);
+                  const colorClass =
+                    PRIORITY_COLOR[notification.priority] ??
+                    "text-gray-400 dark:text-slate-500";
+                  const clickable =
+                    !!notification.actionUrl || !notification.isRead;
+                  return (
+                    <div
+                      key={notification._id}
+                      onClick={
+                        clickable
+                          ? () => handleNotificationClick(notification)
+                          : undefined
+                      }
+                      role={clickable ? "button" : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                      onKeyDown={
+                        clickable
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleNotificationClick(notification);
+                              }
+                            }
+                          : undefined
+                      }
+                      className={`p-3 transition-colors ${
+                        clickable
+                          ? "hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+                          : ""
+                      } ${
+                        !notification.isRead
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <Icon
+                          className={`w-4 h-4 ${colorClass} mt-0.5 flex-shrink-0`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-200">
+                            {notification.title}
+                          </p>
+                          <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed mt-1">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                            {formatTimeAgo(notification.createdAt)}
+                          </p>
+                        </div>
+                        {!notification.isRead && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {notifications.length > 0 && unreadCount > 0 && (
+              <div className="p-3 border-t border-gray-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={handleMarkAllAsRead}
+                  className="w-full text-center text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium transition-colors"
+                >
+                  Mark All as Read
+                </button>
+              </div>
+            )}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <>
       <header className="site-header shrink-0 border-b border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900 transition-colors duration-300">
-        <div className="flex h-full items-center justify-between px-4 md:px-6">
-          <div className="flex flex-1 items-center justify-start min-w-0">
+        <div className="site-header-inner px-3 sm:px-4 md:px-6">
+          <div className="header-left flex items-center min-w-0">
             <button
               type="button"
               onClick={onLeftSidebarToggle}
-              className="hidden md:inline-flex items-center justify-center p-2 -ml-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              className="hidden md:inline-flex items-center justify-center p-2 -ml-1 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               aria-label="Open menu"
             >
               <Menu className="w-5 h-5 shrink-0" strokeWidth={1.75} />
@@ -308,48 +447,33 @@ const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => router.push("/blogs")}
-              className="inline-flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              className="header-nav-blogs inline-flex items-center gap-1.5 px-2 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               aria-label="Open blogs"
             >
               <BookOpen className="w-5 h-5 shrink-0" strokeWidth={1.75} />
-              <span className="hidden sm:inline text-sm font-medium">Blogs</span>
+              <span className="header-nav-label text-sm font-medium whitespace-nowrap">Blogs</span>
             </button>
             <button
               type="button"
               onClick={() => router.push("/news")}
-              className="inline-flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              className="header-nav-news inline-flex items-center gap-1.5 px-2 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               aria-label="Open news"
             >
               <Newspaper className="w-5 h-5 shrink-0" strokeWidth={1.75} />
-              <span className="hidden sm:inline text-sm font-medium">News</span>
+              <span className="header-nav-label text-sm font-medium whitespace-nowrap">News</span>
             </button>
             <button
               type="button"
               onClick={() => router.push("/videos")}
-              className="inline-flex items-center gap-2 px-2.5 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              className="header-nav-videos inline-flex items-center gap-1.5 px-2 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               aria-label="Open videos"
             >
               <Video className="w-5 h-5 shrink-0" strokeWidth={1.75} />
-              <span className="hidden sm:inline text-sm font-medium">Videos</span>
+              <span className="header-nav-label text-sm font-medium whitespace-nowrap">Videos</span>
             </button>
-            {user?.coach ? (
-              <button
-                type="button"
-                onClick={() => router.push("/upgrade")}
-                className={`inline-flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${
-                  pathname === "/upgrade"
-                    ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300"
-                    : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
-                }`}
-                aria-label="Open upgrade plans"
-              >
-                <ArrowUpCircle className="w-5 h-5 shrink-0" strokeWidth={1.75} />
-                <span className="hidden sm:inline text-sm font-medium">Upgrade</span>
-              </button>
-            ) : null}
           </div>
 
-          <div className="header-logo-wrap flex-1 min-w-0 px-2">
+          <div className="header-logo-wrap px-1">
             {headerLogoUrl ? (
               <img
                 src={headerLogoUrl}
@@ -360,25 +484,40 @@ const Header: React.FC<HeaderProps> = ({
             ) : null}
           </div>
 
-          <div className="flex flex-1 items-center justify-end min-w-0 gap-2 sm:gap-3">
+          <div className="header-right flex items-center justify-end gap-1 sm:gap-2">
+            {user?.coach ? (
+              <button
+                type="button"
+                onClick={() => router.push("/upgrade")}
+                className={`inline-flex items-center gap-1.5 px-2 py-2 rounded-lg transition-colors shrink-0 ${
+                  pathname === "/upgrade"
+                    ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300"
+                    : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+                }`}
+                aria-label="Open upgrade plans"
+              >
+                <ArrowUpCircle className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+                <span className="header-upgrade-label text-sm font-medium whitespace-nowrap">Upgrade</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleCoachMeClick}
               disabled={isUserPending}
-              className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-2.5 sm:px-5 sm:py-2.5 text-sm sm:text-base font-semibold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-600 hover:to-green-600 hover:shadow-emerald-500/40 hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70"
+              className="header-coach-me-btn inline-flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500 to-green-500 px-3 py-2 sm:px-4 sm:py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-600 hover:to-green-600 hover:shadow-emerald-500/40 disabled:cursor-wait disabled:opacity-70 shrink-0"
             >
               <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" strokeWidth={2} />
-              <span>Coach Me</span>
+              <span className="header-coach-me-label whitespace-nowrap">Coach Me</span>
             </button>
 
-            <div className="inline-flex items-center gap-2 sm:gap-3 rounded-xl border border-gray-200/70 dark:border-slate-700/70 bg-gray-50/60 dark:bg-slate-800/40 px-1.5 py-1 sm:px-2 sm:py-1.5">
+            <div className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-gray-200/70 dark:border-slate-700/70 bg-gray-50/60 dark:bg-slate-800/40 px-1 py-1 sm:px-1.5 sm:py-1.5 shrink-0">
               <ThemeToggle
                 variant="icon"
                 className="!w-9 !h-9 !p-0 shrink-0 !bg-transparent hover:!bg-white dark:hover:!bg-slate-700/80 shadow-none"
               />
 
               <span
-                className="hidden sm:block w-px h-6 bg-gray-200 dark:bg-slate-600 shrink-0"
+                className="header-theme-divider hidden sm:block w-px h-6 bg-gray-200 dark:bg-slate-600 shrink-0"
                 aria-hidden
               />
 
@@ -399,12 +538,14 @@ const Header: React.FC<HeaderProps> = ({
                   )}
                 </button>
 
-                <div className="relative" ref={dropdownRef}>
+                <div className="relative">
                   <button
+                    ref={bellRef}
                     type="button"
-                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    onClick={toggleNotifications}
                     className="relative inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700/80 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
                     aria-label="Notifications"
+                    aria-expanded={isNotificationsOpen}
                   >
                     <Bell className="w-5 h-5" strokeWidth={1.75} />
                     {unreadCount > 0 && (
@@ -415,99 +556,7 @@ const Header: React.FC<HeaderProps> = ({
                       </span>
                     )}
                   </button>
-
-            {/* Notifications Dropdown */}
-            {isNotificationsOpen && (
-              <div className="absolute right-0 top-12 z-[120] w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg dark:shadow-xl max-h-96 overflow-y-auto">
-                <div className="p-3 border-b border-gray-200 dark:border-slate-700">
-                  <h3 className="font-medium text-gray-800 dark:text-slate-100 text-sm">
-                    Notifications
-                  </h3>
                 </div>
-                <div className="divide-y divide-gray-100 dark:divide-slate-700">
-                  {loading ? (
-                    <div className="p-4 text-center text-gray-500 dark:text-slate-400 text-sm">
-                      Loading...
-                    </div>
-                  ) : notifications.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500 dark:text-slate-400 text-sm">
-                      No notifications yet
-                    </div>
-                  ) : (
-                    notifications.map((notification) => {
-                      const Icon = getNotificationIcon(notification.icon);
-                      const colorClass =
-                        PRIORITY_COLOR[notification.priority] ??
-                        "text-gray-400 dark:text-slate-500";
-                      const clickable =
-                        !!notification.actionUrl || !notification.isRead;
-                      return (
-                        <div
-                          key={notification._id}
-                          onClick={
-                            clickable
-                              ? () => handleNotificationClick(notification)
-                              : undefined
-                          }
-                          role={clickable ? "button" : undefined}
-                          tabIndex={clickable ? 0 : undefined}
-                          onKeyDown={
-                            clickable
-                              ? (e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    handleNotificationClick(notification);
-                                  }
-                                }
-                              : undefined
-                          }
-                          className={`p-3 transition-colors ${
-                            clickable
-                              ? "hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
-                              : ""
-                          } ${
-                            !notification.isRead
-                              ? "bg-blue-50 dark:bg-blue-900/20"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <Icon
-                              className={`w-4 h-4 ${colorClass} mt-0.5 flex-shrink-0`}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800 dark:text-slate-200">
-                                {notification.title}
-                              </p>
-                              <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed mt-1">
-                                {notification.message}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                                {formatTimeAgo(notification.createdAt)}
-                              </p>
-                            </div>
-                            {!notification.isRead && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                {notifications.length > 0 && unreadCount > 0 && (
-                  <div className="p-3 border-t border-gray-200 dark:border-slate-700">
-                    <button
-                      onClick={handleMarkAllAsRead}
-                      className="w-full text-center text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium transition-colors"
-                    >
-                      Mark All as Read
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
                 <button
                   type="button"
@@ -522,6 +571,7 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </header>
+      {notificationDropdown}
     </>
   );
 };

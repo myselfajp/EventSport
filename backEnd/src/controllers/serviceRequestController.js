@@ -48,7 +48,7 @@ const REQUEST_QUESTIONS = [
         question: 'Private lesson or group lesson?',
         type: 'single_choice',
         options: ['Private lesson', 'Group lesson'],
-        targets: ['coach', 'performance'],
+        targets: ['coach'],
     },
     {
         key: 'instructorGender',
@@ -94,7 +94,14 @@ const REQUEST_QUESTIONS = [
         question: 'Facility preference',
         type: 'single_choice',
         options: ['Private facility', 'Open area', 'No preference'],
-        targets: ['coach', 'performance'],
+        targets: ['coach'],
+    },
+    {
+        key: 'facilityPreference',
+        question: 'Online or face to face?',
+        type: 'single_choice',
+        options: ['Online', 'Face to face'],
+        targets: ['performance'],
     },
     {
         key: 'additionalDetails',
@@ -274,7 +281,7 @@ export const createServiceRequest = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
         if (!req.user.participant) {
-            throw new AppError(403, 'Gamer profile is required to create a service request.');
+            throw new AppError(403, 'Athlete profile is required to create a service request.');
         }
 
         const targetType = trim(req.body?.targetType, 32);

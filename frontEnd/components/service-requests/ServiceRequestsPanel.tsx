@@ -6,6 +6,7 @@ import { ChevronLeft, MessageSquare, X } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import ServiceRequestWizard from "@/components/service-requests/ServiceRequestWizard";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 
 type ServiceRequestResponse = {
   _id: string;
@@ -419,7 +420,7 @@ export default function ServiceRequestsPanel({
               {!showIncomingList ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Review service requests sent by gamers and show your interest.
+                    {ATHLETE_LABELS.serviceRequestReview}
                   </p>
                   <button
                     type="button"
@@ -464,7 +465,7 @@ export default function ServiceRequestsPanel({
                         {request.title || requestTargetLabel(request)}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        From {`${request.requester?.firstName || ""} ${request.requester?.lastName || ""}`.trim() || "Gamer"}
+                        From {`${request.requester?.firstName || ""} ${request.requester?.lastName || ""}`.trim() || ATHLETE_LABELS.serviceRequestFrom}
                       </p>
                     </div>
                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-100">
@@ -493,7 +494,7 @@ export default function ServiceRequestsPanel({
                             [request._id]: e.target.value,
                           }))
                         }
-                        placeholder="Short message to gamer..."
+                        placeholder={ATHLETE_LABELS.messagePlaceholder}
                         className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
                       />
                       <button

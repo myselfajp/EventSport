@@ -25,7 +25,7 @@ type CheckInTimesSectionProps = {
 };
 
 const COLUMN_CARD_CLASS =
-  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-violet-200 dark:border-violet-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-violet-400 dark:hover:border-violet-500 hover:shadow-lg transition-all group flex flex-row gap-3 items-start";
+  "snap-center shrink-0 w-full min-w-full max-w-full overflow-hidden text-left p-4 rounded-xl border border-violet-200 dark:border-violet-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-violet-400 dark:hover:border-violet-500 hover:shadow-lg transition-all group flex flex-row gap-3 items-start";
 
 const CheckInTimesSection: React.FC<CheckInTimesSectionProps> = ({
   className = "",
@@ -128,23 +128,25 @@ const CheckInTimesSection: React.FC<CheckInTimesSectionProps> = ({
                     <div className="flex-1 min-w-0">
                       {countdown && (
                         <span
-                          className={`inline-flex items-center gap-1 self-start mb-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          className={`inline-flex items-center gap-1 self-start max-w-full mb-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
                             countdown === "Open now"
                               ? "bg-green-600 text-white"
                               : "bg-violet-600 text-white"
                           }`}
                         >
-                          <Clock className="w-3 h-3" />
-                          {countdown}
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{countdown}</span>
                         </span>
                       )}
                       <p className="font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-violet-700 dark:group-hover:text-violet-300">
                         {event.name}
                       </p>
                       {checkInAt && (
-                        <div className="flex items-center gap-1.5 mt-3 text-sm font-semibold text-violet-700 dark:text-violet-300">
+                        <div className="flex items-start gap-1.5 mt-3 min-w-0 text-sm font-semibold text-violet-700 dark:text-violet-300">
                           <Clock className="w-4 h-4 shrink-0" />
-                          <span>Check-in {formatEventDateTime(checkInAt)}</span>
+                          <span className="min-w-0 break-words">
+                            Check-in {formatEventDateTime(checkInAt)}
+                          </span>
                         </div>
                       )}
                       <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">

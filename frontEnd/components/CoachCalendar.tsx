@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ArrowLeft, X, Clock, Users, CheckCircle, Cre
 import { useMe } from "@/app/hooks/useAuth";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import ViewEventModal from "./event/ViewEventModal";
 import AddEventModal from "./event/AddEventModal";
 import CoachDetailModal from "./CoachDetailModal";
@@ -785,10 +786,10 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
                                   <button
                                     onClick={(e) => handleShowParticipants(e, event)}
                                     className="px-3 py-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                                    title="View Gamers"
+                                    title={ATHLETE_LABELS.viewParticipants}
                                   >
                                     <Users className="w-3 h-3" />
-                                    Gamers
+                                    {ATHLETE_LABELS.plural}
                                   </button>
                                 )}
                                 {canEditEvent && (
@@ -924,7 +925,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Event Gamers
+                  {ATHLETE_LABELS.eventParticipants}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                   {selectedEventForParticipants.name}
@@ -946,7 +947,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
               ) : participants.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-slate-400">
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No gamers yet</p>
+                  <p>{ATHLETE_LABELS.noParticipantsYet}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -964,7 +965,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
                             {p.user?.firstName} {p.user?.lastName}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-slate-400">
-                            {p.participant?.name || "Gamer"}
+                            {p.participant?.name || ATHLETE_LABELS.fallbackName}
                           </div>
                         </div>
                       </div>
@@ -999,7 +1000,7 @@ const CoachCalendar: React.FC<CoachCalendarProps> = ({
             
             <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
               <div className="flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
-                <span>Total: {participants.length} gamers</span>
+                <span>{ATHLETE_LABELS.totalCount(participants.length)}</span>
                 <span>
                   Checked In: {participants.filter((p: any) => p.isCheckedIn).length}
                 </span>

@@ -256,6 +256,37 @@ export const sendRegistrationOtpSchema = z.object({
     firstName: z.string().trim().optional(),
 });
 
+export const sendPasswordResetOtpSchema = z.object({
+    email: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .email('Please enter a valid email address.'),
+});
+
+export const resetPasswordSchema = z
+    .object({
+        email: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .email('Please enter a valid email address.'),
+        otp: z
+            .string()
+            .length(6, 'Verification code must be 6 digits.')
+            .regex(/^\d{6}$/, 'Verification code must be 6 digits.'),
+        password: z
+            .string()
+            .min(passwordMin, PASSWORD_RULE_MESSAGE)
+            .max(passwordMax, `Password must be at most ${passwordMax} characters.`)
+            .regex(passwordRegex, PASSWORD_RULE_MESSAGE),
+        confirmPassword: z.string().min(1, 'Please confirm your password.'),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+        message: 'Passwords do not match.',
+        path: ['confirmPassword'],
+    });
+
 export const adminCreateUserSchema = z.object({
     firstName: z.string({
         error: (iss) =>

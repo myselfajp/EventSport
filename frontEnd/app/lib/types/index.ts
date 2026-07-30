@@ -314,10 +314,12 @@ export interface Facility {
 export interface FacilitySearchResponse {
   success: boolean;
   data: Facility[];
-  total: number;
-  perPage: number;
-  pageNumber: number;
-  totalPages: number;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    perPage: number;
+    total: number;
+  };
   message?: string;
 }
 
@@ -344,10 +346,12 @@ export interface Company {
 export interface CompanySearchResponse {
   success: boolean;
   data: Company[];
-  total: number;
-  perPage: number;
-  pageNumber: number;
-  totalPages: number;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    perPage: number;
+    total: number;
+  };
   message?: string;
 }
 

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useMe, useSignOut } from "@/app/hooks/useAuth";
 import LoginForm from "./auth/LoginForm";
 import RegistrationForm from "./auth/RegistrationForm";
+import ForgotPasswordForm from "./auth/ForgotPasswordForm";
 import ProfileSidebar from "./profile/ProfileSidebar";
 
 interface LeftSidebarProps {
@@ -69,19 +70,33 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onShowFavorites,
   onShowActivity,
 }) => {
-  const { data: user, isLoading: userLoading } = useMe();
+  const { data: user, isLoading: userLoading, isFetching: userFetching } = useMe();
   const { mutate: signOut } = useSignOut();
   const isLoggedIn = !!user;
+  const authPending = userLoading || (userFetching && !user);
 
   const [showRegistration, setShowRegistration] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleLogout = () => {
     signOut();
     setShowRegistration(false);
+    setShowForgotPassword(false);
   };
 
   const toggleForm = () => {
     setShowRegistration(!showRegistration);
+    setShowForgotPassword(false);
+  };
+
+  const openForgotPassword = () => {
+    setShowForgotPassword(true);
+    setShowRegistration(false);
+  };
+
+  const backToSignIn = () => {
+    setShowForgotPassword(false);
+    setShowRegistration(false);
   };
 
   return (
@@ -90,7 +105,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         isOpen ? "w-full sm:w-96 md:w-[400px]" : "w-0"
       } h-screen bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 transition-all duration-300 overflow-hidden flex-shrink-0`}
     >
-      {userLoading ? (
+      {authPending ? (
         <div className="flex items-center justify-center h-full">
           <div className="flex flex-col items-center gap-3">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
@@ -117,10 +132,17 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
               : []
           }
         />
+      ) : showForgotPassword ? (
+        <ForgotPasswordForm onBackToSignIn={backToSignIn} />
       ) : showRegistration ? (
         <RegistrationForm onToggleForm={toggleForm} />
       ) : (
-        <LoginForm onToggleForm={toggleForm} onLogin={() => {}} loginError="" />
+        <LoginForm
+          onToggleForm={toggleForm}
+          onForgotPassword={openForgotPassword}
+          onLogin={() => {}}
+          loginError=""
+        />
       )}
     </div>
   );

@@ -36,7 +36,7 @@ export async function canGamerReviewCoach(participantId, coachUserId) {
 
 export async function assertGamerCanReviewCoach(user, coachId) {
     if (!user?.participant) {
-        return { ok: false, status: 403, message: 'Only gamers with a participant profile can review coaches.' };
+        return { ok: false, status: 403, message: 'Only athletes with a participant profile can review coaches.' };
     }
 
     const coach = await Coach.findById(coachId).select('_id');
@@ -103,7 +103,7 @@ export async function getCoachReviewSummary(coachId) {
 }
 
 function authorLabel(user) {
-    if (!user) return 'Gamer';
+    if (!user) return 'Athlete';
 
     const firstName = `${user.firstName || ''}`.trim();
     const lastName = `${user.lastName || ''}`.trim();
@@ -112,7 +112,7 @@ function authorLabel(user) {
     if (firstName && lastInitial) return `${firstName} ${lastInitial}.`;
     if (firstName) return firstName;
     if (lastInitial) return `${lastInitial}.`;
-    return 'Gamer';
+    return 'Athlete';
 }
 
 export async function buildCoachReviewsPayload(coachId, viewerUser = null) {

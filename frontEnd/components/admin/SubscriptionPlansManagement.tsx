@@ -161,11 +161,10 @@ export default function SubscriptionPlansManagement() {
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
-          Subscription plans
+          Sales
         </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-          Coach membership prices (TRY) and credit limits. Basic stays free. Stripe checkout
-          will use these plans later.
+          Track coach membership purchases, plan prices (TRY), and credit limits.
         </p>
       </div>
 

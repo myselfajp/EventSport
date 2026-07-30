@@ -8,6 +8,8 @@ import { useMe } from "@/app/hooks/useAuth";
 import { getLevelDefinition } from "@/app/lib/level-definitions";
 import LevelDefinitions from "@/components/LevelDefinitions";
 
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
+
 interface ParticipantModalProps {
   isOpen?: boolean;
   onClose: () => void;
@@ -363,11 +365,11 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
           handleClose();
         }
       } else {
-        setError(res.message || "Failed to save gamer profile");
+        setError(res.message || ATHLETE_LABELS.saveFailed);
       }
     } catch (err) {
       console.error("Error saving participant profile:", err);
-      setError("Failed to save gamer profile");
+      setError(ATHLETE_LABELS.saveFailed);
     } finally {
       setLoading(false);
     }
@@ -725,10 +727,10 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-100">
-              {isEditMode ? "Gamer Profile" : "Create Gamer Profile"}
+              {isEditMode ? ATHLETE_LABELS.profile : ATHLETE_LABELS.createProfile}
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Save your gamer preferences to personalize events.
+              {ATHLETE_LABELS.preferencesHint}
             </p>
           </div>
           {isEditMode && (
@@ -749,8 +751,8 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
             {isEditMode
-              ? "Edit Gamer Profile"
-              : "Create Gamer Profile"}
+              ? ATHLETE_LABELS.editProfile
+              : ATHLETE_LABELS.createProfile}
           </h2>
           <button
             onClick={handleClose}

@@ -14,6 +14,7 @@ import {
   isPhoneComplete,
 } from "../../app/lib/phone-utils";
 import { useMe } from "../../app/hooks/useAuth";
+import { ATHLETE_LABELS } from "../../app/lib/athlete-labels";
 
 interface User {
   _id: string;
@@ -848,7 +849,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
       const branch = user.performanceMember.branch || user.summary?.performance?.branch;
       parts.push(`Performance Team (${performanceBranchLabel(branch)})`);
     }
-    if (user.participant) parts.push("Gamer");
+    if (user.participant) parts.push(ATHLETE_LABELS.singular);
     if (user.facility && user.facility.length > 0) parts.push(`Facility Owner (${user.facility.length})`);
     return parts.length > 0 ? parts.join(", ") : "Regular User";
   };
@@ -897,7 +898,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-slate-400 dark:hover:text-slate-300'
             }`}
           >
-            Gamers
+            {ATHLETE_LABELS.plural}
           </button>
           <button
             onClick={() => setActiveTab('coach')}
@@ -947,7 +948,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
           <div className="rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900 dark:text-slate-100">
-                Most Active Gamers
+                Most Active {ATHLETE_LABELS.plural}
               </h3>
               {activityLoading ? (
                 <span className="text-xs text-gray-500 dark:text-slate-400">Loading...</span>
@@ -1724,7 +1725,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
 
                 {detailsData?.participant && (
                   <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
-                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">Gamer Profile</h4>
+                    <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100">{ATHLETE_LABELS.profile}</h4>
                     <div className="space-y-2 text-sm">
                       {detailsData.participant.mainSport && (
                         <p>

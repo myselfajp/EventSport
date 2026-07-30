@@ -22,6 +22,7 @@ import {
   notifyNoEventCreditsAndGoUpgrade,
 } from "@/app/lib/subscription-credits";
 import { showAppToast } from "@/app/lib/app-toast";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 
 // Custom hook for debounce
 function useDebounce<T>(value: T, delay: number): T {
@@ -499,13 +500,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
           );
         } else {
           setInviteCandidates([]);
-          setInviteSearchError(res?.message || "Could not search gamers.");
+          setInviteSearchError(res?.message || ATHLETE_LABELS.couldNotSearch);
         }
       } catch (err) {
         if (!cancelled) {
           console.error("Error searching invite candidates:", err);
           setInviteCandidates([]);
-          setInviteSearchError("Could not search gamers.");
+          setInviteSearchError(ATHLETE_LABELS.couldNotSearch);
         }
       } finally {
         if (!cancelled) setLoadingInviteCandidates(false);
@@ -1013,12 +1014,12 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     }
 
     if (!formData.participationFee || parseFloat(formData.participationFee) < 0) {
-      setError("Gamer Fee must be a valid number (0 or greater)");
+      setError(ATHLETE_LABELS.feeValidation);
       return;
     }
 
     if (formData.priceType !== "Free" && parseFloat(formData.participationFee) === 0) {
-      setError("Gamer Fee must be greater than 0 when Price Type is not 'Free'");
+      setError(ATHLETE_LABELS.feeValidationPositive);
       return;
     }
 
@@ -1157,11 +1158,6 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       }
 
       formDataToSend.append("data", JSON.stringify(eventData));
-
-      console.log(
-        "Submitting event with token:",
-        localStorage.getItem("se_at")
-      );
 
       const url = isEditMode && initialData?._id 
         ? EP.COACH.editEvent(initialData._id)
@@ -2196,7 +2192,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Gamer Fee <span className="text-red-500">*</span>
+                    {ATHLETE_LABELS.fee} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -2204,7 +2200,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     onChange={(e) =>
                       handleInputChange("participationFee", e.target.value)
                     }
-                    placeholder="Gamer Fee"
+                    placeholder={ATHLETE_LABELS.fee}
                     className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                     disabled={formData.priceType === "Free"}
                     min="0"
@@ -2467,17 +2463,17 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Invite Gamers
+                          {ATHLETE_LABELS.inviteTitle}
                         </h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Search gamers by name or email. Selected gamers will receive an event invitation notification after the event is created.
+                          {ATHLETE_LABELS.inviteHelp}
                         </p>
                       </div>
                     </div>
 
                     <div className="relative">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Find gamers
+                        {ATHLETE_LABELS.findPlaceholder}
                       </label>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -2498,7 +2494,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                         <div className="absolute z-20 mt-2 w-full max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
                           {loadingInviteCandidates ? (
                             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                              Searching gamers...
+                              {ATHLETE_LABELS.searching}
                             </div>
                           ) : inviteSearchError ? (
                             <div className="px-4 py-3 text-sm text-red-600 dark:text-red-400">
@@ -2536,7 +2532,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                             ))
                           ) : (
                             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                              No matching gamers found.
+                              {ATHLETE_LABELS.noMatches}
                             </div>
                           )}
                         </div>

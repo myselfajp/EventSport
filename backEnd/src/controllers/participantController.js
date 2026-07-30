@@ -930,10 +930,13 @@ export const makeReservation = async (req, res, next) => {
         }
 
         const now = new Date();
-        if (event.endTime && now >= event.endTime) {
+        const startTime = event.startTime ? new Date(event.startTime) : null;
+        const endTime = event.endTime ? new Date(event.endTime) : null;
+
+        if (endTime && now >= endTime) {
             throw new AppError(403, 'This event has ended');
         }
-        if (now >= event.startTime) {
+        if (startTime && now >= startTime) {
             throw new AppError(403, 'This event has already started');
         }
 
@@ -1394,7 +1397,7 @@ export const endPhoto = async (req, res, next) => {
             participant: user.participant,
             event: eventId,
         });
-        if (!isReserved) throw new AppError(403, 'You are not a gamer of this event.');
+        if (!isReserved) throw new AppError(403, 'You are not an athlete of this event.');
 
         const alreadySubmitted = await EventEndPhoto.exists({ user: user._id, event: eventId });
         if (alreadySubmitted) {
@@ -1547,11 +1550,11 @@ export const getParticipantDetails = async (req, res, next) => {
             },
             { path: 'sportGoal' },
         ]);
-        if (!participant) throw new AppError(404, 'gamer not found');
+        if (!participant) throw new AppError(404, 'Athlete not found');
 
         const user = await User.find({
             participant: participantId,
-        }).select('-email -phone -isEmailVerified -isPhoneVerified');
+        }).select('-email -phone -isEmailVerified -isPhoneVerified -age');
 
         const allData = {
             user,

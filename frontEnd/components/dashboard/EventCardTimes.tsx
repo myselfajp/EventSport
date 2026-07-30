@@ -25,16 +25,16 @@ export default function EventCardTimes({
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-600 dark:text-slate-300">
+      <div className="flex items-start gap-1.5 mt-2 min-w-0 text-xs text-gray-600 dark:text-slate-300">
         <Calendar className="w-3.5 h-3.5 shrink-0" />
-        <span>
+        <span className="min-w-0 break-words">
           {startLabel} {formatEventDateTime(event.startTime)}
         </span>
       </div>
       {checkInAt && (
-        <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-slate-400">
+        <div className="flex items-start gap-1.5 mt-1 min-w-0 text-xs text-gray-500 dark:text-slate-400">
           <Clock className="w-3.5 h-3.5 shrink-0" />
-          <span>
+          <span className="min-w-0 break-words">
             {checkInLabel} {formatEventDateTime(checkInAt)}
           </span>
         </div>

@@ -31,6 +31,7 @@ import {
 } from "@/app/hooks/useFavorites";
 import { useMe } from "@/app/hooks/useAuth";
 import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 
 interface Event {
   _id: string;
@@ -169,7 +170,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
     e.stopPropagation();
     if (!eventItem?._id) return;
     if (!canFavorite) {
-      alert("Create a gamer profile to like events.");
+      alert(ATHLETE_LABELS.createProfileToLike);
       return;
     }
     const animKey = `event-${eventItem._id}`;
@@ -364,23 +365,23 @@ const EventsTable: React.FC<EventsTableProps> = ({
       {needsGamerProfile && activeTab === "all" && (
         <GamerProfileRequiredBanner className="mb-5" />
       )}
-      {/* Tab Header */}
-      <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-slate-700 pb-4 gap-3 flex-wrap">
-        <div className="flex gap-4 flex-wrap">
+      {/* Tab bar, search, filters, and create — single row */}
+      <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-4 mb-6 border-b border-gray-200 dark:border-slate-700 pb-4">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
           <button
             onClick={() => setActiveTab("all")}
-            className={`pb-2 font-semibold transition-colors ${
+            className={`pb-2 text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === "all"
                 ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
                 : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
             }`}
           >
-            All Events {activeTab === "all" ? `(${pagination.total})` : ""}
+            All {activeTab === "all" ? `(${pagination.total})` : ""}
           </button>
           <button
             onClick={() => canSeeMyEvents && setActiveTab("my")}
             disabled={!canSeeMyEvents}
-            className={`pb-2 font-semibold transition-colors ${
+            className={`pb-2 text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === "my"
                 ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
                 : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
@@ -391,99 +392,98 @@ const EventsTable: React.FC<EventsTableProps> = ({
                 : undefined
             }
           >
-            My Events {activeTab === "my" ? `(${pagination.total})` : ""}
+            My {activeTab === "my" ? `(${pagination.total})` : ""}
           </button>
           <button
             onClick={() => setActiveTab("registered")}
             disabled={!user?.participant}
-            className={`pb-2 font-semibold transition-colors ${
+            className={`pb-2 text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === "registered"
                 ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
                 : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
             } ${!user?.participant ? "opacity-40 cursor-not-allowed hover:text-gray-500" : ""}`}
             title={
               !user?.participant
-                ? "Create a gamer profile to use Registered Events"
+                ? ATHLETE_LABELS.createProfileToRegistered
                 : undefined
             }
           >
-            Registered Events{" "}
+            Registered{" "}
             {activeTab === "registered" ? `(${pagination.total})` : ""}
           </button>
           <button
             onClick={() => setActiveTab("participated")}
             disabled={!user?.participant}
-            className={`pb-2 font-semibold transition-colors ${
+            className={`pb-2 text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === "participated"
                 ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
                 : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
             } ${!user?.participant ? "opacity-40 cursor-not-allowed hover:text-gray-500" : ""}`}
             title={
               !user?.participant
-                ? "Create a gamer profile to use Participated Events"
+                ? ATHLETE_LABELS.createProfileToParticipated
                 : undefined
             }
           >
-            Participated Events{" "}
+            Participated{" "}
             {activeTab === "participated" ? `(${pagination.total})` : ""}
           </button>
         </div>
-        {/* Create Event button is only meaningful for coaches; shown here when appropriate. */}
+
+        {activeTab === "all" ? (
+          <>
+            <div className="relative flex-1 min-w-[140px] basis-[12rem]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search events..."
+                value={searchValue}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg 
+                           bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
+                           placeholder:text-gray-400 dark:placeholder:text-slate-500
+                           focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400
+                           transition-colors"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm text-gray-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                Private
+              </span>
+              <button
+                type="button"
+                onClick={() => onPrivateToggle(!isPrivateFilter)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  isPrivateFilter
+                    ? "bg-cyan-500 dark:bg-cyan-600"
+                    : "bg-gray-300 dark:bg-slate-600"
+                }`}
+                aria-label="Filter private events"
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isPrivateFilter ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 min-w-0" aria-hidden />
+        )}
+
         {canCreateOrManageEvents && onCreateEventClick && (
           <button
+            type="button"
             onClick={onCreateEventClick}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 text-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 text-sm shrink-0"
           >
             <Plus className="w-4 h-4" />
             Create Event
           </button>
         )}
       </div>
-
-      {/* Filters and Search — only for browsing all events */}
-      {activeTab === "all" && (
-      <div className="mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search events..."
-              value={searchValue}
-              onChange={(e) => handleSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg 
-                         bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100
-                         placeholder:text-gray-400 dark:placeholder:text-slate-500
-                         focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400
-                         transition-colors"
-            />
-          </div>
-
-
-          {/* Private Toggle */}
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-gray-700 dark:text-slate-300 font-medium">
-              Private Event
-            </span>
-            <button
-              onClick={() => onPrivateToggle(!isPrivateFilter)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                isPrivateFilter
-                  ? "bg-cyan-500 dark:bg-cyan-600"
-                  : "bg-gray-300 dark:bg-slate-600"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isPrivateFilter ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-      </div>
-      )}
 
       {/* Table Content */}
       {isLoading ? (
@@ -501,7 +501,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
               ? "Add a coach profile (or sign in as admin) to list events you create."
               : (activeTab === "registered" || activeTab === "participated") &&
                   !user?.participant
-                ? "Create a gamer profile to see registered and participated events."
+                ? ATHLETE_LABELS.createProfileToSeeEvents
                 : "No events found"}
           </p>
         </div>
@@ -548,7 +548,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
                     onClick={() => handleEventClick(event)}
                     title={
                       needsGamerProfile
-                        ? "Create a Gamer profile in the left panel to join events"
+                        ? ATHLETE_LABELS.createProfileToJoinPanel
                         : undefined
                     }
                     className={`border-b border-gray-100 dark:border-slate-700/50 
@@ -594,7 +594,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
                           <button
                             onClick={(e) => handleShowParticipants(e, event)}
                             className="p-2 rounded-full border border-transparent hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors text-blue-500 dark:text-blue-400 flex items-center gap-1"
-                            title="View Gamers"
+                            title={ATHLETE_LABELS.viewParticipants}
                           >
                             <Users className="w-4 h-4" />
                             {(event as any).participantCount !== undefined && (

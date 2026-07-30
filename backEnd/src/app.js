@@ -99,6 +99,18 @@ app.post(
     validateCSRFToken,
     authController.sendRegistrationOtp
 );
+app.post(
+    '/api/v1/auth/send-password-reset-otp',
+    authRateLimiter,
+    validateCSRFToken,
+    authController.sendPasswordResetOtp
+);
+app.post(
+    '/api/v1/auth/reset-password',
+    authRateLimiter,
+    validateCSRFToken,
+    authController.resetPassword
+);
 app.post('/api/v1/auth/sign-up', signupRateLimiter, validateCSRFToken, authController.signUp);
 app.use('/api/v1/auth', validateCSRFToken, authMiddleware, authRouter);
 app.use('/api/v1/legal', validateCSRFToken, legalRouter);

@@ -9,6 +9,8 @@ import {
     loginSchema,
     signupSchema,
     sendRegistrationOtpSchema,
+    sendPasswordResetOtpSchema,
+    resetPasswordSchema,
     editUserSchema,
     accountSettingsSchema,
     requestAccountDeletionSchema,
@@ -20,14 +22,21 @@ import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '.
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { recordLegalAcceptance, recordCookieConsent } from '../utils/contractAcceptanceHelper.js';
-import { isSmtpConfigured, sendRegistrationOtpEmail } from '../utils/emailService.js';
+import { isSmtpConfigured, sendRegistrationOtpEmail, sendPasswordResetOtpEmail } from '../utils/emailService.js';
 import {
     assertCanResendOtp,
     generateOtpCode,
     saveRegistrationOtp,
     verifyAndConsumeRegistrationOtp,
 } from '../utils/registrationOtp.js';
+import {
+    assertCanResendPasswordResetOtp,
+    generateOtpCode as generatePasswordResetOtpCode,
+    savePasswordResetOtp,
+    verifyAndConsumePasswordResetOtp,
+} from '../utils/passwordResetOtp.js';
 import RegistrationOtp from '../models/registrationOtpModel.js';
+import PasswordResetOtp from '../models/passwordResetOtpModel.js';
 import { assertNotBlacklisted } from '../utils/blacklistHelper.js';
 import { resolveIstanbulDistrictId, buildLocationKey } from '../utils/locationHelper.js';
 
@@ -69,6 +78,94 @@ export const sendRegistrationOtp = async (req, res, next) => {
             success: true,
             message: 'Verification code sent to your email address.',
             emailSent: true,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const sendPasswordResetOtp = async (req, res, next) => {
+    try {
+        const { email } = sendPasswordResetOtpSchema.parse(req.body || {});
+
+        if (!isSmtpConfigured()) {
+            throw new AppError(
+                503,
+                'Email delivery is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS.'
+            );
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            throw new AppError(404, 'No account found with this email address.');
+        }
+
+        if (user.isActive === false) {
+            throw new AppError(403, 'Your account has been deactivated. Contact support.');
+        }
+
+        await assertNotBlacklisted({ email: user.email, phone: user.phone });
+        await assertCanResendPasswordResetOtp(email);
+
+        const otp = generatePasswordResetOtpCode();
+        await savePasswordResetOtp(email, otp);
+
+        try {
+            await sendPasswordResetOtpEmail({
+                to: email,
+                firstName: user.firstName,
+                otp,
+            });
+        } catch (mailErr) {
+            await PasswordResetOtp.deleteOne({ email });
+            throw mailErr;
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Password reset code sent to your email address.',
+            emailSent: true,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const resetPassword = async (req, res, next) => {
+    try {
+        if (req.user) {
+            return res.status(200).json({
+                success: false,
+                message: 'You are already signed in. Sign out first to reset password.',
+            });
+        }
+
+        const { email, otp, password } = resetPasswordSchema.parse(req.body || {});
+
+        const passwordCheck = checkPasswordStrength(password);
+        if (!passwordCheck.valid) {
+            throw new AppError(400, passwordCheck.message);
+        }
+
+        const user = await User.findOne({ email }).select('+password');
+        if (!user) {
+            throw new AppError(404, 'No account found with this email address.');
+        }
+
+        if (user.isActive === false) {
+            throw new AppError(403, 'Your account has been deactivated. Contact support.');
+        }
+
+        await verifyAndConsumePasswordResetOtp(email, otp);
+
+        user.password = await argon2.hash(password);
+        user.failedLoginAttempts = 0;
+        user.accountLockedUntil = null;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Password updated successfully. You can sign in with your new password.',
         });
     } catch (err) {
         next(err);
@@ -297,9 +394,14 @@ export const getUser = async (req, res, next) => {
             ]);
             if (!getUser) throw new AppError(404);
 
+            const data = getUser.toObject();
+            if (String(data._id) !== String(req.user._id)) {
+                delete data.age;
+            }
+
             return res.status(200).json({
                 success: true,
-                data: getUser,
+                data,
             });
         }
 

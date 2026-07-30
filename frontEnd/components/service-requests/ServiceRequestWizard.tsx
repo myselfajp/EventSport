@@ -572,8 +572,7 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
             ) : (
               <p className="text-sm text-gray-600 dark:text-gray-300">
                 By continuing, you allow sports coaches and providers to contact you via email about
-                this request. The full consent text can be managed in Admin → Contracts → Legal
-                documents.
+                this request.
               </p>
             )}
             <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700">

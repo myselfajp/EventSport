@@ -2,6 +2,7 @@
 
 import { AlertCircle, User } from "lucide-react";
 import { useGamerProfilePrompt } from "@/app/contexts/GamerProfilePromptContext";
+import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 
 type GamerProfileRequiredBannerProps = {
   compact?: boolean;
@@ -27,7 +28,7 @@ export default function GamerProfileRequiredBanner({
             onClick={openGamerProfile}
             className="font-semibold underline text-cyan-700 dark:text-cyan-400 hover:text-cyan-800"
           >
-            Gamer profile
+            {ATHLETE_LABELS.profileShort}
           </button>
           .
         </p>
@@ -45,10 +46,10 @@ export default function GamerProfileRequiredBanner({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-            Gamer profile required
+            {ATHLETE_LABELS.profileRequired}
           </h3>
           <p className="text-sm text-amber-800/90 dark:text-amber-200/90 mt-1">
-            To join events, create and save your Gamer profile from the left panel.
+            {ATHLETE_LABELS.profileRequiredBanner}
           </p>
           <button
             type="button"
@@ -56,7 +57,7 @@ export default function GamerProfileRequiredBanner({
             className="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
           >
             <User className="w-4 h-4" />
-            Create Gamer profile
+            {ATHLETE_LABELS.createProfile}
           </button>
         </div>
       </div>

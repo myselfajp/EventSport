@@ -984,7 +984,7 @@ export const rejectCertificate = async (req, res, next) => {
         res.status(200).json({
             success: true,
             message: reverted
-                ? 'Certificate rejected. User remains a gamer; coach application was removed.'
+                ? 'Certificate rejected. User remains an athlete; coach application was removed.'
                 : 'Certificate rejected successfully',
             data: branch,
             revertedToGamer: reverted,
@@ -1070,7 +1070,7 @@ export const getParticipantDetails = async (req, res, next) => {
         const user = await User.findById(userId).populate('participant');
 
         if (!user || !user.participant) {
-            throw new AppError(404, 'User or gamer profile not found');
+            throw new AppError(404, 'User or athlete profile not found');
         }
 
         const participantId = user.participant._id;
@@ -1406,7 +1406,7 @@ export const getParticipantProfile = async (req, res, next) => {
         });
 
         if (!user || !user.participant) {
-            throw new AppError(404, 'User or gamer profile not found');
+            throw new AppError(404, 'User or athlete profile not found');
         }
 
         const participant = user.participant;
@@ -1439,7 +1439,7 @@ export const updateParticipantProfile = async (req, res, next) => {
         const user = await User.findById(userId).populate('participant');
 
         if (!user || !user.participant) {
-            throw new AppError(404, 'User or gamer profile not found');
+            throw new AppError(404, 'User or athlete profile not found');
         }
 
         const result = zodValidation.editParticipantSchema.parse({
@@ -1458,7 +1458,7 @@ export const updateParticipantProfile = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: 'Gamer profile updated successfully',
+            message: 'Athlete profile updated successfully',
             data: editParticipant,
         });
     } catch (err) {

@@ -35,7 +35,7 @@ type HotUpcomingSectionProps = {
 };
 
 const COLUMN_CARD_CLASS =
-  "snap-center shrink-0 w-full min-w-full text-left p-4 rounded-xl border border-orange-200 dark:border-orange-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-lg transition-all group flex flex-row gap-3 items-start";
+  "snap-center shrink-0 w-full min-w-full max-w-full overflow-hidden text-left p-4 rounded-xl border border-orange-200 dark:border-orange-800/50 bg-white/90 dark:bg-slate-900/60 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-lg transition-all group flex flex-row gap-3 items-start";
 
 const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
   className = "",
@@ -160,7 +160,7 @@ const HotUpcomingSection: React.FC<HotUpcomingSectionProps> = ({
                           HOT
                         </span>
                         {countdown && (
-                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                          <span className="min-w-0 truncate text-xs font-bold text-orange-600 dark:text-orange-400">
                             {countdown}
                           </span>
                         )}

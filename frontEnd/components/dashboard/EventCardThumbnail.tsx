@@ -31,7 +31,7 @@ export default function EventCardThumbnail({
 
   return (
     <div
-      className={`shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden bg-gray-100 dark:bg-slate-700 border border-gray-200/80 dark:border-slate-600/80 ${className}`}
+      className={`shrink-0 w-[clamp(3.25rem,5cqw,4.5rem)] h-[clamp(3.25rem,5cqw,4.5rem)] max-w-[40%] rounded-lg overflow-hidden bg-gray-100 dark:bg-slate-700 border border-gray-200/80 dark:border-slate-600/80 ${className}`}
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element

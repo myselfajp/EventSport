@@ -381,8 +381,8 @@ const EventsDashboard = () => {
               !showFavorites &&
               !showActivity &&
               !selectedStaticPageName && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
+                <div className="dashboard-summary-container space-y-4">
+                  <div className="dashboard-summary-grid grid gap-4 items-stretch">
                     <YourNextEventSection />
                     <NearbyEventsSection
                       locationKey={userLocationKey}
