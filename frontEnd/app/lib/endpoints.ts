@@ -73,6 +73,8 @@ export const EP = {
     contractsCatalog: `${API_V1_BASE}/public/contracts`,
     subscriptionPlans: `${API_V1_BASE}/public/subscription-plans`,
     suggestion: `${API_V1_BASE}/public/suggestion`,
+    welcomePage: `${API_V1_BASE}/public/welcome-page`,
+    welcomePageSubscribe: `${API_V1_BASE}/public/welcome-page/subscribe`,
     dashboardHeaderLogo: `${API_V1_BASE}/public/dashboard-header-logo`,
     dashboardHeroSlides: (context?: "home" | "blog" | "news" | "videos") => {
       const q = new URLSearchParams();
@@ -408,6 +410,17 @@ export const EP = {
         if (params?.to) q.set("to", params.to);
         const qs = q.toString();
         return `${ADMIN_API}/dashboard-hero-analytics${qs ? `?${qs}` : ""}`;
+      },
+    },
+    welcomePage: {
+      get: `${ADMIN_API}/welcome-page`,
+      update: `${ADMIN_API}/welcome-page`,
+      leads: (params?: { page?: number; limit?: number }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        const qs = q.toString();
+        return `${ADMIN_API}/welcome-page/leads${qs ? `?${qs}` : ""}`;
       },
     },
   },

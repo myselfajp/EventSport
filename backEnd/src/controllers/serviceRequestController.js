@@ -12,114 +12,10 @@ import {
     consumeCoachCredit,
     refundCoachCredit,
 } from '../utils/subscriptionPlanHelper.js';
-
-const SPORTS_GOAL_OPTIONS = [
-    'Just started, I don\'t have any idea what to do',
-    'Beginner with few months of experience',
-    'Motivating Back - I made it in the past, decided to come back',
-    'I want to keep up with pre intermediates',
-    'I want to keep up with intermediates',
-    'I want to keep up with professionals',
-    'I want to be a champion and have long term commitment',
-];
-
-const REQUEST_QUESTIONS = [
-    {
-        key: 'sportGroupBranch',
-        question: 'Sport group and branch',
-        type: 'sport_select',
-        targets: ['coach'],
-    },
-    {
-        key: 'level',
-        question: 'Your level',
-        type: 'level_confirm',
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'sportsGoal',
-        question: 'Your sports goal',
-        type: 'single_choice',
-        options: SPORTS_GOAL_OPTIONS,
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'sessionFormat',
-        question: 'Private lesson or group lesson?',
-        type: 'single_choice',
-        options: ['Private lesson', 'Group lesson'],
-        targets: ['coach'],
-    },
-    {
-        key: 'instructorGender',
-        question: 'Instructor gender preference',
-        type: 'single_choice',
-        options: ['No preference', 'Male instructor', 'Female instructor'],
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'location',
-        question: 'Country, city, and district',
-        type: 'location',
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'budget',
-        question: 'Monthly budget',
-        type: 'single_choice',
-        options: ['I have set a monthly budget', 'Let me get a quote'],
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'availableDays',
-        question: 'Which days are you available?',
-        type: 'multi_choice',
-        options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'availableTimes',
-        question: 'Which time slots work for you?',
-        type: 'multi_choice',
-        options: [
-            'Morning (6am–12pm)',
-            'Afternoon (12pm–5pm)',
-            'Evening (5pm–9pm)',
-            'Night (9pm+)',
-        ],
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'facilityPreference',
-        question: 'Facility preference',
-        type: 'single_choice',
-        options: ['Private facility', 'Open area', 'No preference'],
-        targets: ['coach'],
-    },
-    {
-        key: 'facilityPreference',
-        question: 'Online or face to face?',
-        type: 'single_choice',
-        options: ['Online', 'Face to face'],
-        targets: ['performance'],
-    },
-    {
-        key: 'additionalDetails',
-        question: 'Any other details?',
-        type: 'textarea',
-        targets: ['coach', 'performance'],
-    },
-    {
-        key: 'emailConsent',
-        question: 'Email contact consent',
-        type: 'consent',
-        targets: ['coach', 'performance'],
-    },
-];
-
-function questionsForTarget(targetType) {
-    return REQUEST_QUESTIONS.filter((q) => q.targets.includes(targetType));
-}
+import {
+    REQUEST_QUESTIONS,
+    questionsForTarget,
+} from '../constants/serviceRequestQuestions.js';
 
 const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
@@ -169,21 +65,27 @@ function normalizeAnswers(input, targetType) {
     return answers;
 }
 
+function resolveCoachId(user) {
+    if (!user?.coach) return null;
+    return user.coach._id || user.coach;
+}
+
 async function getProviderProfile(user, targetType = null) {
     if (!user) throw new AppError(401);
 
+    // Coaches: any coach profile can see/respond (reply credits still gate new offers).
+    // Approved-branch check is used for notifications, not for Incoming visibility.
     if ((!targetType || targetType === 'coach') && user.coach) {
-        const approvedBranchCount = await Branch.countDocuments({
-            coach: user.coach,
-            status: 'Approved',
-        });
-        if (approvedBranchCount > 0) {
-            return { providerType: 'coach', coach: user.coach, performanceMember: null };
+        const coachId = resolveCoachId(user);
+        if (coachId) {
+            return { providerType: 'coach', coach: coachId, performanceMember: null };
         }
     }
 
     if ((!targetType || targetType === 'performance') && user.performanceMember) {
-        const performanceMember = await PerformanceMember.findById(user.performanceMember);
+        const performanceMemberId =
+            user.performanceMember._id || user.performanceMember;
+        const performanceMember = await PerformanceMember.findById(performanceMemberId);
         if (performanceMember?.isVerified && performanceMember.status === 'Approved') {
             return {
                 providerType: 'performance',
@@ -376,19 +278,30 @@ export const listIncomingRequests = async (req, res, next) => {
                 }
         );
 
+        // Open matching requests + any request this provider already responded to
+        // (so "Responded" stays visible for coaches the same way as Performance Team).
+        const myResponses = await ServiceRequestResponse.find({
+            providerUser: req.user._id,
+            status: { $ne: 'withdrawn' },
+        }).lean();
+        const respondedIds = myResponses.map((r) => r.serviceRequest);
+
         const requests = await ServiceRequest.find({
-            status: 'open',
-            expiresAt: { $gt: new Date() },
-            $or: or,
+            $or: [
+                {
+                    status: 'open',
+                    expiresAt: { $gt: new Date() },
+                    $or: or,
+                },
+                ...(respondedIds.length
+                    ? [{ _id: { $in: respondedIds }, $or: or }]
+                    : []),
+            ],
         })
             .populate('requester', 'firstName lastName photo')
             .sort({ createdAt: -1 })
             .lean();
 
-        const myResponses = await ServiceRequestResponse.find({
-            serviceRequest: { $in: requests.map((r) => r._id) },
-            providerUser: req.user._id,
-        }).lean();
         const responseMap = new Map(myResponses.map((r) => [String(r.serviceRequest), r]));
 
         res.status(200).json({

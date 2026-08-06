@@ -7,6 +7,7 @@ import { EP } from "@/app/lib/endpoints";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
 import { useMe } from "@/app/hooks/useAuth";
 import LegalContentModal from "@/components/auth/LegalContentModal";
+import ProviderRoleSwitchConsent from "./ProviderRoleSwitchConsent";
 
 type CertificateLevel = "A" | "B" | "C";
 
@@ -91,6 +92,10 @@ const CoachModal: React.FC<CoachModalProps> = ({
     title: string;
     content: string;
   } | null>(null);
+  const [roleSwitchAccepted, setRoleSwitchAccepted] = useState(false);
+
+  const requiresPerformanceRoleSwitch =
+    !adminUserId && !!user?.performanceMember && !isEditMode;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -442,10 +447,12 @@ const CoachModal: React.FC<CoachModalProps> = ({
     setError("");
 
     if (!adminUserId && user?.performanceMember) {
-      const confirmed = window.confirm(
-        "You are currently on the Performance Team. If you apply as a coach, your Performance Team profile will be removed. Do you want to continue?"
-      );
-      if (!confirmed) return;
+      if (!roleSwitchAccepted) {
+        setError(
+          "Please confirm that you understand your Performance Team data will be deleted."
+        );
+        return;
+      }
     }
 
     if (formData.branches.length === 0) {
@@ -591,6 +598,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
     setIsEditMode(false);
     setAgreeCoachAgreement(false);
     setMarketingConsent(false);
+    setRoleSwitchAccepted(false);
   };
 
   const handleClose = () => {
@@ -1104,10 +1112,12 @@ const CoachModal: React.FC<CoachModalProps> = ({
               </div>
             )}
 
-            {!adminUserId && user?.performanceMember && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                You are currently on the Performance Team. Submitting this application will remove your Performance Team profile.
-              </div>
+            {requiresPerformanceRoleSwitch && (
+              <ProviderRoleSwitchConsent
+                direction="to-coach"
+                checked={roleSwitchAccepted}
+                onChange={setRoleSwitchAccepted}
+              />
             )}
 
             {error && (
@@ -1129,7 +1139,11 @@ const CoachModal: React.FC<CoachModalProps> = ({
             <button
               type="submit"
               className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || initializing}
+              disabled={
+                loading ||
+                initializing ||
+                (requiresPerformanceRoleSwitch && !roleSwitchAccepted)
+              }
             >
               {loading ? "Saving..." : isEditMode ? "Update" : "Create"}
             </button>

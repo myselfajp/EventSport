@@ -26,6 +26,7 @@ import ReportModal from "@/components/report/ReportModal";
 import AddEventModal from "@/components/event/AddEventModal";
 import EventParticipantsModal from "@/components/event/EventParticipantsModal";
 import ShareEventDialog from "@/components/event/ShareEventDialog";
+import AddToCalendarButton from "@/components/event/AddToCalendarButton";
 import type { EventSharePayload } from "@/app/lib/event-share";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
@@ -1717,6 +1718,9 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   <ClipboardList className="w-4 h-4" />
                   Reservation
                 </button>
+                {hasJoined && event && !isCancelled && (
+                  <AddToCalendarButton event={event} />
+                )}
                 <button
                   type="button"
                   onClick={handleCheckIn}

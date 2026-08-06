@@ -22,6 +22,8 @@ import AdminPermissionGroupsManagement from "../../components/admin/AdminPermiss
 import BlacklistManagement from "../../components/admin/BlacklistManagement";
 import NewsManagement from "../../components/news/NewsManagement";
 import VideoManagement from "../../components/video/VideoManagement";
+import BlogManagement from "../../components/blog/BlogManagement";
+import WelcomePageManagement from "../../components/admin/WelcomePageManagement";
 
 type TabType =
   | "users"
@@ -30,6 +32,7 @@ type TabType =
   | "performance"
   | "enums"
   | "events"
+  | "blogs"
   | "news"
   | "videos"
   | "notifications"
@@ -39,6 +42,7 @@ type TabType =
   | "suggestions"
   | "reports"
   | "dashboard-hero"
+  | "welcome-page"
   | "permission-groups";
 
 const TAB_ORDER: TabType[] = [
@@ -48,6 +52,7 @@ const TAB_ORDER: TabType[] = [
   "performance",
   "enums",
   "events",
+  "blogs",
   "news",
   "videos",
   "notifications",
@@ -55,6 +60,7 @@ const TAB_ORDER: TabType[] = [
   "site-pages",
   "subscription-plans",
   "dashboard-hero",
+  "welcome-page",
   "suggestions",
   "reports",
   "permission-groups",
@@ -67,6 +73,7 @@ const TAB_LABEL: Record<TabType, string> = {
   performance: "Performance Team",
   enums: "Enum Management",
   events: "Events",
+  blogs: "Blogs",
   news: "News",
   videos: "Videos",
   notifications: "Notifications",
@@ -74,6 +81,7 @@ const TAB_LABEL: Record<TabType, string> = {
   "site-pages": "Site Pages",
   "subscription-plans": "Sales",
   "dashboard-hero": "Dashboard Hero",
+  "welcome-page": "Welcome Page",
   suggestions: "Suggestions",
   reports: "Reports",
   "permission-groups": "Permission Groups",
@@ -87,6 +95,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   performance: "admin.coaches",
   enums: "admin.enums",
   events: "admin.events",
+  blogs: "admin.blogs",
   news: "admin.news",
   videos: "admin.videos",
   notifications: "admin.notifications",
@@ -94,6 +103,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   "site-pages": "admin.static_pages",
   "subscription-plans": "admin.subscription_plans",
   "dashboard-hero": "admin.dashboard_hero",
+  "welcome-page": "admin.welcome_page",
   suggestions: "admin.suggestions",
   reports: "admin.reports",
 };
@@ -292,6 +302,7 @@ export default function AdminPanelPage() {
             {activeTab === "performance" && <PerformanceTeamApproval />}
             {activeTab === "enums" && <EnumManagement />}
             {activeTab === "events" && <EventsManagement />}
+            {activeTab === "blogs" && <BlogManagement mode="admin" />}
             {activeTab === "news" && <NewsManagement />}
             {activeTab === "videos" && <VideoManagement mode="admin" />}
             {activeTab === "notifications" && <NotificationManagement />}
@@ -308,6 +319,7 @@ export default function AdminPanelPage() {
             {activeTab === "site-pages" && <StaticPagesManagement />}
             {activeTab === "subscription-plans" && <SubscriptionPlansManagement />}
             {activeTab === "dashboard-hero" && <DashboardHeroManagement />}
+            {activeTab === "welcome-page" && <WelcomePageManagement />}
             {activeTab === "suggestions" && <SuggestionsManagement />}
             {activeTab === "reports" && <ReportsManagement />}
             {activeTab === "permission-groups" && <AdminPermissionGroupsManagement />}

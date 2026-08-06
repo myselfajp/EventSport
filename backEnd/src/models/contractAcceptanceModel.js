@@ -42,7 +42,7 @@ const contractAcceptanceSchema = new mongoose.Schema(
         },
         context: {
             type: String,
-            enum: ['signup', 'event_reservation', 'coach_profile', 'marketing', 'cookie_consent'],
+            enum: ['signup', 'event_reservation', 'coach_profile', 'marketing', 'cookie_consent', 'welcome_page'],
             required: true,
             index: true,
         },

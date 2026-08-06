@@ -20,6 +20,7 @@ export const ADMIN_PERMISSION_KEYS = [
     'admin.static_pages',
     'admin.subscription_plans',
     'admin.dashboard_hero',
+    'admin.welcome_page',
     'admin.suggestions',
     'admin.reports',
 ];
@@ -40,6 +41,7 @@ export const ADMIN_PERMISSION_LABELS = {
     'admin.static_pages': 'Static pages',
     'admin.subscription_plans': 'Subscription plans',
     'admin.dashboard_hero': 'Homepage hero',
+    'admin.welcome_page': 'Welcome page',
     'admin.suggestions': 'Suggestions',
     'admin.reports': 'Reports',
 };

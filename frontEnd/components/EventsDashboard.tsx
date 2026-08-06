@@ -69,7 +69,7 @@ const EventsDashboard = () => {
   const openCoachMe = useCallback(
     (
       tab: "mine" | "incoming" = "mine",
-      autoWizard = tab === "mine",
+      autoWizard = false,
       focusRequestId: string | null = null
     ) => {
       setServiceRequestsPreferredTab(tab);
@@ -88,7 +88,7 @@ const EventsDashboard = () => {
     const initialTab = readServiceRequestsTabFromUrl();
     if (initialTab) {
       const focusId = readServiceRequestFocusFromUrl();
-      openCoachMe(initialTab, !focusId && initialTab === "mine", focusId);
+      openCoachMe(initialTab, false, focusId);
       clearServiceRequestsUrlParam();
     }
 
@@ -108,7 +108,7 @@ const EventsDashboard = () => {
       const tab = detail?.tab || "mine";
       openCoachMe(
         tab,
-        detail?.autoWizard ?? tab === "mine",
+        detail?.autoWizard ?? false,
         detail?.requestId ?? null
       );
       clearServiceRequestsUrlParam();

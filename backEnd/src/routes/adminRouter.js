@@ -12,6 +12,7 @@ import * as adminPermissionGroupController from '../controllers/adminPermissionG
 import * as blacklistController from '../controllers/blacklistController.js';
 import * as reportController from '../controllers/reportController.js';
 import * as subscriptionPlanController from '../controllers/subscriptionPlanController.js';
+import * as welcomePageController from '../controllers/welcomePageController.js';
 import { requireAdminPermission, requireFullAdmin } from '../middleware/requireAdminPermission.js';
 
 const HEADER_LOGO_MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -246,8 +247,25 @@ router.delete(
     adminController.deleteStaticPage
 );
 
-// Blogs — admin read-only list (coaches create/edit via coach API)
+// Blogs — admin CRUD + coach list
 router.get('/blogs', requireAdminPermission('admin.blogs'), blogController.listAdminBlogs);
+router.post(
+    '/blogs',
+    requireAdminPermission('admin.blogs'),
+    uploadFile({ fieldName: 'blog-cover-image' }),
+    blogController.createAdminBlog
+);
+router.put(
+    '/blogs/:blogId',
+    requireAdminPermission('admin.blogs'),
+    uploadFile({ fieldName: 'blog-cover-image', optional: true }),
+    blogController.updateAdminBlog
+);
+router.delete(
+    '/blogs/:blogId',
+    requireAdminPermission('admin.blogs'),
+    blogController.deleteAdminBlog
+);
 
 // News — admin only
 router.get('/news', requireAdminPermission('admin.news'), newsController.listAdminNews);
@@ -358,6 +376,24 @@ router.delete(
     '/dashboard-header-logo',
     requireAdminPermission('admin.dashboard_hero'),
     adminController.deleteDashboardHeaderLogo
+);
+
+// Welcome page (first-visit landing)
+router.get(
+    '/welcome-page',
+    requireAdminPermission('admin.welcome_page'),
+    welcomePageController.getAdminWelcomePageSettings
+);
+router.put(
+    '/welcome-page',
+    requireAdminPermission('admin.welcome_page'),
+    uploadFile({ fieldName: 'welcome-page-image', optional: true }),
+    welcomePageController.updateAdminWelcomePageSettings
+);
+router.get(
+    '/welcome-page/leads',
+    requireAdminPermission('admin.welcome_page'),
+    welcomePageController.listAdminWelcomePageLeads
 );
 
 export default router;

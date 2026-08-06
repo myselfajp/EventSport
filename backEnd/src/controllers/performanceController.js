@@ -43,7 +43,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
             if (!confirmRoleSwitch) {
                 throw new AppError(
                     409,
-                    'You are currently a coach. Applying to the Performance Team will remove your coach profile. Confirm the role switch to continue.'
+                    'You are currently a coach. Applying to the Performance Team will remove your coach profile, service request data, and related messages. Confirm the role switch to continue.'
                 );
             }
             await removeCoachProfileForUser(req.user._id);

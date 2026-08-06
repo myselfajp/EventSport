@@ -101,7 +101,7 @@ const Header: React.FC<HeaderProps> = ({
     if (pathname === "/") {
       window.dispatchEvent(
         new CustomEvent("eventsport:open-coach-me", {
-          detail: { tab: "mine", autoWizard: true },
+          detail: { tab: "mine", autoWizard: false },
         })
       );
       return;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus,
   ChevronLeft,
@@ -24,6 +24,10 @@ import {
   coachHasEventCredits,
   notifyNoEventCreditsAndGoUpgrade,
 } from "@/app/lib/subscription-credits";
+import { formatEventDateTime } from "@/app/lib/event-dashboard-utils";
+
+/** Coach earnings widget — hidden until needed */
+const SHOW_COACH_EARNINGS = false;
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -262,6 +266,15 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
 
   const monthDaysData = getMonthDays();
 
+  const calendarMonthEvents = useMemo(() => {
+    return [...monthMarkerEvents]
+      .filter((event) => event?.startTime)
+      .sort(
+        (a, b) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+  }, [monthMarkerEvents]);
+
   const monthNames = [
     "January",
     "February",
@@ -472,10 +485,56 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
               })}
             </div>
           </div>
+
+          {/* Events for selected calendar month */}
+          <div className="mt-4">
+            <h4 className="text-sm font-semibold text-gray-800 dark:text-slate-100 mb-2">
+              Events in {monthNames[currentDate.getMonth()]}
+            </h4>
+            {calendarMonthEvents.length === 0 ? (
+              <p className="text-xs text-gray-500 dark:text-slate-400 py-2">
+                No events this month
+              </p>
+            ) : (
+              <ul className="space-y-2 max-h-64 overflow-y-auto">
+                {calendarMonthEvents.map((event, idx) => (
+                  <li key={event._id || idx}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEvent(event);
+                        setShowViewEventModal(true);
+                      }}
+                      className="w-full text-left rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-3 py-2 hover:border-cyan-300 dark:hover:border-cyan-700 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span
+                          className="mt-1.5 h-2 w-2 rounded-full shrink-0"
+                          style={{
+                            backgroundColor:
+                              event.eventStyle?.color || "#06b6d4",
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">
+                            {event.name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            {formatEventDateTime(event.startTime)}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
-        {/* Earnings Card (Coach Only) */}
-        {isCoach && (
+        {/* Earnings Card (Coach Only) — hidden for now */}
+        {SHOW_COACH_EARNINGS && isCoach && (
           <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md border border-gray-100 dark:border-slate-700">
             <div className="mb-4">
               <div className="flex items-baseline gap-2 mb-1">

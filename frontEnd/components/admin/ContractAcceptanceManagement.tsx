@@ -38,6 +38,7 @@ const CONTEXT_LABELS: Record<string, string> = {
   coach_profile: "Coach profile",
   marketing: "Marketing consent",
   cookie_consent: "Cookie consent",
+  welcome_page: "Welcome page",
 };
 
 function formatUser(

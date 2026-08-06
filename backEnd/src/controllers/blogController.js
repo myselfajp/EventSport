@@ -315,8 +315,8 @@ async function createBlog(req, res, next, { authorType }) {
     }
 }
 
-export const createAdminBlog = (_req, _res, next) =>
-    next(new AppError(403, 'Blog posts can only be created by coaches.'));
+export const createAdminBlog = (req, res, next) =>
+    createBlog(req, res, next, { authorType: 'admin' });
 
 export const createCoachBlog = (req, res, next) =>
     createBlog(req, res, next, { authorType: 'coach' });
@@ -395,8 +395,7 @@ async function updateBlog(req, res, next, { admin = false } = {}) {
     }
 }
 
-export const updateAdminBlog = (_req, _res, next) =>
-    next(new AppError(403, 'Blog posts can only be edited by coaches.'));
+export const updateAdminBlog = (req, res, next) => updateBlog(req, res, next, { admin: true });
 export const updateCoachBlog = (req, res, next) => updateBlog(req, res, next);
 
 async function deleteBlog(req, res, next, { admin = false } = {}) {
@@ -417,6 +416,5 @@ async function deleteBlog(req, res, next, { admin = false } = {}) {
     }
 }
 
-export const deleteAdminBlog = (_req, _res, next) =>
-    next(new AppError(403, 'Blog posts can only be deleted by coaches.'));
+export const deleteAdminBlog = (req, res, next) => deleteBlog(req, res, next, { admin: true });
 export const deleteCoachBlog = (req, res, next) => deleteBlog(req, res, next);

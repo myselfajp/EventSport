@@ -56,3 +56,12 @@ export const publicSuggestionRateLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+/** Welcome page email signup — strict limit per IP. */
+export const welcomePageSubscribeRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 20,
+    message: 'Too many signup attempts. Please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+

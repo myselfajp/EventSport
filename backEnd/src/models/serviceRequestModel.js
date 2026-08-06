@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { PERFORMANCE_BRANCHES } from './performanceMemberModel.js';
+import { expectedAnswerCountForTarget } from '../constants/serviceRequestQuestions.js';
 
 const serviceRequestAnswerSchema = new mongoose.Schema(
     {
@@ -44,7 +45,9 @@ const serviceRequestSchema = new mongoose.Schema(
             type: [serviceRequestAnswerSchema],
             validate: {
                 validator(value) {
-                    return Array.isArray(value) && value.length >= 11;
+                    if (!Array.isArray(value) || value.length === 0) return false;
+                    const expected = expectedAnswerCountForTarget(this.targetType);
+                    return value.length === expected;
                 },
                 message: 'Service request answers are incomplete.',
             },

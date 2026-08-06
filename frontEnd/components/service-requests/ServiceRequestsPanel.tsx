@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, MessageSquare, X } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import ServiceRequestWizard from "@/components/service-requests/ServiceRequestWizard";
 import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
+import {
+  formatServiceRequestDate,
+  formatServiceRequestLocation,
+  serviceRequestDetailPreview,
+} from "@/app/lib/service-request-display";
 
 type ServiceRequestResponse = {
   _id: string;
@@ -14,7 +19,7 @@ type ServiceRequestResponse = {
     _id: string;
     firstName?: string;
     lastName?: string;
-  };
+  } | string;
   providerType: "coach" | "performance";
   message?: string;
   status: string;
@@ -46,13 +51,23 @@ type Props = {
 };
 
 function providerLabel(response: ServiceRequestResponse) {
-  const userName = `${response.providerUser?.firstName || ""} ${response.providerUser?.lastName || ""}`.trim();
+  const provider = response.providerUser;
+  const userName =
+    typeof provider === "object" && provider
+      ? `${provider.firstName || ""} ${provider.lastName || ""}`.trim()
+      : "";
   return (
     response.coach?.name ||
     response.performanceMember?.name ||
     userName ||
     "Provider"
   );
+}
+
+function providerUserId(response: ServiceRequestResponse): string {
+  const value = response.providerUser;
+  if (!value) return "";
+  return typeof value === "string" ? value : value._id || "";
 }
 
 function requestTargetLabel(request: ServiceRequest) {
@@ -64,6 +79,13 @@ function requestTargetLabel(request: ServiceRequest) {
     psychotherapist: "Psychotherapist",
   };
   return branches[request.performanceBranch || ""] || "Performance Team";
+}
+
+function requesterName(request: ServiceRequest) {
+  return (
+    `${request.requester?.firstName || ""} ${request.requester?.lastName || ""}`.trim() ||
+    ATHLETE_LABELS.serviceRequestFrom
+  );
 }
 
 export default function ServiceRequestsPanel({
@@ -83,10 +105,9 @@ export default function ServiceRequestsPanel({
   const [error, setError] = useState("");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [interestMessage, setInterestMessage] = useState<Record<string, string>>({});
-  const [showMyRequestHistory, setShowMyRequestHistory] = useState(false);
-  const [showIncomingList, setShowIncomingList] = useState(false);
   const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
   const [focusedIncomingRequestId, setFocusedIncomingRequestId] = useState<string | null>(null);
+  const [selectingResponseId, setSelectingResponseId] = useState<string | null>(null);
 
   const canCreate = hasGamerProfile;
   const visibleTabs = useMemo(
@@ -97,92 +118,120 @@ export default function ServiceRequestsPanel({
     [hasGamerProfile, isProvider]
   );
 
-  useEffect(() => {
-    if (!isOpen) {
-      setShowMyRequestHistory(false);
-      setShowIncomingList(false);
-      setWizardOpen(false);
-      setFocusedRequestId(null);
-      setFocusedIncomingRequestId(null);
-      return;
+  const defaultTab = useMemo((): "mine" | "incoming" => {
+    if (preferredTab && visibleTabs.some((item) => item.id === preferredTab)) {
+      return preferredTab;
     }
-    if (focusRequestId) {
-      if (preferredTab === "incoming") {
-        setFocusedIncomingRequestId(focusRequestId);
-        setShowIncomingList(true);
-        setWizardOpen(false);
-        setFocusedRequestId(null);
-        setShowMyRequestHistory(false);
-        return;
-      }
-      setFocusedRequestId(focusRequestId);
-      setShowMyRequestHistory(true);
-      setWizardOpen(false);
-      setShowIncomingList(false);
-      setFocusedIncomingRequestId(null);
-      return;
-    }
-    setFocusedRequestId(null);
-    setFocusedIncomingRequestId(null);
-    if (preferredTab === "incoming") {
-      setShowIncomingList(true);
-      setWizardOpen(false);
-      return;
-    }
-    if (autoStartWizard && hasGamerProfile) {
-      setWizardOpen(true);
-    }
-  }, [isOpen, preferredTab, autoStartWizard, hasGamerProfile, focusRequestId]);
+    if (isProvider && !hasGamerProfile) return "incoming";
+    return visibleTabs[0]?.id || "mine";
+  }, [preferredTab, visibleTabs, isProvider, hasGamerProfile]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (preferredTab && visibleTabs.find((item) => item.id === preferredTab)) {
-      setTab(preferredTab);
-      return;
-    }
-    if (!visibleTabs.find((item) => item.id === tab)) {
-      setTab(visibleTabs[0]?.id || "mine");
-    }
-  }, [isOpen, preferredTab, tab, visibleTabs]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, tab]);
-
-  useEffect(() => {
-    if (!isOpen || !focusedIncomingRequestId || tab !== "incoming" || !showIncomingList) return;
-    const el = document.getElementById(`incoming-request-${focusedIncomingRequestId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [isOpen, focusedIncomingRequestId, tab, showIncomingList, incoming.length]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      if (hasGamerProfile && tab === "mine") {
-        const res = await fetchJSON(EP.SERVICE_REQUESTS.mine, { method: "GET" });
-        if (res?.success) setMyRequests(res.data || []);
+      const tasks: Promise<void>[] = [];
+
+      if (hasGamerProfile) {
+        tasks.push(
+          fetchJSON(EP.SERVICE_REQUESTS.mine, { method: "GET" }).then((res) => {
+            if (res?.success) setMyRequests(res.data || []);
+          })
+        );
       }
 
-      if (isProvider && tab === "incoming") {
-        const res = await fetchJSON(EP.SERVICE_REQUESTS.incoming, { method: "GET" });
-        if (res?.success) setIncoming(res.data || []);
+      if (isProvider) {
+        tasks.push(
+          fetchJSON(EP.SERVICE_REQUESTS.incoming, { method: "GET" }).then((res) => {
+            if (res?.success) {
+              setIncoming(res.data || []);
+              return;
+            }
+            setIncoming([]);
+            throw new Error(
+              res?.message || res?.error || "Incoming service requests could not be loaded."
+            );
+          })
+        );
       }
+
+      await Promise.all(tasks);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Service requests could not be loaded.");
     } finally {
       setLoading(false);
     }
+  }, [hasGamerProfile, isProvider]);
+
+  const handleTabChange = (nextTab: "mine" | "incoming") => {
+    setTab(nextTab);
+    setWizardOpen(false);
+    setFocusedRequestId(null);
+    setFocusedIncomingRequestId(null);
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setWizardOpen(false);
+      setFocusedRequestId(null);
+      setFocusedIncomingRequestId(null);
+      return;
+    }
+
+    setTab(defaultTab);
+
+    if (focusRequestId) {
+      if (preferredTab === "incoming" || (!hasGamerProfile && isProvider)) {
+        setTab("incoming");
+        setFocusedIncomingRequestId(focusRequestId);
+        setFocusedRequestId(null);
+        setWizardOpen(false);
+        return;
+      }
+      setTab("mine");
+      setFocusedRequestId(focusRequestId);
+      setFocusedIncomingRequestId(null);
+      setWizardOpen(false);
+      return;
+    }
+
+    setFocusedRequestId(null);
+    setFocusedIncomingRequestId(null);
+
+    if (autoStartWizard && hasGamerProfile) {
+      setWizardOpen(true);
+      return;
+    }
+
+    setWizardOpen(false);
+  }, [
+    isOpen,
+    defaultTab,
+    preferredTab,
+    autoStartWizard,
+    hasGamerProfile,
+    isProvider,
+    focusRequestId,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void loadData();
+  }, [isOpen, loadData]);
+
+  const openMessaging = (conversationId?: string, recipientId?: string) => {
+    onClose();
+    const params = new URLSearchParams();
+    if (conversationId) params.set("conversationId", conversationId);
+    if (recipientId) params.set("recipientId", recipientId);
+    const qs = params.toString();
+    router.push(qs ? `/messaging?${qs}` : "/messaging");
   };
 
   const handleWizardSubmitted = async () => {
     setTab("mine");
-    setShowMyRequestHistory(true);
+    setWizardOpen(false);
     await loadData();
   };
 
@@ -194,11 +243,10 @@ export default function ServiceRequestsPanel({
         body: { message: interestMessage[requestId] || "" },
       });
       if (!res?.success) {
-        throw new Error(
-          res?.message || res?.error || "Interest could not be sent."
-        );
+        throw new Error(res?.message || res?.error || "Interest could not be sent.");
       }
       await loadData();
+      setInterestMessage((prev) => ({ ...prev, [requestId]: "" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Interest could not be sent.");
     }
@@ -206,24 +254,37 @@ export default function ServiceRequestsPanel({
 
   const selectProvider = async (requestId: string, responseId: string) => {
     try {
+      setSelectingResponseId(responseId);
       setError("");
       const res = await fetchJSON(
         EP.SERVICE_REQUESTS.selectResponse(requestId, responseId),
         { method: "POST" }
       );
-      if (res?.success === false) {
-        throw new Error(res?.message || "Provider could not be selected.");
+      if (!res?.success) {
+        throw new Error(res?.message || res?.error || "Provider could not be selected.");
       }
-      const conversationId = res?.data?.conversation?._id;
-      if (conversationId) {
-        router.push(`/messaging?conversationId=${conversationId}`);
-        onClose();
-      } else {
-        await loadData();
-      }
+
+      const conversation = res?.data?.conversation;
+      const conversationId = conversation?._id || conversation?.id;
+      const response = res?.data?.response as ServiceRequestResponse | undefined;
+      const recipientId = response ? providerUserId(response) : "";
+
+      await loadData();
+      openMessaging(conversationId, recipientId || undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Provider could not be selected.");
+    } finally {
+      setSelectingResponseId(null);
     }
+  };
+
+  const openProviderChat = (response: ServiceRequestResponse) => {
+    const recipientId = providerUserId(response);
+    if (!recipientId) {
+      setError("Could not open messaging for this provider.");
+      return;
+    }
+    openMessaging(undefined, recipientId);
   };
 
   if (!isOpen) return null;
@@ -232,36 +293,26 @@ export default function ServiceRequestsPanel({
     ? myRequests.find((r) => r._id === focusedRequestId) || null
     : null;
 
-  const renderMyRequestCard = (request: ServiceRequest) => (
-    <div key={request._id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-gray-900 dark:text-white">
-            {request.title || requestTargetLabel(request)}
-          </h3>
-          <p className="text-xs text-gray-500">
-            {requestTargetLabel(request)} · {request.status}
-          </p>
-        </div>
-        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-100">
-          {request.responses?.length || 0} interested
-        </span>
-      </div>
-      <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
-        {(request.answers || []).slice(0, 4).map((answer) => (
-          <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
-            <div className="text-xs text-gray-500">{answer.question}</div>
-            <div className="text-gray-800 dark:text-gray-100">{answer.answer || "-"}</div>
-          </div>
-        ))}
-      </div>
-      <div className="space-y-2">
-        {(request.responses || []).length === 0 && (
-          <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
-            No offers yet.
-          </p>
-        )}
-        {(request.responses || []).map((response) => (
+  const focusedIncomingRequest = focusedIncomingRequestId
+    ? incoming.find((r) => r._id === focusedIncomingRequestId) || null
+    : null;
+
+  const renderProviderResponses = (request: ServiceRequest) => (
+    <div className="space-y-2">
+      {(request.responses || []).length === 0 && (
+        <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
+          No offers yet.
+        </p>
+      )}
+      {(request.responses || []).map((response) => {
+        const canChoose =
+          request.status === "open" && response.status === "interested";
+        const isSelected =
+          request.status === "in_conversation" && response.status === "selected";
+        const canOpenChat = canChoose || isSelected;
+        const busy = selectingResponseId === response._id;
+
+        return (
           <div
             key={response._id}
             className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
@@ -276,16 +327,170 @@ export default function ServiceRequestsPanel({
             </div>
             <button
               type="button"
-              disabled={request.status !== "open" || response.status !== "interested"}
-              onClick={() => selectProvider(request._id, response._id)}
+              disabled={!canOpenChat || busy}
+              onClick={() =>
+                canChoose
+                  ? void selectProvider(request._id, response._id)
+                  : openProviderChat(response)
+              }
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white disabled:opacity-50"
             >
               <MessageSquare className="h-4 w-4" />
-              Choose & Message
+              {busy ? "Opening…" : isSelected ? "Open chat" : "Choose & Message"}
             </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderMyRequestCard = (request: ServiceRequest, compact = false) => (
+    <div
+      key={request._id}
+      className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-white">
+            {request.title || requestTargetLabel(request)}
+          </h3>
+          <p className="text-xs text-gray-500">
+            {formatServiceRequestDate(request.createdAt)} · {requestTargetLabel(request)} ·{" "}
+            {request.status}
+          </p>
+        </div>
+        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-100">
+          {request.responses?.length || 0} interested
+        </span>
+      </div>
+      {!compact && (
+        <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+          {(request.answers || []).slice(0, 4).map((answer) => (
+            <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+              <div className="text-xs text-gray-500">{answer.question}</div>
+              <div className="text-gray-800 dark:text-gray-100">{answer.answer || "—"}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {renderProviderResponses(request)}
+    </div>
+  );
+
+  const renderIncomingDetail = (request: ServiceRequest) => (
+    <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-white">
+            {request.title || requestTargetLabel(request)}
+          </h3>
+          <p className="text-xs text-gray-500">
+            From {requesterName(request)} · {formatServiceRequestDate(request.createdAt)}
+          </p>
+        </div>
+        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-100">
+          {requestTargetLabel(request)}
+        </span>
+      </div>
+      <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+        {(request.answers || []).map((answer) => (
+          <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+            <div className="text-xs text-gray-500">{answer.question}</div>
+            <div className="text-gray-800 dark:text-gray-100">{answer.answer || "—"}</div>
           </div>
         ))}
       </div>
+      {request.myResponse ? (
+        <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-200">
+          You already showed interest. Status: {request.myResponse.status}
+          {request.myResponse.message ? (
+            <p className="mt-1 text-green-800/90 dark:text-green-100/90">
+              “{request.myResponse.message}”
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={interestMessage[request._id] || ""}
+            onChange={(e) =>
+              setInterestMessage((prev) => ({
+                ...prev,
+                [request._id]: e.target.value,
+              }))
+            }
+            placeholder={ATHLETE_LABELS.messagePlaceholder}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
+          />
+          <button
+            type="button"
+            onClick={() => void respond(request._id)}
+            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+          >
+            I am interested
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderIncomingSummaryList = () => (
+    <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="hidden sm:grid sm:grid-cols-[120px_1fr_1.4fr] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+        <span>Date</span>
+        <span>Location</span>
+        <span>Details</span>
+      </div>
+      <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+        {incoming.map((request) => (
+          <li key={request._id}>
+            <button
+              type="button"
+              onClick={() => setFocusedIncomingRequestId(request._id)}
+              className="w-full px-4 py-3 text-left transition-colors hover:bg-cyan-50/70 dark:hover:bg-cyan-950/20"
+            >
+              <div className="grid gap-2 sm:grid-cols-[120px_1fr_1.4fr] sm:items-start sm:gap-3">
+                <div>
+                  <div className="text-xs font-medium uppercase text-gray-400 sm:hidden">Date</div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatServiceRequestDate(request.createdAt)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium uppercase text-gray-400 sm:hidden">
+                    Location
+                  </div>
+                  <div className="text-sm text-gray-700 dark:text-gray-200">
+                    {formatServiceRequestLocation(request.answers)}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-100">
+                      {requestTargetLabel(request)}
+                    </span>
+                    {request.myResponse && (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-900/40 dark:text-green-100">
+                        Responded
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-medium uppercase text-gray-400 sm:hidden">
+                    Details
+                  </div>
+                  <div className="truncate text-sm text-gray-600 dark:text-gray-300">
+                    {serviceRequestDetailPreview(
+                      request.answers,
+                      request.title || requestTargetLabel(request)
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">From {requesterName(request)}</div>
+                </div>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 
@@ -294,9 +499,7 @@ export default function ServiceRequestsPanel({
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 es-animate-dialog dark:bg-gray-800 dark:ring-white/10">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-white px-6 py-4 dark:border-gray-700 dark:from-emerald-950/20 dark:to-gray-800">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Coach Me
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Coach Me</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Find a coach or Performance Team member that fits your goals.
             </p>
@@ -311,7 +514,7 @@ export default function ServiceRequestsPanel({
             {visibleTabs.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setTab(item.id)}
+                onClick={() => handleTabChange(item.id)}
                 className={`px-4 py-2 text-sm ${
                   tab === item.id
                     ? "bg-cyan-600 text-white"
@@ -319,13 +522,23 @@ export default function ServiceRequestsPanel({
                 }`}
               >
                 {item.label}
+                {item.id === "incoming" && incoming.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-white/20 px-1.5 text-xs">
+                    {incoming.length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
           {canCreate && (
             <button
               type="button"
-              onClick={() => setWizardOpen(true)}
+              onClick={() => {
+                setTab("mine");
+                setWizardOpen(true);
+                setFocusedRequestId(null);
+                setFocusedIncomingRequestId(null);
+              }}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
               New request
@@ -376,139 +589,43 @@ export default function ServiceRequestsPanel({
 
           {!loading && !wizardOpen && tab === "mine" && !focusedRequestId && (
             <div className="space-y-4">
-              {!showMyRequestHistory ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Use <span className="font-medium text-gray-900 dark:text-white">New request</span>{" "}
-                    to send a request to a coach or Performance Team member.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowMyRequestHistory(true)}
-                    className="mt-4 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 py-2.5 text-sm font-medium text-emerald-800 shadow-sm transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-200 dark:hover:bg-slate-700"
-                  >
-                    Past requests ({myRequests.length})
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Past requests
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowMyRequestHistory(false)}
-                      className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
-                    >
-                      Hide list
-                    </button>
-                  </div>
-                  {myRequests.length === 0 && (
-                    <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
-                      No service requests yet.
-                    </p>
-                  )}
-                  {myRequests.map((request) => renderMyRequestCard(request))}
-                </>
+              {myRequests.length === 0 && (
+                <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+                  No service requests yet. Use{" "}
+                  <span className="font-medium text-gray-900 dark:text-white">New request</span>{" "}
+                  to send a request to a coach or Performance Team member.
+                </p>
               )}
+              {myRequests.map((request) => renderMyRequestCard(request))}
             </div>
           )}
 
           {!loading && !wizardOpen && tab === "incoming" && (
             <div className="space-y-4">
-              {!showIncomingList ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {ATHLETE_LABELS.serviceRequestReview}
-                  </p>
+              {incoming.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+                  No incoming service requests for your provider profile.
+                </p>
+              ) : focusedIncomingRequestId ? (
+                <>
                   <button
                     type="button"
-                    onClick={() => setShowIncomingList(true)}
-                    className="mt-4 inline-flex items-center justify-center rounded-lg border border-cyan-300 bg-white px-4 py-2.5 text-sm font-medium text-cyan-800 shadow-sm transition-colors hover:bg-cyan-50 dark:border-cyan-800 dark:bg-slate-800 dark:text-cyan-200 dark:hover:bg-slate-700"
+                    onClick={() => setFocusedIncomingRequestId(null)}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
                   >
-                    View Incoming Requests ({incoming.length})
+                    <ChevronLeft className="h-4 w-4" />
+                    All incoming requests
                   </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Incoming Requests
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowIncomingList(false)}
-                      className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
-                    >
-                      Hide list
-                    </button>
-                  </div>
-                  {incoming.length === 0 && (
+                  {focusedIncomingRequest ? (
+                    renderIncomingDetail(focusedIncomingRequest)
+                  ) : (
                     <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
-                      No incoming service requests for your provider profile.
+                      This request is no longer available.
                     </p>
                   )}
-                  {incoming.map((request) => (
-                <div
-                  key={request._id}
-                  id={`incoming-request-${request._id}`}
-                  className={`rounded-xl border p-4 dark:border-gray-700 ${
-                    focusedIncomingRequestId === request._id
-                      ? "border-cyan-500 ring-2 ring-cyan-200 dark:ring-cyan-800"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {request.title || requestTargetLabel(request)}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        From {`${request.requester?.firstName || ""} ${request.requester?.lastName || ""}`.trim() || ATHLETE_LABELS.serviceRequestFrom}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-100">
-                      {requestTargetLabel(request)}
-                    </span>
-                  </div>
-                  <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
-                    {(request.answers || []).map((answer) => (
-                      <div key={answer.key} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
-                        <div className="text-xs text-gray-500">{answer.question}</div>
-                        <div className="text-gray-800 dark:text-gray-100">{answer.answer || "-"}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {request.myResponse ? (
-                    <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-200">
-                      You already showed interest. Status: {request.myResponse.status}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <input
-                        value={interestMessage[request._id] || ""}
-                        onChange={(e) =>
-                          setInterestMessage((prev) => ({
-                            ...prev,
-                            [request._id]: e.target.value,
-                          }))
-                        }
-                        placeholder={ATHLETE_LABELS.messagePlaceholder}
-                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => respond(request._id)}
-                        className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
-                      >
-                        I am interested
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
                 </>
+              ) : (
+                renderIncomingSummaryList()
               )}
             </div>
           )}

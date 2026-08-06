@@ -104,7 +104,7 @@ export function formatCheckInCountdown(
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  if (hours > 72) {
+  if (hours > 24) {
     const days = Math.ceil(hours / 24);
     return `Opens in ${days} day${days === 1 ? "" : "s"}`;
   }

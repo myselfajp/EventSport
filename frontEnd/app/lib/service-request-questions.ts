@@ -101,7 +101,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     key: "facilityPreference",
     question: "Facility preference",
     type: "single_choice",
-    options: ["Private facility", "Open area", "No preference"],
+    options: ["Private facility", "Open area", "Online", "No preference"],
     targets: ["coach"],
   },
   {

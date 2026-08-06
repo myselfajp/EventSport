@@ -189,6 +189,35 @@ async function createEventInvites({
     };
 }
 
+async function processEventInvitesOnEdit({ user, invitedUserIds = [], events = [] }) {
+    if (!invitedUserIds.length) {
+        return { invitedUserCount: 0, inviteRecordCount: 0 };
+    }
+    if (!user.coach) {
+        throw new AppError(
+            400,
+            'A coach profile is required to invite athletes while editing an event.'
+        );
+    }
+
+    const now = new Date();
+    const futureEvents = events.filter((eventDoc) => {
+        const start = eventDoc?.startTime ? new Date(eventDoc.startTime) : null;
+        return start && start > now;
+    });
+    if (futureEvents.length === 0) {
+        throw new AppError(400, 'Cannot invite athletes to events that have already started.');
+    }
+
+    return createEventInvites({
+        inviterCoachId: user.coach,
+        invitedUserIds,
+        events: futureEvents,
+        notificationEvent: futureEvents[0],
+        inviterName: coachDisplayName(user),
+    });
+}
+
 export const searchInviteCandidates = async (req, res, next) => {
     try {
         if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
@@ -262,7 +291,7 @@ export const createBranch = async (req, res, next) => {
             if (confirmRoleSwitch !== true) {
                 throw new AppError(
                     409,
-                    'You are currently on the Performance Team. Applying as a coach will remove your Performance Team profile. Confirm the role switch to continue.'
+                    'You are currently on the Performance Team. Applying as a coach will remove your Performance Team profile, service request data, and related messages. Confirm the role switch to continue.'
                 );
             }
             await removePerformanceProfileForUser(user._id);
@@ -694,6 +723,8 @@ export const editEvent = async (req, res, next) => {
         }
 
         const data = req.body.data ? JSON.parse(req.body.data) : req.body;
+        const invitedUserIds = Array.isArray(data?.invitedUserIds) ? data.invitedUserIds : [];
+        delete data.invitedUserIds;
 
         if (data.startTime) {
             data.startTime = new Date(data.startTime);
@@ -867,11 +898,22 @@ export const editEvent = async (req, res, next) => {
                     ),
                 });
             }
+
+            const inviteEvents = await Event.find({
+                _id: { $in: seriesOutcome?.eventIds ?? [eventId] },
+            });
+            const inviteSummary = await processEventInvitesOnEdit({
+                user,
+                invitedUserIds,
+                events: inviteEvents,
+            });
+
             return res.status(200).json({
                 success: true,
                 message: 'Event series updated (this and following sessions)',
                 data: updatedEvent,
                 scope,
+                invites: inviteSummary,
             });
         }
 
@@ -893,10 +935,17 @@ export const editEvent = async (req, res, next) => {
             ),
         });
 
+        const inviteSummary = await processEventInvitesOnEdit({
+            user,
+            invitedUserIds,
+            events: [updatedEvent],
+        });
+
         res.status(200).json({
             success: true,
             message: 'Event updated successfully',
             data: updatedEvent,
+            invites: inviteSummary,
         });
     } catch (err) {
         next(err);

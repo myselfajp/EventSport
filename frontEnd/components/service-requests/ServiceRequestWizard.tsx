@@ -46,6 +46,10 @@ function formatLocation(fields: LocationFields) {
   return [fields.country, fields.city, fields.district].filter(Boolean).join(" / ");
 }
 
+function stripHtml(value: string) {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function validateStep(
   stepKey: string,
   question: ServiceRequestQuestion | null,
@@ -580,11 +584,12 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
                 type="checkbox"
                 checked={emailConsent}
                 onChange={(event) => setEmailConsent(event.target.checked)}
-                className="mt-1"
+                className="mt-1 shrink-0"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-200">
-                {coachMeConsentDoc?.title ||
-                  "I allow sports coaches and providers to contact me via email about this request."}
+              <span className="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-200">
+                {coachMeConsentDoc?.title
+                  ? stripHtml(coachMeConsentDoc.title)
+                  : "I allow sports coaches and providers to contact me via email about this request."}
               </span>
             </label>
           </div>

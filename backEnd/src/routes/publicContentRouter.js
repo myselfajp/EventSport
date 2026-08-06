@@ -5,10 +5,13 @@ import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
 import * as videoController from '../controllers/videoController.js';
 import { validateCSRFToken } from '../middleware/csrfProtection.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 import {
     heroClickRateLimiter,
     publicSuggestionRateLimiter,
+    welcomePageSubscribeRateLimiter,
 } from '../middleware/rateLimiter.js';
+import * as welcomePageController from '../controllers/welcomePageController.js';
 
 const router = express.Router();
 
@@ -39,6 +42,14 @@ router.post(
     validateCSRFToken,
     publicSuggestionRateLimiter,
     publicContentController.submitSuggestion
+);
+router.get('/public/welcome-page', welcomePageController.getPublicWelcomePage);
+router.post(
+    '/public/welcome-page/subscribe',
+    validateCSRFToken,
+    authMiddleware,
+    welcomePageSubscribeRateLimiter,
+    welcomePageController.subscribeWelcomePage
 );
 
 export default router;

@@ -1136,6 +1136,55 @@ export const inviteCandidateSearchSchema = z.object({
     limit: z.coerce.number().int().min(1).max(20).optional().default(10),
 });
 
+const welcomeSocialPlatformSchema = z.enum([
+    'instagram',
+    'twitter',
+    'linkedin',
+    'youtube',
+    'telegram',
+    'facebook',
+]);
+
+export const welcomePageSettingsSchema = z.object({
+    headline: z.string().trim().max(300).optional(),
+    subheadline: z.string().trim().max(800).optional(),
+    emailPrompt: z.string().trim().max(300).optional(),
+    ctaSubmitLabel: z.string().trim().max(80).optional(),
+    ctaSkipLabel: z.string().trim().max(80).optional(),
+    imageAlt: z.string().trim().max(200).optional(),
+    isActive: z.boolean().optional(),
+    socialLinks: z
+        .array(
+            z.object({
+                platform: welcomeSocialPlatformSchema,
+                url: z.string().trim().max(500),
+            })
+        )
+        .max(12)
+        .optional(),
+});
+
+export const welcomePageSubscribeSchema = z
+    .object({
+        email: z.string().trim().email().max(254),
+        visitorKey: z.string().trim().max(120).optional().nullable(),
+        kvkkConsent: z.literal(true, {
+            errorMap: () => ({ message: 'Privacy consent is required.' }),
+        }),
+        marketingConsent: z.boolean().optional().default(false),
+        kvkkVersionId: mongoObjectId,
+        commercialMessagesVersionId: mongoObjectId.optional().nullable(),
+    })
+    .superRefine((data, ctx) => {
+        if (data.marketingConsent && !data.commercialMessagesVersionId) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Commercial messages consent version is required when opting in.',
+                path: ['commercialMessagesVersionId'],
+            });
+        }
+    });
+
 // clubGroup
 export const createGroupSchema = z.object({
     name: z.string({

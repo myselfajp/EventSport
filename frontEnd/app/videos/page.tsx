@@ -3,11 +3,12 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Filter, Play, Plus, Search, User, Video, X } from "lucide-react";
+import { CalendarDays, Play, Plus, User, Video, X } from "lucide-react";
 import Header from "@/components/Header";
 import LeftSidebar from "@/components/LeftSidebar";
 import RightSidebar from "@/components/RightSidebar";
 import PageHeroBanner from "@/components/PageHeroBanner";
+import SportsBanner from "@/components/SportsBanner";
 import VideoManagement from "@/components/video/VideoManagement";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
@@ -37,9 +38,6 @@ type VideoItem = {
   author?: VideoAuthor;
   publishedAt?: string;
 };
-
-type SportGroup = { _id: string; name: string };
-type Sport = { _id: string; name: string; group: string };
 
 function formatDate(value?: string) {
   if (!value) return "-";
@@ -80,35 +78,12 @@ function VideosPageContent() {
 
   const [activeType, setActiveType] = useState<VideoType>("educational");
   const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [sportGroups, setSportGroups] = useState<SportGroup[]>([]);
-  const [sports, setSports] = useState<Sport[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filters, setFilters] = useState({ search: "", sportGroup: "", sport: "" });
+  const [selectedSportId, setSelectedSportId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ totalPages: 1, total: 0, perPage: 12 });
   const [isVideosManageOpen, setIsVideosManageOpen] = useState(false);
-
-  useEffect(() => {
-    void fetchJSON(EP.PUBLIC.sportGroups({ page: 1, limit: 100 }), { method: "GET" }, { skipAuth: true }).then((res) => {
-      if (res?.success && Array.isArray(res.data)) setSportGroups(res.data);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!filters.sportGroup) {
-      setSports([]);
-      setFilters((prev) => (prev.sport ? { ...prev, sport: "" } : prev));
-      return;
-    }
-    void fetchJSON(
-      EP.PUBLIC.sports({ page: 1, limit: 100, sportGroup: filters.sportGroup }),
-      { method: "GET" },
-      { skipAuth: true }
-    ).then((res) => {
-      setSports(res?.success && Array.isArray(res.data) ? res.data : []);
-    });
-  }, [filters.sportGroup]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,9 +95,7 @@ function VideosPageContent() {
           EP.PUBLIC.videos({
             page,
             limit: pagination.perPage,
-            search: filters.search.trim() || undefined,
-            sportGroup: filters.sportGroup || undefined,
-            sport: filters.sport || undefined,
+            sport: selectedSportId || undefined,
             videoType: activeType,
             coachId: coachId || undefined,
           }),
@@ -154,31 +127,15 @@ function VideosPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeType, filters, page, pagination.perPage, coachId]);
-
-  const activeSportGroupName = useMemo(
-    () => sportGroups.find((group) => group._id === filters.sportGroup)?.name,
-    [filters.sportGroup, sportGroups]
-  );
+  }, [activeType, selectedSportId, page, pagination.perPage, coachId]);
 
   const coachFilterName = useMemo(() => {
     if (!coachId || videos.length === 0) return null;
     return videos.find((video) => video.author?.coachId === coachId)?.author?.name || null;
   }, [coachId, videos]);
 
-  const activeTypeMeta = VIDEO_TYPE_OPTIONS.find((option) => option.id === activeType)!;
-
-  const updateFilter = (key: keyof typeof filters, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      ...(key === "sportGroup" ? { sport: "" } : {}),
-    }));
-    setPage(1);
-  };
-
-  const clearFilters = () => {
-    setFilters({ search: "", sportGroup: "", sport: "" });
+  const handleSportFilter = (sportId: string | null) => {
+    setSelectedSportId(sportId);
     setPage(1);
   };
 
@@ -245,6 +202,11 @@ function VideosPageContent() {
               </div>
             </div>
 
+            <SportsBanner
+              selectedSportId={selectedSportId}
+              onSportClick={handleSportFilter}
+            />
+
             <section className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-1.5">
               <div className="grid gap-1.5 sm:grid-cols-2">
                 {VIDEO_TYPE_OPTIONS.map((option) => (
@@ -275,67 +237,6 @@ function VideosPageContent() {
                     </div>
                   </button>
                 ))}
-              </div>
-            </section>
-
-            <section className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 shrink-0 mr-1">
-                  <Filter className="w-4 h-4 text-gray-500 dark:text-slate-400" />
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Filters</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0 ${
-                    !filters.search && !filters.sportGroup && !filters.sport
-                      ? "bg-cyan-600 text-white border-cyan-600"
-                      : "bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600"
-                  }`}
-                >
-                  All
-                </button>
-                <div className="relative flex-1 min-w-[160px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    value={filters.search}
-                    onChange={(event) => updateFilter("search", event.target.value)}
-                    placeholder={`Search ${activeTypeMeta.label.toLowerCase()}`}
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
-                  />
-                </div>
-                <select
-                  value={filters.sportGroup}
-                  onChange={(event) => updateFilter("sportGroup", event.target.value)}
-                  className="min-w-[150px] px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white"
-                  aria-label="Sport Group"
-                >
-                  <option value="">All Sport Groups</option>
-                  {sportGroups.map((group) => (
-                    <option key={group._id} value={group._id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={filters.sport}
-                  disabled={!filters.sportGroup}
-                  onChange={(event) => updateFilter("sport", event.target.value)}
-                  className="min-w-[130px] px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm text-gray-900 dark:text-white disabled:opacity-50"
-                  aria-label="Sport"
-                >
-                  <option value="">All Sports</option>
-                  {sports.map((sport) => (
-                    <option key={sport._id} value={sport._id}>
-                      {sport.name}
-                    </option>
-                  ))}
-                </select>
-                {activeSportGroupName && (
-                  <span className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-cyan-50 dark:bg-cyan-950/30 text-cyan-800 dark:text-cyan-200 border border-cyan-200 dark:border-cyan-800 shrink-0">
-                    {activeSportGroupName}
-                  </span>
-                )}
               </div>
             </section>
 

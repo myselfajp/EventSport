@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X, Upload, ImageIcon, ChevronDown, Search, Mail, UserPlus } from "lucide-react";
 import { fetchJSON, apiFetch } from "@/app/lib/api";
@@ -179,6 +180,16 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const queryClient = useQueryClient();
   const { data: user } = useMe();
   const isEditMode = !!initialData;
+  const canInviteAthletes = useMemo(() => {
+    if (!isEditMode) return true;
+    if (!initialData?.startTime) return false;
+    return new Date(initialData.startTime).getTime() > Date.now();
+  }, [isEditMode, initialData?.startTime]);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   // Block create flow early if coach has no event credits left
   useEffect(() => {
@@ -476,7 +487,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   }, [formData.facility, showSalonDropdown, debouncedSalonSearch]);
 
   useEffect(() => {
-    if (isEditMode) return;
+    if (!canInviteAthletes) return;
 
     const search = debouncedInviteSearch.trim();
     if (!showInviteSuggestions || search.length < 2) {
@@ -524,7 +535,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     };
   }, [
     debouncedInviteSearch,
-    isEditMode,
+    canInviteAthletes,
     selectedInvitees,
     showInviteSuggestions,
   ]);
@@ -1160,7 +1171,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         (eventData as any).scope = formData.editScope;
       }
 
-      if (!isEditMode && selectedInvitees.length > 0) {
+      if (canInviteAthletes && selectedInvitees.length > 0) {
         (eventData as any).invitedUserIds = selectedInvitees.map((user) => user._id);
       }
 
@@ -1178,11 +1189,14 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       const result = await response.json();
 
       if (result.success) {
+        const inviteCount = result.invites?.invitedUserCount ?? selectedInvitees.length;
         const msg =
           !isEditMode && formData.isRecurring && result.sessions
             ? `Series created with ${result.sessions.length} sessions. Listing: ${result.listing?.totalAmount ?? 0} TRY`
             : isEditMode
-              ? "Event updated successfully."
+              ? inviteCount > 0
+                ? `Event updated. ${inviteCount} invite(s) sent.`
+                : "Event updated successfully."
               : "Event created successfully.";
         showAppToast(msg, "success");
         if (!isEditMode) {
@@ -1289,13 +1303,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     return item ? item[key] : "";
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !portalReady) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl mx-auto max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+  const modal = (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-app-modal p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl mx-auto max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col overflow-hidden my-auto">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
             {isEditMode ? "Edit Event" : "Add a New Event"}
           </h2>
           <button
@@ -1306,9 +1320,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
-          <fieldset disabled={isAnyLoading}>
-            <div className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col flex-1 min-h-0 overflow-hidden"
+        >
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3">
+            <fieldset disabled={isAnyLoading} className="min-w-0 border-0 p-0 m-0">
+              <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1320,7 +1338,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                         <img
                           src={photoPreview}
                           alt="Event"
-                          className="w-full h-48 object-cover"
+                          className="w-full h-28 object-cover"
                         />
                         <button
                           type="button"
@@ -1331,8 +1349,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-48 space-y-2 p-4">
-                        <ImageIcon className="w-12 h-12 text-gray-300 dark:text-gray-600" />
+                      <div className="flex flex-col items-center justify-center h-28 space-y-1.5 p-3">
+                        <ImageIcon className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                         <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                           Upload Image
@@ -1361,7 +1379,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                         <img
                           src={bannerPreview}
                           alt="Event banner"
-                          className="w-full h-48 object-cover"
+                          className="w-full h-28 object-cover"
                         />
                         <button
                           type="button"
@@ -1372,8 +1390,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-48 space-y-2 p-4">
-                        <ImageIcon className="w-12 h-12 text-gray-300 dark:text-gray-600" />
+                      <div className="flex flex-col items-center justify-center h-28 space-y-1.5 p-3">
+                        <ImageIcon className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                         <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                           Upload Banner
@@ -2099,7 +2117,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 items-start">
-                <LevelDefinitions className="min-h-0 max-h-[320px] overflow-y-auto" />
+                <LevelDefinitions className="min-h-0 max-h-[180px] overflow-y-auto" />
                 <div className="lg:pt-7">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Level <span className="text-red-500">*</span>
@@ -2483,7 +2501,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </div>
               )}
 
-              {!isEditMode && (
+              {canInviteAthletes && (
                 <div className="pt-2">
                   <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
                     <div className="flex items-start gap-3 mb-4">
@@ -2495,7 +2513,9 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                           {ATHLETE_LABELS.inviteTitle}
                         </h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {ATHLETE_LABELS.inviteHelp}
+                          {isEditMode
+                            ? "Search and invite additional athletes to this event."
+                            : ATHLETE_LABELS.inviteHelp}
                         </p>
                       </div>
                     </div>
@@ -2604,26 +2624,27 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </div>
               )}
             </div>
-          </fieldset>
+            </fieldset>
+          </div>
 
           {error && (
-            <div className="mt-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-lg">
+            <div className="mx-4 mb-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded-lg shrink-0">
               {error}
             </div>
           )}
 
-          <div className="flex gap-3 pt-6 mt-6 pb-6 px-6 -mx-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-800">
+          <div className="flex gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-800">
             <button
               type="button"
               onClick={handleClose}
-              className="px-6 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isAnyLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isAnyLoading}
             >
               {submitting ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update" : "Submit")}
@@ -2633,6 +2654,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 };
 
 export default AddEventModal;

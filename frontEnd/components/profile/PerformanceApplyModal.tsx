@@ -5,6 +5,7 @@ import { X, Upload } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
+import ProviderRoleSwitchConsent from "./ProviderRoleSwitchConsent";
 
 const PERFORMANCE_BRANCHES = [
   { value: "manager", label: "Manager" },
@@ -43,6 +44,7 @@ export default function PerformanceApplyModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [roleSwitchAccepted, setRoleSwitchAccepted] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,6 +83,7 @@ export default function PerformanceApplyModal({
   const handleClose = () => {
     setError("");
     setCertificate(null);
+    setRoleSwitchAccepted(false);
     onClose();
   };
 
@@ -88,11 +91,9 @@ export default function PerformanceApplyModal({
     event.preventDefault();
     setError("");
 
-    if (user?.coach) {
-      const confirmed = window.confirm(
-        "You are currently a coach. If you apply to the Performance Team, your coach profile and sport branches will be removed. Do you want to continue?"
-      );
-      if (!confirmed) return;
+    if (user?.coach && !roleSwitchAccepted) {
+      setError("Please confirm that you understand your coach data will be deleted.");
+      return;
     }
 
     if (!profile && !certificate) {
@@ -138,8 +139,8 @@ export default function PerformanceApplyModal({
 
   return (
     <div className="fixed inset-0 z-app-modal flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+      <div className="flex max-h-[min(90vh,100dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Performance Team Application
@@ -159,107 +160,113 @@ export default function PerformanceApplyModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          {loading ? (
-            <div className="py-8 text-center text-sm text-gray-500">Loading...</div>
-          ) : (
-            <>
-              {user?.coach && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                  You are currently a coach. If you continue, your coach profile and sport branches will be removed when your Performance Team application is submitted.
-                </div>
-              )}
-
-              {profile?.status === "Rejected" && profile.rejectionReason && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
-                  {profile.rejectionReason}
-                </div>
-              )}
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Branch
-                </label>
-                <select
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  {PERFORMANCE_BRANCHES.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Title / Specialty
-                </label>
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Sports dietitian, clinical psychologist..."
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  About
-                </label>
-                <textarea
-                  value={about}
-                  onChange={(e) => setAbout(e.target.value)}
-                  rows={4}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Certificate / License
-                </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-600 hover:border-cyan-500 dark:border-gray-600 dark:text-gray-300">
-                  <Upload className="h-5 w-5 text-cyan-600" />
-                  <span className="flex-1">
-                    {certificate?.name ||
-                      profile?.certificate?.originalName ||
-                      "Upload certificate or license"}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf,.pdf"
-                    className="hidden"
-                    onChange={(e) => setCertificate(e.target.files?.[0] || null)}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
+            {loading ? (
+              <div className="py-8 text-center text-sm text-gray-500">Loading...</div>
+            ) : (
+              <>
+                {user?.coach && (
+                  <ProviderRoleSwitchConsent
+                    direction="to-performance"
+                    checked={roleSwitchAccepted}
+                    onChange={setRoleSwitchAccepted}
                   />
-                </label>
-              </div>
+                )}
 
-              {error && (
-                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200">
-                  {error}
+                {profile?.status === "Rejected" && profile.rejectionReason && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+                    {profile.rejectionReason}
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Branch
+                  </label>
+                  <select
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  >
+                    {PERFORMANCE_BRANCHES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
 
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Send for approval"}
-                </button>
-              </div>
-            </>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Title / Specialty
+                  </label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Sports dietitian, clinical psychologist..."
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    About
+                  </label>
+                  <textarea
+                    value={about}
+                    onChange={(e) => setAbout(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Certificate / License
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-600 hover:border-cyan-500 dark:border-gray-600 dark:text-gray-300">
+                    <Upload className="h-5 w-5 text-cyan-600" />
+                    <span className="flex-1">
+                      {certificate?.name ||
+                        profile?.certificate?.originalName ||
+                        "Upload certificate or license"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf,.pdf"
+                      className="hidden"
+                      onChange={(e) => setCertificate(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+
+                {error && (
+                  <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200">
+                    {error}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {!loading && (
+            <div className="flex shrink-0 justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-800">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || (user?.coach ? !roleSwitchAccepted : false)}
+                className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Send for approval"}
+              </button>
+            </div>
           )}
         </form>
       </div>

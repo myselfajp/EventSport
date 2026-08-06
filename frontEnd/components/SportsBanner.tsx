@@ -89,7 +89,7 @@ const SportsBanner: React.FC<SportsBannerProps> = ({
           <button
             onClick={() => onSportClick(null)}
             className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg transition-all duration-200 flex-shrink-0 ${
-              selectedSportId === null
+              !selectedSportId
                 ? "bg-cyan-500 dark:bg-cyan-600 scale-110"
                 : "bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700"
             }`}
@@ -97,7 +97,7 @@ const SportsBanner: React.FC<SportsBannerProps> = ({
           >
             <span
               className={`text-xs sm:text-sm font-semibold ${
-                selectedSportId === null
+                !selectedSportId
                   ? "text-white"
                   : "text-gray-600 dark:text-slate-400"
               }`}
