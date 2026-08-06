@@ -951,6 +951,16 @@ export const createEventSchema = z
                     ? { message: 'Participation fee is required.' }
                     : { message: 'Invalid participation fee.' },
         }),
+        currency: z
+            .enum(['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'SAR', 'AED'], {
+                errorMap: (iss) =>
+                    iss.code === 'invalid_enum_value'
+                        ? { message: 'Invalid currency code.' }
+                        : iss.input === undefined
+                            ? { message: 'Currency is required.' }
+                            : { message: 'Invalid currency.' },
+            })
+            .default('USD'),
         isRecurring: z.boolean({
             error: (iss) =>
                 iss.input === undefined

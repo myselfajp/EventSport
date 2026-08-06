@@ -106,6 +106,9 @@ const applyPlanSchema = z.object({
     planKey: z.enum(['basic', 'active', 'frequent', 'power']),
     /** addCredits = upgrade carry-over (default). replace = reset credits to plan amounts. */
     mode: z.enum(['addCredits', 'replace']).default('addCredits'),
+    /** Optional override; when omitted, plan credit amounts are used. */
+    eventCredits: z.number().int().min(0).optional(),
+    replyCredits: z.number().int().min(0).optional(),
 });
 
 /**
@@ -115,14 +118,20 @@ const applyPlanSchema = z.object({
 export const applyPlanToUserCoach = async (req, res, next) => {
     try {
         const userId = mongoObjectId.parse(req.params.userId);
-        const { planKey, mode } = applyPlanSchema.parse(req.body || {});
+        const { planKey, mode, eventCredits, replyCredits } = applyPlanSchema.parse(
+            req.body || {}
+        );
 
         const user = await User.findById(userId).select('coach');
         if (!user?.coach) {
             throw new AppError(404, 'User has no coach profile.');
         }
 
-        const coach = await applyPlanToCoachById(user.coach, planKey, { mode });
+        const coach = await applyPlanToCoachById(user.coach, planKey, {
+            mode,
+            eventCredits,
+            replyCredits,
+        });
 
         res.status(200).json({
             success: true,

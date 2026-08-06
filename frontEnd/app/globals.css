@@ -1070,6 +1070,15 @@
     transform: translateY(-2px);
     box-shadow: var(--shadow-strong);
   }
+
+  /* Above .site-header (z-index: 100); below dropdowns/toasts (180+) */
+  .z-app-modal {
+    z-index: 150;
+  }
+
+  .z-app-modal-nested {
+    z-index: 160;
+  }
 }
 
 /* Respect users who prefer reduced motion */

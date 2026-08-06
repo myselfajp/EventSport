@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronDown } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
 import { fetchJSON } from "@/app/lib/api";
@@ -77,6 +78,11 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   const [selectedGoalName, setSelectedGoalName] = useState("");
 
   const isVisible = renderInline ? true : isOpen;
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (isVisible && (!userLoading || adminUserId)) {
@@ -446,6 +452,7 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
       <div
         className={initializing ? "opacity-0 pointer-events-none" : "space-y-4"}
       >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Sport Group Dropdown */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -594,34 +601,6 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
             </p>
           )}
         </div>
-
-        <LevelDefinitions />
-
-        {/* Skill Level Slider */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Skill Level <span className="text-red-500">*</span>
-          </label>
-          <div className="space-y-2">
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={formData.skillLevel}
-              onChange={(e) =>
-                handleInputChange("skillLevel", Number(e.target.value))
-              }
-              className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || initializing}
-            />
-            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-              <span>1 – Beginner</span>
-              <span className="font-medium text-cyan-600 dark:text-cyan-400 text-center max-w-[60%]">
-                {getSkillLevelLabel()}
-              </span>
-              <span>10 – Elite</span>
-            </div>
-          </div>
         </div>
 
         {/* Sport Goal Dropdown */}
@@ -692,6 +671,35 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
           </div>
         </div>
 
+        <LevelDefinitions />
+
+        {/* Skill Level Slider */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Skill Level <span className="text-red-500">*</span>
+          </label>
+          <div className="space-y-2">
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={formData.skillLevel}
+              onChange={(e) =>
+                handleInputChange("skillLevel", Number(e.target.value))
+              }
+              className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || initializing}
+            />
+            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+              <span>1 – Beginner</span>
+              <span className="font-medium text-cyan-600 dark:text-cyan-400 text-center max-w-[60%]">
+                {getSkillLevelLabel()}
+              </span>
+              <span>10 – Elite</span>
+            </div>
+          </div>
+        </div>
+
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded-lg">
@@ -744,9 +752,11 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
     );
   }
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto">
+  if (!isOpen) return null;
+
+  const modal = (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-app-modal p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
@@ -768,6 +778,10 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
       </div>
     </div>
   );
+
+  if (!portalReady) return null;
+
+  return createPortal(modal, document.body);
 };
 
 export default ParticipantModal;

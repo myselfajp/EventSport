@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   ImageIcon,
@@ -17,6 +18,9 @@ import {
   Ban,
   Users,
   Flag,
+  Calendar,
+  MapPin,
+  Globe,
 } from "lucide-react";
 import ReportModal from "@/components/report/ReportModal";
 import AddEventModal from "@/components/event/AddEventModal";
@@ -31,6 +35,7 @@ import { resolveCoachProfileId } from "@/app/lib/coach-profile-utils";
 import EventLikeButton from "@/components/favorite/EventLikeButton";
 import { showAppToast } from "@/app/lib/app-toast";
 import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
+import { formatEventFee } from "@/app/lib/event-currencies";
 
 /** Temporarily hide event Pay button; flip to true when payment UI is needed again. */
 const SHOW_EVENT_PAY_BUTTON = false;
@@ -94,6 +99,11 @@ interface Event {
     name: string;
   };
   location?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  districtName?: string;
+  district?: string | { _id?: string; name?: string };
   startTime: string;
   endTime: string;
   createdAt: string;
@@ -103,6 +113,7 @@ interface Event {
   type?: string;
   priceType?: string;
   participationFee?: number;
+  currency?: string;
   equipment?: string;
   eventDetails?: string;
   eventLink?: string;
@@ -209,6 +220,11 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   const [resolvedCheckInHours, setResolvedCheckInHours] = useState(48);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [joinStatus, setJoinStatus] = useState<{
@@ -958,14 +974,43 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
     }).format(date);
   };
 
+  const formatDateTimeCompact = (isoString: string) => {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
+
   const imageUrl = getImageUrl(event.photo);
   const bannerUrl = getImageUrl(event.banner);
+  const countryCode = String(event.country || "").trim().toUpperCase();
+  const countryLabel =
+    countryCode === "US"
+      ? "United States"
+      : countryCode === "TR"
+        ? "Turkey"
+        : countryCode || "-";
+  const cityLabel = event.city?.trim() || "-";
+  const districtLabel =
+    event.districtName?.trim() ||
+    (typeof event.district === "object" && event.district?.name
+      ? String(event.district.name)
+      : "") ||
+    (countryCode === "US" ? event.state?.trim() || "" : "") ||
+    "-";
 
-  return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl mx-auto max-h-[90vh] overflow-y-auto">
+  if (!portalReady) return null;
+
+  const modal = (
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-app-modal p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-3xl mx-auto max-h-[90vh] overflow-y-auto">
         <div className="relative">
-          <div className="relative h-48 bg-gray-200 dark:bg-slate-700 overflow-visible">
+          <div className="relative h-40 sm:h-44 bg-gray-200 dark:bg-slate-700 overflow-visible">
             {bannerUrl ? (
               <img
                 src={bannerUrl}
@@ -973,16 +1018,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-slate-700">
+              <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
                 <ImageIcon className="w-12 h-12 text-gray-400 dark:text-slate-500" />
               </div>
             )}
-            <div className="absolute bottom-0 left-6 transform translate-y-1/2 z-10">
+            <div className="absolute bottom-0 left-5 sm:left-6 transform translate-y-1/2 z-10">
               <div
-                className="w-44 h-44 rounded-full p-1 shadow-xl"
+                className="w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1 shadow-xl ring-2 ring-white dark:ring-slate-800"
                 style={{ backgroundColor: event.eventStyle?.color || '#ffffff' }}
               >
-                <div className="w-full h-full p-2 rounded-full">
+                <div className="w-full h-full p-1.5 rounded-full">
                   {imageUrl ? (
                     <img
                       src={imageUrl}
@@ -991,25 +1036,43 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                     />
                   ) : (
                     <div className="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-slate-700 rounded-full">
-                      <ImageIcon className="w-16 h-16 text-gray-400 dark:text-slate-500" />
+                      <ImageIcon className="w-10 h-10 text-gray-400 dark:text-slate-500" />
                     </div>
                   )}
                 </div>
               </div>
             </div>
           </div>
-          <div className="absolute top-4 right-4 z-20">
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+            {event.private ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600/90 text-white shadow-sm backdrop-blur-sm">
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Private Event
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600/90 text-white shadow-sm backdrop-blur-sm">
+                <Users className="w-3.5 h-3.5" />
+                Public Event
+              </span>
+            )}
             <button
               onClick={onClose}
               className="text-white hover:text-gray-200 transition-colors bg-black/50 rounded-full p-2"
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        <div className="p-6 pt-20">
-          <div className="space-y-6">
+        <div className="p-5 sm:p-6 pt-16 sm:pt-[4.5rem]">
+          <div className="space-y-4">
             {isCancelled && (
               <div
                 role="alert"
@@ -1032,11 +1095,60 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                Event Name
-              </label>
-              <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
-                {event.name || "-"}
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white leading-snug">
+                {event.name || "Untitled event"}
+              </h2>
+              <div className="mt-3.5 flex flex-nowrap items-center gap-1.5 overflow-hidden text-xs leading-none text-gray-700 dark:text-slate-200">
+                <div className="inline-flex items-center gap-1 shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-2 py-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                    Start
+                  </span>
+                  <span className="font-semibold tabular-nums whitespace-nowrap">
+                    {formatDateTimeCompact(event.startTime)}
+                  </span>
+                </div>
+                <div className="inline-flex items-center gap-1 shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-2 py-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                    End
+                  </span>
+                  <span className="font-semibold tabular-nums whitespace-nowrap">
+                    {formatDateTimeCompact(event.endTime)}
+                  </span>
+                </div>
+                <div
+                  className="inline-flex items-center gap-1 shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-2 py-1.5"
+                  title={countryLabel}
+                >
+                  <Globe className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                    Country
+                  </span>
+                  <span className="font-semibold whitespace-nowrap">
+                    {countryCode || countryLabel}
+                  </span>
+                </div>
+                <div
+                  className="inline-flex items-center gap-1 shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-2 py-1.5"
+                  title={cityLabel}
+                >
+                  <MapPin className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                    City
+                  </span>
+                  <span className="font-semibold whitespace-nowrap">{cityLabel}</span>
+                </div>
+                <div
+                  className="inline-flex items-center gap-1 shrink-0 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 px-2 py-1.5"
+                  title={districtLabel}
+                >
+                  <MapPin className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                    {countryCode === "US" && !event.districtName ? "State" : "District"}
+                  </span>
+                  <span className="font-semibold whitespace-nowrap">{districtLabel}</span>
+                </div>
               </div>
             </div>
 
@@ -1227,26 +1339,6 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Event Start
-                </label>
-                <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
-                  {formatDateTime(event.startTime)}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Event End
-                </label>
-                <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
-                  {formatDateTime(event.endTime)}
-                </div>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
@@ -1291,7 +1383,9 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   {ATHLETE_LABELS.fee}
                 </label>
                 <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300">
-                  {event.participationFee ? `$${event.participationFee}` : "-"}
+                  {event.priceType === "Free"
+                    ? "Free"
+                    : formatEventFee(event.participationFee, event.currency)}
                 </div>
               </div>
             </div>
@@ -1334,73 +1428,45 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap gap-3">
-              {event.private && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg">
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span className="text-sm font-medium">Private Event</span>
-                </div>
-              )}
+            {(event.isRecurring || seriesEnrollment) && (
+              <div className="flex flex-wrap gap-2">
+                {event.isRecurring && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">
+                      Recurring
+                      {event.sessionIndex
+                        ? ` · Session ${event.sessionIndex}${
+                            seriesInfo && typeof seriesInfo.sessionCount === "number"
+                              ? `/${seriesInfo.sessionCount}`
+                              : ""
+                          }`
+                        : ""}
+                    </span>
+                  </div>
+                )}
 
-              {event.isRecurring && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg">
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span className="text-sm font-medium">
-                    Recurring
-                    {event.sessionIndex
-                      ? ` · Session ${event.sessionIndex}${
-                          seriesInfo && typeof seriesInfo.sessionCount === "number"
-                            ? `/${seriesInfo.sessionCount}`
-                            : ""
-                        }`
-                      : ""}
-                  </span>
-                </div>
-              )}
-
-              {seriesEnrollment && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 rounded-lg">
-                  <CheckCircle className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    Enrolled in series ({seriesEnrollment.sessionCount ?? "?"}{" "}
-                    sessions)
-                  </span>
-                </div>
-              )}
-
-              {!event.private && !event.isRecurring && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg">
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
-                  </svg>
-                  <span className="text-sm font-medium">Public Event</span>
-                </div>
-              )}
-            </div>
+                {seriesEnrollment && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 rounded-lg">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      Enrolled in series ({seriesEnrollment.sessionCount ?? "?"}{" "}
+                      sessions)
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {seriesSessions.length > 0 && (
               <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/90 dark:bg-slate-900/50 p-4">
@@ -1682,7 +1748,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                     className="px-4 py-2.5 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg flex items-center gap-2 transition-colors"
                   >
                     <CreditCard className="w-4 h-4" />
-                    Pay {event.participationFee ? `$${event.participationFee}` : ""}
+                    Pay {formatEventFee(event.participationFee, event.currency)}
                   </button>
                 )}
               {hasJoined && joinStatus?.isCheckedIn && (
@@ -2124,7 +2190,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4">
                 <p className="text-sm text-gray-600 dark:text-slate-400 mb-2">Amount</p>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {event.priceType === 'Free' ? 'Free' : `$${event.participationFee || 0}`}
+                  {event.priceType === 'Free' ? 'Free' : formatEventFee(event.participationFee, event.currency)}
                 </p>
               </div>
               
@@ -2258,6 +2324,8 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
       )}
     </div>
   );
+
+  return createPortal(modal, document.body);
 };
 
 export default ViewEventModal;

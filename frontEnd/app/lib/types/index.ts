@@ -267,6 +267,7 @@ export interface CoachDetails {
     point: number | null;
     priceType: string;
     participationFee: number;
+    currency?: string;
     isRecurring: boolean;
     location?: string;
     facility?: {

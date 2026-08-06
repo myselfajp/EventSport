@@ -31,15 +31,19 @@ export async function getBasicPlanAssignmentFields() {
  * mode 'replace' — set tier + set credits from plan (new coach / reset).
  * mode 'addCredits' — set tier + add plan credits to remaining (upgrade carry-over).
  */
-export function applyPlanToCoachDoc(coach, plan, { mode = 'replace' } = {}) {
+export function applyPlanToCoachDoc(coach, plan, { mode = 'replace', eventCredits, replyCredits } = {}) {
     if (!coach || !plan) return coach;
     coach.subscriptionTier = plan.key;
+    const eventAmount =
+        eventCredits !== undefined ? Number(eventCredits) : Number(plan.eventCredits || 0);
+    const replyAmount =
+        replyCredits !== undefined ? Number(replyCredits) : Number(plan.replyCredits || 0);
     if (mode === 'addCredits') {
-        coach.eventCredits = (Number(coach.eventCredits) || 0) + Number(plan.eventCredits || 0);
-        coach.replyCredits = (Number(coach.replyCredits) || 0) + Number(plan.replyCredits || 0);
+        coach.eventCredits = (Number(coach.eventCredits) || 0) + eventAmount;
+        coach.replyCredits = (Number(coach.replyCredits) || 0) + replyAmount;
     } else {
-        coach.eventCredits = Number(plan.eventCredits) || 0;
-        coach.replyCredits = Number(plan.replyCredits) || 0;
+        coach.eventCredits = eventAmount;
+        coach.replyCredits = replyAmount;
     }
     return coach;
 }
@@ -84,7 +88,11 @@ export async function refundCoachCredit(coachId, field) {
 /**
  * Apply plan to coach by id and save (carry-over or replace).
  */
-export async function applyPlanToCoachById(coachId, planKey, { mode = 'addCredits' } = {}) {
+export async function applyPlanToCoachById(
+    coachId,
+    planKey,
+    { mode = 'addCredits', eventCredits, replyCredits } = {}
+) {
     const plan = await findPlanByKey(planKey);
     if (!plan || !plan.isActive) {
         throw new AppError(404, 'Subscription plan not found or inactive.');
@@ -93,7 +101,7 @@ export async function applyPlanToCoachById(coachId, planKey, { mode = 'addCredit
     const coach = await Coach.findById(coachId);
     if (!coach) throw new AppError(404, 'Coach profile not found.');
 
-    applyPlanToCoachDoc(coach, plan, { mode });
+    applyPlanToCoachDoc(coach, plan, { mode, eventCredits, replyCredits });
     await coach.save();
     return coach;
 }

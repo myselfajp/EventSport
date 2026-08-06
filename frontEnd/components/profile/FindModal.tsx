@@ -2244,7 +2244,7 @@ const FindModal: React.FC<FindModalProps> = ({ isOpen, onClose }) => {
       />
 
       {showPerformanceDetails && selectedPerformance && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-app-modal-nested flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>

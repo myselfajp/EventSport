@@ -14,11 +14,11 @@ export const LevelDefinitions: React.FC<LevelDefinitionsProps> = ({ className = 
     <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
       Level Definitions
     </h4>
-    <ul className="space-y-2 text-sm">
+    <ul className="space-y-2 text-sm overflow-x-auto">
       {LEVEL_DEFINITIONS.map(({ level, label, description }) => (
         <li
           key={level}
-          className="flex gap-2 text-gray-700 dark:text-gray-300"
+          className="flex gap-2 text-gray-700 dark:text-gray-300 whitespace-nowrap"
         >
           <span className="font-medium text-cyan-600 dark:text-cyan-400 shrink-0">
             {level}.

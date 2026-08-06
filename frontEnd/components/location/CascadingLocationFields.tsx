@@ -19,6 +19,8 @@ type Props = {
   note?: React.ReactNode;
   /** When false, postal / ZIP fields are hidden (e.g. event creation). */
   showPostalCode?: boolean;
+  /** Pair fields side-by-side (Country–City, District–Postal Code). */
+  twoColumn?: boolean;
 };
 
 const COUNTRY_OPTIONS = [
@@ -42,6 +44,7 @@ export default function CascadingLocationFields({
   disabled = false,
   note,
   showPostalCode = true,
+  twoColumn = false,
 }: Props) {
   const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
@@ -160,8 +163,160 @@ export default function CascadingLocationFields({
     patch({ stateCode: code, state: state?.name || "", city: "" });
   };
 
+  const rowClass = twoColumn ? "grid grid-cols-2 gap-3" : "space-y-3";
+
   return (
-    <div className="space-y-3">
+    <div className={twoColumn ? "space-y-3" : "space-y-3"}>
+      {twoColumn ? (
+        <>
+          <div className={rowClass}>
+            <div>
+              <label className={labelClass}>Country</label>
+              <select
+                value={country}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                disabled={disabled}
+                className={inputClass}
+              >
+                {COUNTRY_OPTIONS.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {country === "TR" ? (
+              <div>
+                <label className={labelClass}>City</label>
+                <select
+                  value={value.provinceSlug || ""}
+                  onChange={(e) => handleProvinceChange(e.target.value)}
+                  disabled={disabled}
+                  className={inputClass}
+                  required
+                >
+                  <option value="">Select city</option>
+                  {provinces.map((p) => (
+                    <option key={p.slug} value={p.slug}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className={labelClass}>State</label>
+                <select
+                  value={value.stateCode || ""}
+                  onChange={(e) => handleStateChange(e.target.value)}
+                  disabled={disabled}
+                  className={inputClass}
+                  required
+                >
+                  <option value="">Select a state</option>
+                  {states.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          {note ? (
+            <p className="text-xs text-gray-500 dark:text-slate-400">{note}</p>
+          ) : null}
+
+          {country === "TR" ? (
+            <div className={rowClass}>
+              <div>
+                <label className={labelClass}>District</label>
+                <select
+                  value={value.districtName || ""}
+                  onChange={(e) => patch({ districtName: e.target.value })}
+                  disabled={disabled || !value.provinceSlug || districtsLoading}
+                  className={inputClass}
+                  required
+                >
+                  <option value="">
+                    {!value.provinceSlug
+                      ? "Select city first"
+                      : districtsLoading
+                        ? "Loading..."
+                        : "Select district"}
+                  </option>
+                  {districts.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {showPostalCode ? (
+                <div>
+                  <label className={labelClass}>Postal Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={value.postalCode || ""}
+                    onChange={(e) => patch({ postalCode: e.target.value })}
+                    disabled={disabled}
+                    placeholder="34000"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+              ) : (
+                <div />
+              )}
+            </div>
+          ) : (
+            <div className={rowClass}>
+              <div>
+                <label className={labelClass}>City</label>
+                <input
+                  type="text"
+                  list={citiesListId}
+                  value={value.city || ""}
+                  onChange={(e) => patch({ city: e.target.value })}
+                  disabled={disabled || !value.stateCode}
+                  placeholder={
+                    value.stateCode
+                      ? "Start typing or pick a city"
+                      : "Select a state first"
+                  }
+                  className={inputClass}
+                  required
+                />
+                <datalist id={citiesListId}>
+                  {cities.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+              {showPostalCode ? (
+                <div>
+                  <label className={labelClass}>ZIP Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={value.postalCode || ""}
+                    onChange={(e) => patch({ postalCode: e.target.value })}
+                    disabled={disabled}
+                    placeholder="90001"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+              ) : (
+                <div />
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
       <div>
         <label className={labelClass}>Country</label>
         <select
@@ -225,7 +380,7 @@ export default function CascadingLocationFields({
           </div>
           {showPostalCode ? (
             <div>
-              <label className={labelClass}>Posta Kodu</label>
+              <label className={labelClass}>Postal Code</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -291,6 +446,8 @@ export default function CascadingLocationFields({
               />
             </div>
           ) : null}
+        </>
+      )}
         </>
       )}
     </div>

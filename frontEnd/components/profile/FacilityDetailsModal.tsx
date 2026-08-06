@@ -210,7 +210,7 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-app-modal flex items-center justify-center p-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
           <div className="flex-shrink-0 p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -490,7 +490,7 @@ const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
       )}
 
       {showFacilityCalendar && facilityId && (
-        <div className="fixed inset-0 z-[60] bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 overflow-auto">
+        <div className="fixed inset-0 z-app-modal-nested bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 overflow-auto">
           <div className="max-w-6xl mx-auto h-full min-h-0">
             <CoachCalendar
               facilityId={facilityId}

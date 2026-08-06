@@ -43,6 +43,13 @@ const eventSeriesSchema = new mongoose.Schema(
         },
         /** Per-session gamer fee at time of creation (for series enrollment pricing). */
         participationFeePerSession: { type: Number, default: 0 },
+        currency: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            default: 'USD',
+            enum: ['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'SAR', 'AED'],
+        },
         priceType: {
             type: String,
             enum: ['Manual', 'Stable', 'Free'],

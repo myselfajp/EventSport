@@ -79,6 +79,7 @@ export async function createRecurringEventSeries({
         secretId: seriesSecret,
         participationFeePerSession: eventPayload.participationFee,
         priceType: eventPayload.priceType,
+        currency: eventPayload.currency || 'USD',
     });
 
     listingOrder.series = series._id;

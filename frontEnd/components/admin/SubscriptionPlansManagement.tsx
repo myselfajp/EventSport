@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Edit2, Save, X } from "lucide-react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
@@ -17,6 +17,13 @@ interface SubscriptionPlan {
   isActive: boolean;
   badge: string;
   stripePriceId?: string | null;
+}
+
+interface CoachSearchUser {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
 }
 
 type FormState = {
@@ -52,11 +59,94 @@ export default function SubscriptionPlansManagement() {
   const [applyUserId, setApplyUserId] = useState("");
   const [applyPlanKey, setApplyPlanKey] = useState("active");
   const [applyMode, setApplyMode] = useState<"addCredits" | "replace">("addCredits");
+  const [applyEventCredits, setApplyEventCredits] = useState("");
+  const [applyReplyCredits, setApplyReplyCredits] = useState("");
+  const [coachSearchQuery, setCoachSearchQuery] = useState("");
+  const [coachSearchResults, setCoachSearchResults] = useState<CoachSearchUser[]>([]);
+  const [coachSearchLoading, setCoachSearchLoading] = useState(false);
+  const [selectedCoach, setSelectedCoach] = useState<CoachSearchUser | null>(null);
+  const [showCoachDropdown, setShowCoachDropdown] = useState(false);
   const [applying, setApplying] = useState(false);
+  const coachSearchRef = useRef<HTMLDivElement>(null);
+
+  const formatCoachName = (user: CoachSearchUser) =>
+    [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.email || "Coach";
+
+  useEffect(() => {
+    const plan = plans.find((p) => p.key === applyPlanKey);
+    if (!plan) return;
+    setApplyEventCredits(String(plan.eventCredits ?? 0));
+    setApplyReplyCredits(String(plan.replyCredits ?? 0));
+  }, [applyPlanKey, plans]);
 
   useEffect(() => {
     void fetchPlans();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        coachSearchRef.current &&
+        !coachSearchRef.current.contains(event.target as Node)
+      ) {
+        setShowCoachDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const searchCoaches = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setCoachSearchResults([]);
+      return;
+    }
+    try {
+      setCoachSearchLoading(true);
+      const res = await fetchJSON(EP.ADMIN.users.getAll, {
+        method: "POST",
+        body: {
+          search: trimmed,
+          profileType: "coach",
+          perPage: 10,
+          pageNumber: 1,
+        },
+      });
+      if (res?.success && Array.isArray(res?.data)) {
+        setCoachSearchResults(res.data as CoachSearchUser[]);
+      } else {
+        setCoachSearchResults([]);
+      }
+    } catch {
+      setCoachSearchResults([]);
+    } finally {
+      setCoachSearchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showCoachDropdown || selectedCoach) return;
+    const timer = window.setTimeout(() => {
+      void searchCoaches(coachSearchQuery);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [coachSearchQuery, showCoachDropdown, selectedCoach, searchCoaches]);
+
+  const selectCoach = (coach: CoachSearchUser) => {
+    setSelectedCoach(coach);
+    setApplyUserId(coach._id);
+    setCoachSearchQuery(formatCoachName(coach));
+    setShowCoachDropdown(false);
+    setCoachSearchResults([]);
+  };
+
+  const clearSelectedCoach = () => {
+    setSelectedCoach(null);
+    setApplyUserId("");
+    setCoachSearchQuery("");
+    setCoachSearchResults([]);
+  };
 
   const fetchPlans = async () => {
     try {
@@ -99,7 +189,17 @@ export default function SubscriptionPlansManagement() {
   const handleApplyPlan = async () => {
     const userId = applyUserId.trim();
     if (!userId) {
-      setError("Enter a user id (MongoDB ObjectId) that has a coach profile.");
+      setError("Select a coach by typing their name.");
+      return;
+    }
+    const eventCredits = Number(applyEventCredits);
+    const replyCredits = Number(applyReplyCredits);
+    if (!Number.isFinite(eventCredits) || eventCredits < 0) {
+      setError("Enter a valid event credit amount (0 or more).");
+      return;
+    }
+    if (!Number.isFinite(replyCredits) || replyCredits < 0) {
+      setError("Enter a valid reply credit amount (0 or more).");
       return;
     }
     try {
@@ -108,14 +208,19 @@ export default function SubscriptionPlansManagement() {
       setSuccess("");
       const res = await fetchJSON(EP.ADMIN.subscriptionPlans.applyToUser(userId), {
         method: "POST",
-        body: { planKey: applyPlanKey, mode: applyMode },
+        body: {
+          planKey: applyPlanKey,
+          mode: applyMode,
+          eventCredits,
+          replyCredits,
+        },
       });
       if (!res?.success) {
         throw new Error(res?.message || res?.error || "Could not apply plan");
       }
       const d = res.data;
       setSuccess(
-        `Applied ${applyPlanKey}: tier=${d?.subscriptionTier}, events=${d?.eventCredits}, replies=${d?.replyCredits}`
+        `Applied ${applyPlanKey} to ${selectedCoach ? formatCoachName(selectedCoach) : "coach"}: tier=${d?.subscriptionTier}, events=${d?.eventCredits}, replies=${d?.replyCredits}`
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not apply plan");
@@ -185,18 +290,89 @@ export default function SubscriptionPlansManagement() {
             Apply plan to coach (until Stripe)
           </h3>
           <p className="text-xs text-gray-600 dark:text-slate-400 mt-0.5">
-            Use addCredits for upgrade carry-over (remaining + new plan credits). replace resets
-            credits to the plan amounts.
+            Search for a coach by name, set event/reply credits, then apply. addCredits adds to
+            remaining balance; replace sets credits to the amounts you enter.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-end">
-          <label className="text-xs font-medium text-gray-600 dark:text-slate-400 grow min-w-[200px]">
-            User ID
+          <div
+            ref={coachSearchRef}
+            className="text-xs font-medium text-gray-600 dark:text-slate-400 grow min-w-[220px] relative"
+          >
+            Coach
+            <div className="mt-1 flex gap-1">
+              <input
+                className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+                value={coachSearchQuery}
+                onChange={(e) => {
+                  setCoachSearchQuery(e.target.value);
+                  if (selectedCoach) {
+                    setSelectedCoach(null);
+                    setApplyUserId("");
+                  }
+                  setShowCoachDropdown(true);
+                }}
+                onFocus={() => setShowCoachDropdown(true)}
+                placeholder="Type coach name or email…"
+                autoComplete="off"
+              />
+              {selectedCoach && (
+                <button
+                  type="button"
+                  onClick={clearSelectedCoach}
+                  className="shrink-0 px-2 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  aria-label="Clear selected coach"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {showCoachDropdown && !selectedCoach && coachSearchQuery.trim().length >= 2 && (
+              <div className="absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg">
+                {coachSearchLoading ? (
+                  <p className="px-3 py-2 text-sm text-gray-500">Searching…</p>
+                ) : coachSearchResults.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-gray-500">No coaches found</p>
+                ) : (
+                  coachSearchResults.map((coach) => (
+                    <button
+                      key={coach._id}
+                      type="button"
+                      onClick={() => selectCoach(coach)}
+                      className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
+                    >
+                      <span className="block text-sm font-medium text-gray-900 dark:text-slate-100">
+                        {formatCoachName(coach)}
+                      </span>
+                      {coach.email && (
+                        <span className="block text-xs text-gray-500 dark:text-slate-400">
+                          {coach.email}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <label className="text-xs font-medium text-gray-600 dark:text-slate-400">
+            Event credits
             <input
-              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm font-mono"
-              value={applyUserId}
-              onChange={(e) => setApplyUserId(e.target.value)}
-              placeholder="24-char MongoDB user _id"
+              type="number"
+              min={0}
+              className="mt-1 block w-28 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+              value={applyEventCredits}
+              onChange={(e) => setApplyEventCredits(e.target.value)}
+            />
+          </label>
+          <label className="text-xs font-medium text-gray-600 dark:text-slate-400">
+            Reply credits
+            <input
+              type="number"
+              min={0}
+              className="mt-1 block w-28 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm"
+              value={applyReplyCredits}
+              onChange={(e) => setApplyReplyCredits(e.target.value)}
             />
           </label>
           <label className="text-xs font-medium text-gray-600 dark:text-slate-400">

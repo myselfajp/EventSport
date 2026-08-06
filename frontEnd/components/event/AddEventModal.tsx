@@ -23,6 +23,10 @@ import {
 } from "@/app/lib/subscription-credits";
 import { showAppToast } from "@/app/lib/app-toast";
 import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
+import {
+  DEFAULT_EVENT_CURRENCY,
+  EVENT_CURRENCIES,
+} from "@/app/lib/event-currencies";
 
 // Custom hook for debounce
 function useDebounce<T>(value: T, delay: number): T {
@@ -204,6 +208,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     level: "",
     type: "",
     priceType: "",
+    currency: DEFAULT_EVENT_CURRENCY,
     participationFee: "",
     equipment: "",
     eventDetails: "",
@@ -554,6 +559,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         level: initialData.level?.toString() || "",
         type: initialData.type || "",
         priceType: initialData.priceType || "",
+        currency: initialData.currency || DEFAULT_EVENT_CURRENCY,
         participationFee: initialData.participationFee?.toString() || "",
         equipment: initialData.equipment || "",
         eventDetails: initialData.eventDetails || "",
@@ -1074,6 +1080,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
         level: parseInt(formData.level),
         type: formData.type,
         priceType: formData.priceType,
+        currency: formData.currency || DEFAULT_EVENT_CURRENCY,
         participationFee: formData.participationFee
           ? parseFloat(formData.participationFee)
           : 0,
@@ -1238,6 +1245,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       level: "",
       type: "",
       priceType: "",
+      currency: DEFAULT_EVENT_CURRENCY,
       participationFee: "",
       equipment: "",
       eventDetails: "",
@@ -2170,7 +2178,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Price Type <span className="text-red-500">*</span>
@@ -2187,6 +2195,27 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     <option value="Free">Free</option>
                     <option value="Manual">Manual</option>
                     <option value="Stable">Stable</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) =>
+                      handleInputChange("currency", e.target.value)
+                    }
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+                    disabled={formData.priceType === "Free"}
+                    required
+                  >
+                    {EVENT_CURRENCIES.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -2209,7 +2238,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   />
                   {formData.priceType === "Free" && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Disabled if Price Type is "Free".
+                      Disabled if Price Type is &quot;Free&quot;.
                     </p>
                   )}
                 </div>

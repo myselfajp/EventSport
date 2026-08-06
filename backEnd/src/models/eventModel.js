@@ -110,6 +110,16 @@ const eventSchema = new mongoose.Schema(
             type: Number,
             required: true,
         },
+        currency: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            default: 'USD',
+            enum: {
+                values: ['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'SAR', 'AED'],
+                message: 'Invalid currency code',
+            },
+        },
         isRecurring: {
             type: Boolean,
             required: true,

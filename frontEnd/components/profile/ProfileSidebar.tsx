@@ -23,6 +23,7 @@ import {
   BookOpen,
   Briefcase,
   ArrowUpCircle,
+  Video,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -69,6 +70,7 @@ import { useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
 import { fetchJSON } from "@/app/lib/api";
 import BlogManagement from "@/components/blog/BlogManagement";
+import VideoManagement from "@/components/video/VideoManagement";
 import PerformanceApplyModal from "./PerformanceApplyModal";
 
 interface ProfileSidebarProps {
@@ -109,6 +111,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isGroupsListOpen, setIsGroupsListOpen] = useState(false);
   const [isBlogsListOpen, setIsBlogsListOpen] = useState(false);
+  const [isVideosListOpen, setIsVideosListOpen] = useState(false);
   const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
@@ -1224,29 +1227,44 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         </div>
 
         {hasCoachProfile && (
-          <button
-            type="button"
-            onClick={() => setIsBlogsListOpen(true)}
-            className="mt-2 w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left"
-          >
-            <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50">
-              <BookOpen className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-800 dark:text-white text-sm">
-                My Blogs
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setIsBlogsListOpen(true)}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left min-w-0"
+            >
+              <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50 shrink-0">
+                <BookOpen className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
               </div>
-              <div className="text-xs text-cyan-700 dark:text-cyan-300">
-                Create and manage blog posts
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-800 dark:text-white text-xs sm:text-sm truncate">
+                  My Blogs
+                </div>
               </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          </button>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsVideosListOpen(true)}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left min-w-0"
+            >
+              <div className="p-1.5 rounded-md bg-cyan-100 dark:bg-cyan-900/50 shrink-0">
+                <Video className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-800 dark:text-white text-xs sm:text-sm truncate">
+                  My Videos
+                </div>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            </button>
+          </div>
         )}
       </div>
 
       {isApplyChoiceOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-app-modal flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1395,7 +1413,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
       {/* Facilities List Modal */}
       {isFacilitiesListOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-app-modal p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
@@ -1564,7 +1582,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
       {/* Companies List Modal */}
       {isCompaniesListOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-app-modal p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
@@ -1703,7 +1721,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
       {/* Clubs List Modal */}
       {isClubsListOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-app-modal p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
@@ -1851,7 +1869,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
       {/* Groups List Modal */}
       {isGroupsListOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-app-modal p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
@@ -2060,7 +2078,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       />
 
       {isBlogsListOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-app-modal p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-700">
               <div>
@@ -2082,6 +2100,34 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             </div>
             <div className="p-5 overflow-y-auto max-h-[calc(90vh-73px)]">
               <BlogManagement mode="coach" embedded />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isVideosListOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-app-modal p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  My Videos
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Upload and manage educational or general videos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVideosListOpen(false)}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                aria-label="Close videos"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[calc(90vh-73px)]">
+              <VideoManagement mode="coach" embedded />
             </div>
           </div>
         </div>

@@ -47,6 +47,15 @@ interface Event {
     _id: string;
     name: string;
   };
+  group?: {
+    _id: string;
+    name: string;
+  };
+  city?: string;
+  districtName?: string;
+  district?: string | { _id?: string; name?: string };
+  state?: string;
+  country?: string;
   eventStyle?: {
     name: string;
     color: string;
@@ -529,14 +538,14 @@ const EventsTable: React.FC<EventsTableProps> = ({
                       {getSortIcon("startTime")}
                     </button>
                   </th>
+                  <th className="pb-4 pt-4 px-4 text-sm font-semibold text-gray-700 dark:text-slate-300 whitespace-nowrap">
+                    City / District
+                  </th>
                   <th className="pb-4 pt-4 px-4 text-sm font-semibold text-gray-700 dark:text-slate-300">
-                    <button
-                      onClick={() => handleSort("endTime")}
-                      className="flex items-center hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
-                    >
-                      End Time
-                      {getSortIcon("endTime")}
-                    </button>
+                    Sport
+                  </th>
+                  <th className="pb-4 pt-4 px-4 text-sm font-semibold text-gray-700 dark:text-slate-300">
+                    Community
                   </th>
                   <th className="pb-4 pt-4 px-4"></th>
                 </tr>
@@ -581,11 +590,28 @@ const EventsTable: React.FC<EventsTableProps> = ({
                         </div>
                       </div>
                     </td>
-                    <td className="py-5 px-4 text-gray-700 dark:text-slate-300 font-medium">
+                    <td className="py-5 px-4 text-gray-700 dark:text-slate-300 font-medium whitespace-nowrap">
                       {formatDate(event.startTime)}
                     </td>
-                    <td className="py-5 px-4 text-gray-700 dark:text-slate-300 font-medium">
-                      {formatDate(event.endTime)}
+                    <td className="py-5 px-4 text-sm text-gray-700 dark:text-slate-300">
+                      {(() => {
+                        const city = event.city?.trim() || "";
+                        const district =
+                          event.districtName?.trim() ||
+                          (typeof event.district === "object" &&
+                          event.district?.name
+                            ? String(event.district.name)
+                            : "") ||
+                          "";
+                        if (city && district) return `${city} / ${district}`;
+                        return city || district || "—";
+                      })()}
+                    </td>
+                    <td className="py-5 px-4 text-sm text-gray-700 dark:text-slate-300">
+                      {event.sport?.name || "—"}
+                    </td>
+                    <td className="py-5 px-4 text-sm text-gray-700 dark:text-slate-300">
+                      {event.group?.name || "—"}
                     </td>
                     <td className="py-5 px-4">
                       <div className="flex items-center justify-end gap-2">
