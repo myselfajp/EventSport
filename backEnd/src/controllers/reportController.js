@@ -16,6 +16,8 @@ import {
     resolveReportSchema,
     mongoObjectId,
 } from '../utils/validation.js';
+import { writeAuditLog, auditRoleForUser } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 const MAX_REPORTS_PER_DAY = 10;
 const OPEN_STATUSES = ['open'];
@@ -322,6 +324,19 @@ export const submitReport = async (req, res, next) => {
             console.error('Failed to notify admins of new report:', notifyErr);
         }
 
+        await writeAuditLog({
+            req,
+            actorRole: auditRoleForUser(req.user),
+            action: AUDIT_ACTIONS.REPORT_SUBMITTED,
+            entityType: 'report',
+            entityId: report._id,
+            description: `${parsed.targetType} report submitted`,
+            metadata: {
+                targetType: parsed.targetType,
+                targetId: resolvedTargetId,
+                reason: parsed.reason || null,
+            },
+        });
         res.status(201).json({
             success: true,
             message: 'Report submitted. Our team will review it.',

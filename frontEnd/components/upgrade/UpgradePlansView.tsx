@@ -5,6 +5,7 @@ import { Check, Crown, Loader2 } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
+import { getProviderSubscription } from "@/app/lib/subscription-credits";
 
 export type SubscriptionPlan = {
   _id: string;
@@ -34,8 +35,8 @@ export default function UpgradePlansView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const coach = user?.coach && typeof user.coach === "object" ? user.coach : null;
-  const currentTier = String(coach?.subscriptionTier || "").toLowerCase() || null;
+  const providerSub = getProviderSubscription(user);
+  const currentTier = String(providerSub?.subscriptionTier || "").toLowerCase() || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -81,12 +82,12 @@ export default function UpgradePlansView() {
           Upgrade
         </h1>
         <p className="mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-300">
-          Choose a coach membership. Create more events and reply to more Coach Me requests.
+          Choose a provider membership. Create more events and reply to more Coach Me requests.
           Online payment arrives with Stripe; plans and prices are already live from admin.
         </p>
       </section>
 
-      {coach && (
+      {providerSub && (
         <section className="rounded-2xl border border-cyan-200/70 dark:border-cyan-800/50 bg-cyan-50/70 dark:bg-cyan-950/20 px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -100,11 +101,11 @@ export default function UpgradePlansView() {
             <div className="flex flex-wrap gap-4 text-sm text-gray-700 dark:text-slate-200">
               <div>
                 <span className="text-gray-500 dark:text-slate-400">Event credits </span>
-                <span className="font-semibold">{coach.eventCredits ?? 0}</span>
+                <span className="font-semibold">{providerSub.eventCredits ?? 0}</span>
               </div>
               <div>
                 <span className="text-gray-500 dark:text-slate-400">Reply credits </span>
-                <span className="font-semibold">{coach.replyCredits ?? 0}</span>
+                <span className="font-semibold">{providerSub.replyCredits ?? 0}</span>
               </div>
             </div>
           </div>

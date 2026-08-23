@@ -34,7 +34,8 @@ import {
   readServiceRequestsTabFromUrl,
 } from "@/app/lib/service-request-url";
 import {
-  coachHasEventCredits,
+  isEventHost,
+  providerHasEventCredits,
   notifyNoEventCreditsAndGoUpgrade,
 } from "@/app/lib/subscription-credits";
 
@@ -128,7 +129,7 @@ const EventsDashboard = () => {
     };
   }, [openCoachMe, openServiceRequests, user, isUserPending]);
   const isCoach = user?.coach != null;
-  const canManageEvents = isCoach || user?.role === 0;
+  const canManageEvents = isEventHost(user);
 
   const userLocation = user?.location as
     | {
@@ -188,7 +189,7 @@ const EventsDashboard = () => {
         return;
       }
 
-      if (activeTab === "my" && !user?.coach && user?.role !== 0) {
+      if (activeTab === "my" && !isEventHost(user)) {
         setEvents([]);
         setPagination((prev) => ({
           ...prev,
@@ -435,7 +436,7 @@ const EventsDashboard = () => {
                   onCreateEventClick={
                     canManageEvents
                       ? () => {
-                          if (coachHasEventCredits(user) === false) {
+                          if (providerHasEventCredits(user) === false) {
                             notifyNoEventCreditsAndGoUpgrade(router);
                             return;
                           }

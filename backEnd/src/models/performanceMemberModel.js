@@ -51,6 +51,29 @@ const performanceMemberSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        subscriptionTier: {
+            type: String,
+            default: 'basic',
+            enum: {
+                values: ['basic', 'active', 'frequent', 'power'],
+                message: 'Invalid subscription tier',
+            },
+        },
+        eventCredits: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        replyCredits: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        /** Set when starter Basic credits are granted (prevents duplicate grants). */
+        basicCreditsGranted: {
+            type: Boolean,
+            default: false,
+        },
         rejectionReason: {
             type: String,
             trim: true,

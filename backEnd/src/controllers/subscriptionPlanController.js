@@ -1,9 +1,13 @@
 import { z } from 'zod';
 import SubscriptionPlan, { SUBSCRIPTION_PLAN_KEYS } from '../models/subscriptionPlanModel.js';
 import User from '../models/userModel.js';
+import Coach from '../models/coachModel.js';
+import PerformanceMember from '../models/performanceMemberModel.js';
 import { AppError } from '../utils/appError.js';
-import { applyPlanToCoachById } from '../utils/subscriptionPlanHelper.js';
+import { applyPlanToCoachById, applyPlanToPerformanceById } from '../utils/subscriptionPlanHelper.js';
 import { mongoObjectId } from '../utils/validation.js';
+import { writeAuditLog } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 const updatePlanSchema = z.object({
     name: z.string().trim().min(1).max(80).optional(),
@@ -122,26 +126,88 @@ export const applyPlanToUserCoach = async (req, res, next) => {
             req.body || {}
         );
 
-        const user = await User.findById(userId).select('coach');
-        if (!user?.coach) {
-            throw new AppError(404, 'User has no coach profile.');
+        const user = await User.findById(userId).select('coach performanceMember');
+        if (user?.coach) {
+            const before = await Coach.findById(user.coach)
+                .select('subscriptionTier eventCredits replyCredits')
+                .lean();
+            const coach = await applyPlanToCoachById(user.coach, planKey, {
+                mode,
+                eventCredits,
+                replyCredits,
+            });
+
+            await writeAuditLog({
+                req,
+                actorRole: 'admin',
+                targetUserId: userId,
+                targetRole: 'coach',
+                action: AUDIT_ACTIONS.SUBSCRIPTION_PLAN_CHANGED,
+                entityType: 'subscription',
+                entityId: coach._id,
+                changedFields: ['subscriptionTier', 'eventCredits', 'replyCredits'],
+                before,
+                after: {
+                    subscriptionTier: coach.subscriptionTier,
+                    eventCredits: coach.eventCredits,
+                    replyCredits: coach.replyCredits,
+                },
+                description: `Coach subscription changed to ${planKey}`,
+                metadata: { mode },
+            });
+            return res.status(200).json({
+                success: true,
+                message: `Applied ${planKey} plan (${mode})`,
+                data: {
+                    providerType: 'coach',
+                    subscriptionTier: coach.subscriptionTier,
+                    eventCredits: coach.eventCredits,
+                    replyCredits: coach.replyCredits,
+                },
+            });
         }
 
-        const coach = await applyPlanToCoachById(user.coach, planKey, {
-            mode,
-            eventCredits,
-            replyCredits,
-        });
+        if (user?.performanceMember) {
+            const before = await PerformanceMember.findById(user.performanceMember)
+                .select('subscriptionTier eventCredits replyCredits')
+                .lean();
+            const member = await applyPlanToPerformanceById(user.performanceMember, planKey, {
+                mode,
+                eventCredits,
+                replyCredits,
+            });
 
-        res.status(200).json({
-            success: true,
-            message: `Applied ${planKey} plan (${mode})`,
-            data: {
-                subscriptionTier: coach.subscriptionTier,
-                eventCredits: coach.eventCredits,
-                replyCredits: coach.replyCredits,
-            },
-        });
+            await writeAuditLog({
+                req,
+                actorRole: 'admin',
+                targetUserId: userId,
+                targetRole: 'performance',
+                action: AUDIT_ACTIONS.SUBSCRIPTION_PLAN_CHANGED,
+                entityType: 'subscription',
+                entityId: member._id,
+                changedFields: ['subscriptionTier', 'eventCredits', 'replyCredits'],
+                before,
+                after: {
+                    subscriptionTier: member.subscriptionTier,
+                    eventCredits: member.eventCredits,
+                    replyCredits: member.replyCredits,
+                },
+                description: `Performance Team subscription changed to ${planKey}`,
+                metadata: { mode },
+            });
+            return res.status(200).json({
+                success: true,
+                message: `Applied ${planKey} plan (${mode})`,
+                data: {
+                    providerType: 'performance',
+                    subscriptionTier: member.subscriptionTier,
+                    eventCredits: member.eventCredits,
+                    replyCredits: member.replyCredits,
+                },
+            });
+        }
+
+        throw new AppError(404, 'User has no coach or Performance Team profile.');
     } catch (err) {
         next(err);
     }

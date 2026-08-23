@@ -5,6 +5,7 @@ import Participant from '../models/participantModel.js';
 import Coach from '../models/coachModel.js';
 import ContractAcceptance from '../models/contractAcceptanceModel.js';
 import RegistrationConsentLog from '../models/registrationConsentLogModel.js';
+import AuditLog from '../models/auditLogModel.js';
 
 const DEFAULT_RETENTION_MONTHS = 24;
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -59,6 +60,13 @@ export async function anonymizeUserRecord(user) {
 
     await RegistrationConsentLog.updateMany(
         { user: userId },
+        { $set: { ipAddress: null, userAgent: null } }
+    );
+
+    // Audit rows remain append-only business history; only client-identifying
+    // network metadata is redacted after the configured retention period.
+    await AuditLog.updateMany(
+        { $or: [{ actorUser: userId }, { targetUser: userId }] },
         { $set: { ipAddress: null, userAgent: null } }
     );
 }

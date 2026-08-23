@@ -15,7 +15,6 @@ import CascadingLocationFields, {
   normalizeCountry,
 } from "@/components/location/CascadingLocationFields";
 import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
-import LevelDefinitions from "@/components/LevelDefinitions";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMe } from "@/app/hooks/useAuth";
 import {
@@ -1310,7 +1309,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl mx-auto max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col overflow-hidden my-auto">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            {isEditMode ? "Edit Event" : "Add a New Event"}
+            {isEditMode ? "Edit Event" : "Create Event"}
           </h2>
           <button
             onClick={handleClose}
@@ -2048,11 +2047,12 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     value={locationValue}
                     onChange={setLocationValue}
                     showPostalCode={false}
+                    threeColumn
                   />
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Event Start Date <span className="text-red-500">*</span>
@@ -2082,9 +2082,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     required
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Event End Date <span className="text-red-500">*</span>
@@ -2116,26 +2114,23 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 items-start">
-                <LevelDefinitions className="min-h-0 max-h-[180px] overflow-y-auto" />
-                <div className="lg:pt-7">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Level <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.level}
-                    onChange={(e) => handleInputChange("level", e.target.value)}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white dark:bg-gray-700 dark:text-white"
-                    required
-                  >
-                    <option value="">Select Level</option>
-                    {LEVEL_DEFINITIONS.map(({ level, label }) => (
-                      <option key={level} value={level}>
-                        {level} – {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Level <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.level}
+                  onChange={(e) => handleInputChange("level", e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white dark:bg-gray-700 dark:text-white"
+                  required
+                >
+                  <option value="">Select Level</option>
+                  {LEVEL_DEFINITIONS.map(({ level, label, description }) => (
+                    <option key={level} value={level}>
+                      {level} – {label} ({description})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2312,11 +2307,11 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                 ) : null}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <div className="mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Event details &amp; rules
                 </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
                   Optional. Add house rules, skill requirements, cancellation policy, or
                   other notes for participants.
                 </p>
@@ -2326,11 +2321,11 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     handleInputChange("eventDetails", e.target.value)
                   }
                   placeholder="e.g. Arrive 15 minutes early. No refunds within 24h of start. Beginners welcome."
-                  rows={5}
+                  rows={3}
                   maxLength={5000}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-y min-h-[120px] dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors resize-y min-h-[72px] dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                 />
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 text-right">
                   {formData.eventDetails.length}/5000
                 </p>
               </div>
@@ -2350,7 +2345,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     htmlFor="isPrivate"
                     className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Is Private?
+                    Private Event
                   </label>
                 </div>
 
@@ -2369,7 +2364,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     htmlFor="isRecurring"
                     className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Is Recurring?
+                    Recurring Event
                   </label>
                 </div>
               </div>
@@ -2521,26 +2516,26 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     </div>
 
                     <div className="relative">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {ATHLETE_LABELS.findPlaceholder}
-                      </label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={inviteSearchQuery}
-                          onChange={(e) => {
-                            setInviteSearchQuery(e.target.value);
-                            setShowInviteSuggestions(true);
-                          }}
-                          onFocus={() => setShowInviteSuggestions(true)}
-                          placeholder="Type at least 2 characters"
-                          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                        />
-                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 sm:min-w-[7.5rem]">
+                          {ATHLETE_LABELS.findPlaceholder}
+                        </label>
+                        <div className="relative flex-1 min-w-0">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="text"
+                            value={inviteSearchQuery}
+                            onChange={(e) => {
+                              setInviteSearchQuery(e.target.value);
+                              setShowInviteSuggestions(true);
+                            }}
+                            onFocus={() => setShowInviteSuggestions(true)}
+                            placeholder="Type at least 2 characters"
+                            className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                          />
 
-                      {showInviteSuggestions && inviteSearchQuery.trim().length >= 2 && (
-                        <div className="absolute z-20 mt-2 w-full max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                          {showInviteSuggestions && inviteSearchQuery.trim().length >= 2 && (
+                            <div className="absolute z-20 mt-2 w-full max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
                           {loadingInviteCandidates ? (
                             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                               {ATHLETE_LABELS.searching}
@@ -2586,6 +2581,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                           )}
                         </div>
                       )}
+                        </div>
+                      </div>
                     </div>
 
                     {selectedInvitees.length > 0 && (

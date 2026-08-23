@@ -3,6 +3,9 @@ import { AppError } from '../utils/appError.js';
 import User from '../models/userModel.js';
 import PerformanceMember, { PERFORMANCE_BRANCHES } from '../models/performanceMemberModel.js';
 import { removeCoachProfileForUser } from '../utils/providerRoleSwitch.js';
+import { getBasicPlanAssignmentFields } from '../utils/subscriptionPlanHelper.js';
+import { writeAuditLog, changedKeys } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 const normalizeText = (value, max = 2000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -39,6 +42,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
         const confirmRoleSwitch = payload.confirmRoleSwitch === true;
 
         const freshUser = await User.findById(req.user._id).select('coach performanceMember').lean();
+        const switchedFromCoach = !!freshUser?.coach;
         if (freshUser?.coach) {
             if (!confirmRoleSwitch) {
                 throw new AppError(
@@ -63,6 +67,8 @@ export const createOrUpdateProfile = async (req, res, next) => {
         }
 
         const certificate = req.fileMeta || existing?.certificate;
+        const isNewProfile = !existing;
+        const basicFields = isNewProfile ? await getBasicPlanAssignmentFields() : {};
         const update = {
             user: req.user._id,
             name: `${req.user.firstName} ${req.user.lastName}`.trim(),
@@ -73,6 +79,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
             status: 'Pending',
             isVerified: false,
             rejectionReason: '',
+            ...(isNewProfile ? basicFields : {}),
         };
 
         if (existing?.certificate?.path && req.fileMeta?.path) {
@@ -89,6 +96,37 @@ export const createOrUpdateProfile = async (req, res, next) => {
 
         await User.findByIdAndUpdate(req.user._id, { performanceMember: profile._id });
 
+        await writeAuditLog({
+            req,
+            actorRole: 'performance',
+            action: existing
+                ? AUDIT_ACTIONS.PERFORMANCE_APPLICATION_UPDATED
+                : AUDIT_ACTIONS.PERFORMANCE_APPLICATION_CREATED,
+            entityType: 'performance_member',
+            entityId: profile._id,
+            changedFields: existing
+                ? changedKeys(existing, profile, ['branch', 'title', 'about', 'status', 'isVerified'])
+                : ['branch', 'title', 'about', 'status'],
+            before: existing,
+            after: profile,
+            description: existing
+                ? 'Performance Team application updated'
+                : 'Performance Team application created',
+        });
+        if (switchedFromCoach) {
+            await writeAuditLog({
+                req,
+                actorRole: 'performance',
+                targetUserId: req.user._id,
+                targetRole: 'performance',
+                action: AUDIT_ACTIONS.PROVIDER_ROLE_SWITCHED,
+                entityType: 'user',
+                entityId: req.user._id,
+                description: 'Provider role switched from coach to Performance Team',
+                before: { providerRole: 'coach' },
+                after: { providerRole: 'performance' },
+            });
+        }
         res.status(existing ? 200 : 201).json({
             success: true,
             message: 'Performance Team application saved.',

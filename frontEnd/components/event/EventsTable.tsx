@@ -14,6 +14,7 @@ import {
   X,
   Plus,
 } from "lucide-react";
+import { isEventHost } from "@/app/lib/subscription-credits";
 import ViewEventModal from "./ViewEventModal";
 import EventParticipantsModal from "./EventParticipantsModal";
 import CoachDetailModal from "../CoachDetailModal";
@@ -148,8 +149,8 @@ const EventsTable: React.FC<EventsTableProps> = ({
   const { mutateAsync: removeFavoriteAsync, isPending: isRemovingFavorite } =
     useRemoveFavorite();
   const canFavorite = !!user?.participant;
-  const canSeeMyEvents = !!user?.coach || user?.role === 0;
-  const canCreateOrManageEvents = !!user?.coach || user?.role === 0;
+  const canSeeMyEvents = isEventHost(user);
+  const canCreateOrManageEvents = isEventHost(user);
   const [favoriteAnimatingId, setFavoriteAnimatingId] = useState<string | null>(
     null
   );

@@ -8,6 +8,7 @@ import * as newsController from '../controllers/newsController.js';
 import * as videoController from '../controllers/videoController.js';
 import * as legalController from '../controllers/legalController.js';
 import * as contractAcceptanceController from '../controllers/contractAcceptanceController.js';
+import * as auditLogController from '../controllers/auditLogController.js';
 import * as adminPermissionGroupController from '../controllers/adminPermissionGroupController.js';
 import * as blacklistController from '../controllers/blacklistController.js';
 import * as reportController from '../controllers/reportController.js';
@@ -24,6 +25,18 @@ const HEADER_LOGO_ALLOWED_MIME_TYPES = [
 ];
 
 router.get('/panel', adminController.getAdminPanel);
+
+// Append-only business audit records (login/logout and direct-message activity excluded).
+router.get(
+    '/audit-logs/catalog',
+    requireAdminPermission('admin.audit_logs'),
+    auditLogController.getAuditCatalog
+);
+router.get(
+    '/audit-logs',
+    requireAdminPermission('admin.audit_logs'),
+    auditLogController.listAuditLogs
+);
 
 // Permission groups (full access)
 router.get(

@@ -33,6 +33,8 @@ import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { notifyCertificateApproved, notifyCertificateRejected, notifyPerformanceApplicationApproved, notifyPerformanceApplicationRejected } from '../utils/notificationHelper.js';
 import { uploadsRelativePath } from '../utils/eventEndPhotoHelper.js';
 import { isValidHeroCtaHref } from '../utils/heroCtaHref.js';
+import { writeAuditLog } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { ADMIN_PERMISSION_STAR } from '../constants/adminPermissions.js';
 
@@ -780,6 +782,7 @@ export const getPerformanceApplications = async (req, res, next) => {
 export const approvePerformanceApplication = async (req, res, next) => {
     try {
         const applicationId = mongoObjectId.parse(req.params.applicationId);
+        const beforeApplication = await PerformanceMember.findById(applicationId).lean();
 
         const application = await PerformanceMember.findByIdAndUpdate(
             applicationId,
@@ -806,6 +809,24 @@ export const approvePerformanceApplication = async (req, res, next) => {
             console.error('Failed to create notification:', notifErr);
         }
 
+        await writeAuditLog({
+            req,
+            actorRole: 'admin',
+            targetUserId: userId,
+            targetRole: 'performance',
+            action: AUDIT_ACTIONS.PERFORMANCE_APPLICATION_APPROVED,
+            entityType: 'performance_member',
+            entityId: application._id,
+            changedFields: ['status', 'isVerified', 'rejectionReason'],
+            before: {
+                status: beforeApplication?.status,
+                isVerified: beforeApplication?.isVerified,
+                rejectionReason: beforeApplication?.rejectionReason,
+            },
+            after: { status: application.status, isVerified: application.isVerified },
+            description: 'Performance Team application approved',
+            metadata: { branch: application.branch },
+        });
         res.status(200).json({
             success: true,
             message: 'Performance Team application approved successfully',
@@ -819,6 +840,7 @@ export const approvePerformanceApplication = async (req, res, next) => {
 export const rejectPerformanceApplication = async (req, res, next) => {
     try {
         const applicationId = mongoObjectId.parse(req.params.applicationId);
+        const beforeApplication = await PerformanceMember.findById(applicationId).lean();
 
         const application = await PerformanceMember.findByIdAndUpdate(
             applicationId,
@@ -846,6 +868,28 @@ export const rejectPerformanceApplication = async (req, res, next) => {
             console.error('Failed to create notification:', notifErr);
         }
 
+        await writeAuditLog({
+            req,
+            actorRole: 'admin',
+            targetUserId: userId,
+            targetRole: 'performance',
+            action: AUDIT_ACTIONS.PERFORMANCE_APPLICATION_REJECTED,
+            entityType: 'performance_member',
+            entityId: application._id,
+            changedFields: ['status', 'isVerified', 'rejectionReason'],
+            before: {
+                status: beforeApplication?.status,
+                isVerified: beforeApplication?.isVerified,
+                rejectionReason: beforeApplication?.rejectionReason,
+            },
+            after: {
+                status: application.status,
+                isVerified: application.isVerified,
+                rejectionReason: application.rejectionReason,
+            },
+            description: 'Performance Team application rejected',
+            metadata: { branch: application.branch },
+        });
         res.status(200).json({
             success: true,
             message: 'Performance Team application rejected successfully',
@@ -897,6 +941,7 @@ async function revertCoachApplicationIfNotApproved(coachId) {
 export const approveCertificate = async (req, res, next) => {
     try {
         const branchId = mongoObjectId.parse(req.params.branchId);
+        const beforeBranch = await Branch.findById(branchId).lean();
 
         const branch = await Branch.findByIdAndUpdate(
             branchId,
@@ -910,6 +955,7 @@ export const approveCertificate = async (req, res, next) => {
             throw new AppError(404, 'Branch not found');
         }
 
+        let coachOwner = null;
         if (branch.status === 'Approved') {
             const coach = await Coach.findById(branch.coach._id);
             if (coach && !coach.isVerified) {
@@ -923,6 +969,7 @@ export const approveCertificate = async (req, res, next) => {
             // Find user who owns this coach
             const user = await User.findOne({ coach: branch.coach._id });
             if (user) {
+                coachOwner = user;
                 try {
                     await notifyCertificateApproved(
                         user._id,
@@ -937,6 +984,20 @@ export const approveCertificate = async (req, res, next) => {
             }
         }
 
+        await writeAuditLog({
+            req,
+            actorRole: 'admin',
+            targetUserId: coachOwner?._id || null,
+            targetRole: 'coach',
+            action: AUDIT_ACTIONS.COACH_CERTIFICATE_APPROVED,
+            entityType: 'branch',
+            entityId: branch._id,
+            changedFields: ['status'],
+            before: { status: beforeBranch?.status },
+            after: { status: branch.status },
+            description: 'Coach certificate approved',
+            metadata: { sport: branch.sport?._id || branch.sport, level: branch.level },
+        });
         res.status(200).json({
             success: true,
             message: 'Certificate approved successfully',
@@ -950,6 +1011,7 @@ export const approveCertificate = async (req, res, next) => {
 export const rejectCertificate = async (req, res, next) => {
     try {
         const branchId = mongoObjectId.parse(req.params.branchId);
+        const beforeBranch = await Branch.findById(branchId).lean();
 
         const branch = await Branch.findByIdAndUpdate(
             branchId,
@@ -981,6 +1043,24 @@ export const rejectCertificate = async (req, res, next) => {
 
         const { reverted } = await revertCoachApplicationIfNotApproved(coachId);
 
+        await writeAuditLog({
+            req,
+            actorRole: 'admin',
+            targetUserId: user?._id || null,
+            targetRole: 'coach',
+            action: AUDIT_ACTIONS.COACH_CERTIFICATE_REJECTED,
+            entityType: 'branch',
+            entityId: branch._id,
+            changedFields: ['status'],
+            before: { status: beforeBranch?.status },
+            after: { status: branch.status },
+            description: 'Coach certificate rejected',
+            metadata: {
+                sport: branch.sport?._id || branch.sport,
+                level: branch.level,
+                coachProfileRemoved: reverted,
+            },
+        });
         res.status(200).json({
             success: true,
             message: reverted

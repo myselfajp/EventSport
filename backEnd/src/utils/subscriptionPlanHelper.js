@@ -1,5 +1,6 @@
 import SubscriptionPlan from '../models/subscriptionPlanModel.js';
 import Coach from '../models/coachModel.js';
+import PerformanceMember from '../models/performanceMemberModel.js';
 import { AppError } from './appError.js';
 
 export const DEFAULT_BASIC_CREDITS = {
@@ -8,7 +9,6 @@ export const DEFAULT_BASIC_CREDITS = {
     replyCredits: 3,
 };
 
-/** Max coach/performance offers per service request (Hakan rule). */
 export const MAX_OFFERS_PER_SERVICE_REQUEST = 10;
 
 /**
@@ -83,6 +83,70 @@ export async function consumeCoachCredit(coachId, field) {
 export async function refundCoachCredit(coachId, field) {
     if (!coachId || (field !== 'eventCredits' && field !== 'replyCredits')) return;
     await Coach.findByIdAndUpdate(coachId, { $inc: { [field]: 1 } });
+}
+
+export function applyPlanToPerformanceDoc(member, plan, { mode = 'replace', eventCredits, replyCredits } = {}) {
+    if (!member || !plan) return member;
+    member.subscriptionTier = plan.key;
+    const eventAmount =
+        eventCredits !== undefined ? Number(eventCredits) : Number(plan.eventCredits || 0);
+    const replyAmount =
+        replyCredits !== undefined ? Number(replyCredits) : Number(plan.replyCredits || 0);
+    if (mode === 'addCredits') {
+        member.eventCredits = (Number(member.eventCredits) || 0) + eventAmount;
+        member.replyCredits = (Number(member.replyCredits) || 0) + replyAmount;
+    } else {
+        member.eventCredits = eventAmount;
+        member.replyCredits = replyAmount;
+    }
+    return member;
+}
+
+export async function consumePerformanceCredit(performanceMemberId, field) {
+    if (field !== 'eventCredits' && field !== 'replyCredits') {
+        throw new AppError(500, 'Invalid credit field');
+    }
+
+    const updated = await PerformanceMember.findOneAndUpdate(
+        { _id: performanceMemberId, [field]: { $gt: 0 } },
+        { $inc: { [field]: -1 } },
+        { new: true }
+    );
+
+    if (!updated) {
+        const member = await PerformanceMember.findById(performanceMemberId).select(field).lean();
+        if (!member) throw new AppError(404, 'Performance Team profile not found.');
+        const kind = field === 'eventCredits' ? 'event' : 'request reply';
+        throw new AppError(
+            403,
+            `No ${kind} credits left on your plan. Upgrade your membership to continue.`
+        );
+    }
+
+    return updated;
+}
+
+export async function refundPerformanceCredit(performanceMemberId, field) {
+    if (!performanceMemberId || (field !== 'eventCredits' && field !== 'replyCredits')) return;
+    await PerformanceMember.findByIdAndUpdate(performanceMemberId, { $inc: { [field]: 1 } });
+}
+
+export async function applyPlanToPerformanceById(
+    performanceMemberId,
+    planKey,
+    { mode = 'addCredits', eventCredits, replyCredits } = {}
+) {
+    const plan = await findPlanByKey(planKey);
+    if (!plan || !plan.isActive) {
+        throw new AppError(404, 'Subscription plan not found or inactive.');
+    }
+
+    const member = await PerformanceMember.findById(performanceMemberId);
+    if (!member) throw new AppError(404, 'Performance Team profile not found.');
+
+    applyPlanToPerformanceDoc(member, plan, { mode, eventCredits, replyCredits });
+    await member.save();
+    return member;
 }
 
 /**

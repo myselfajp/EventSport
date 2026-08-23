@@ -24,6 +24,7 @@ import NewsManagement from "../../components/news/NewsManagement";
 import VideoManagement from "../../components/video/VideoManagement";
 import BlogManagement from "../../components/blog/BlogManagement";
 import WelcomePageManagement from "../../components/admin/WelcomePageManagement";
+import AuditLogsManagement from "../../components/admin/AuditLogsManagement";
 
 type TabType =
   | "users"
@@ -41,6 +42,7 @@ type TabType =
   | "subscription-plans"
   | "suggestions"
   | "reports"
+  | "audit-logs"
   | "dashboard-hero"
   | "welcome-page"
   | "permission-groups";
@@ -63,6 +65,7 @@ const TAB_ORDER: TabType[] = [
   "welcome-page",
   "suggestions",
   "reports",
+  "audit-logs",
   "permission-groups",
 ];
 
@@ -84,6 +87,7 @@ const TAB_LABEL: Record<TabType, string> = {
   "welcome-page": "Welcome Page",
   suggestions: "Suggestions",
   reports: "Reports",
+  "audit-logs": "Audit Logs",
   "permission-groups": "Permission Groups",
 };
 
@@ -106,6 +110,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   "welcome-page": "admin.welcome_page",
   suggestions: "admin.suggestions",
   reports: "admin.reports",
+  "audit-logs": "admin.audit_logs",
 };
 
 export default function AdminPanelPage() {
@@ -322,6 +327,7 @@ export default function AdminPanelPage() {
             {activeTab === "welcome-page" && <WelcomePageManagement />}
             {activeTab === "suggestions" && <SuggestionsManagement />}
             {activeTab === "reports" && <ReportsManagement />}
+            {activeTab === "audit-logs" && <AuditLogsManagement />}
             {activeTab === "permission-groups" && <AdminPermissionGroupsManagement />}
           </div>
         </div>

@@ -485,7 +485,7 @@ const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="header-right flex items-center justify-end gap-1 sm:gap-2">
-            {user?.coach ? (
+            {(user?.coach || user?.performanceMember) ? (
               <button
                 type="button"
                 onClick={() => router.push("/upgrade")}

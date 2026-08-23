@@ -4,7 +4,6 @@ import { mongoObjectId } from '../utils/validation.js';
 import {
     ALL_CONTRACT_DOC_TYPES,
     CONTRACT_CATEGORIES,
-    DOC_TYPE_TO_CATEGORY,
     LEGAL_DOC_TYPES,
     GAMER_DOC_TYPES,
     COACH_DOC_TYPES,
@@ -211,14 +210,14 @@ export const getActiveCatalog = async (req, res, next) => {
 
         const byType = Object.fromEntries(activeDocs.map((d) => [d.docType, d]));
 
-        const group = (types) =>
+        const group = (types, categoryKey) =>
             types
                 .map((docType) => {
                     const doc = byType[docType];
                     if (!doc) return null;
                     return {
                         docType,
-                        category: DOC_TYPE_TO_CATEGORY[docType],
+                        category: categoryKey,
                         title: doc.title,
                         content: doc.content,
                         version: doc.version,
@@ -230,9 +229,9 @@ export const getActiveCatalog = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: {
-                legal: group(LEGAL_DOC_TYPES),
-                gamer: group(GAMER_DOC_TYPES),
-                coach: group(COACH_DOC_TYPES),
+                legal: group(LEGAL_DOC_TYPES, 'legal'),
+                gamer: group(GAMER_DOC_TYPES, 'gamer'),
+                coach: group(COACH_DOC_TYPES, 'coach'),
             },
         });
     } catch (err) {

@@ -21,7 +21,8 @@ import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { Facility } from "@/app/lib/types";
 import {
-  coachHasEventCredits,
+  isEventHost,
+  providerHasEventCredits,
   notifyNoEventCreditsAndGoUpgrade,
 } from "@/app/lib/subscription-credits";
 import { formatEventDateTime } from "@/app/lib/event-dashboard-utils";
@@ -52,10 +53,10 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const { data: user, isLoading: userLoading } = useMe();
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const isCoach = user?.coach != null;
-  const canManageEvents = isCoach || user?.role === 0;
+  const canManageEvents = isEventHost(user);
 
   const tryOpenCreateEvent = () => {
-    if (coachHasEventCredits(user) === false) {
+    if (providerHasEventCredits(user) === false) {
       notifyNoEventCreditsAndGoUpgrade(router);
       return;
     }

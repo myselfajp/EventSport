@@ -243,10 +243,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [uploadingEndPhoto, setUploadingEndPhoto] = useState(false);
   const [consent, setConsent] = useState({
-    acceptHealthNoIllness: false,
-    acceptHealthNoDisability: false,
-    acceptHealthNoMedication: false,
-    acceptHealthSportOk: false,
+    acceptHealthDeclaration: false,
     acceptDistantSelling: false,
     acceptEventPurchaseTerms: false,
   });
@@ -618,10 +615,10 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
 
     try {
       const body = {
-        acceptHealthNoIllness: true,
-        acceptHealthNoDisability: true,
-        acceptHealthNoMedication: true,
-        acceptHealthSportOk: true,
+        acceptHealthNoIllness: consent.acceptHealthDeclaration,
+        acceptHealthNoDisability: consent.acceptHealthDeclaration,
+        acceptHealthNoMedication: consent.acceptHealthDeclaration,
+        acceptHealthSportOk: consent.acceptHealthDeclaration,
         acceptDistantSelling: true,
         acceptEventPurchaseTerms: true,
         distanceSellingVersionId: legalVersions.distanceSellingId,
@@ -1973,46 +1970,17 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
               <label className="flex gap-3 items-start cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={consent.acceptHealthNoIllness}
+                  checked={consent.acceptHealthDeclaration}
                   onChange={(e) =>
-                    setConsent((c) => ({ ...c, acceptHealthNoIllness: e.target.checked }))
+                    setConsent((c) => ({ ...c, acceptHealthDeclaration: e.target.checked }))
                   }
                   className="mt-1 rounded border-gray-300"
                 />
-                <span>I confirm I have no illness that prevents safe participation.</span>
-              </label>
-              <label className="flex gap-3 items-start cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consent.acceptHealthNoDisability}
-                  onChange={(e) =>
-                    setConsent((c) => ({ ...c, acceptHealthNoDisability: e.target.checked }))
-                  }
-                  className="mt-1 rounded border-gray-300"
-                />
-                <span>I confirm I have no disability that prevents safe participation.</span>
-              </label>
-              <label className="flex gap-3 items-start cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consent.acceptHealthNoMedication}
-                  onChange={(e) =>
-                    setConsent((c) => ({ ...c, acceptHealthNoMedication: e.target.checked }))
-                  }
-                  className="mt-1 rounded border-gray-300"
-                />
-                <span>I confirm I am not using medication that conflicts with this activity.</span>
-              </label>
-              <label className="flex gap-3 items-start cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consent.acceptHealthSportOk}
-                  onChange={(e) =>
-                    setConsent((c) => ({ ...c, acceptHealthSportOk: e.target.checked }))
-                  }
-                  className="mt-1 rounded border-gray-300"
-                />
-                <span>I confirm there is no medical restriction on my taking part in sport.</span>
+                <span>
+                  I confirm that I have no illness, disability, or medical restriction that prevents
+                  safe participation and I am not using medication that conflicts with this
+                  activity.
+                </span>
               </label>
               <label className="flex gap-3 items-start cursor-pointer">
                 <input
@@ -2053,7 +2021,7 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                     rel="noopener noreferrer"
                     className="text-cyan-600 dark:text-cyan-400 underline font-medium"
                   >
-                    event and purchase conditions
+                    event conditions
                   </a>{" "}
                   (logged on the server when you join).
                 </span>

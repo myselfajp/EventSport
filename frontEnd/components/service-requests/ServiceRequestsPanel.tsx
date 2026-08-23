@@ -299,17 +299,17 @@ export default function ServiceRequestsPanel({
 
   const renderProviderResponses = (request: ServiceRequest) => (
     <div className="space-y-2">
-      {(request.responses || []).length === 0 && (
+      {(request.responses || []).filter((r) => r.status !== "rejected").length === 0 && (
         <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
           No offers yet.
         </p>
       )}
-      {(request.responses || []).map((response) => {
-        const canChoose =
-          request.status === "open" && response.status === "interested";
-        const isSelected =
-          request.status === "in_conversation" && response.status === "selected";
-        const canOpenChat = canChoose || isSelected;
+      {(request.responses || [])
+        .filter((response) => response.status !== "rejected")
+        .map((response) => {
+        const hasMessaged = response.status === "selected";
+        const canMessage =
+          response.status === "interested" || response.status === "selected";
         const busy = selectingResponseId === response._id;
 
         return (
@@ -327,16 +327,20 @@ export default function ServiceRequestsPanel({
             </div>
             <button
               type="button"
-              disabled={!canOpenChat || busy}
+              disabled={!canMessage || busy}
               onClick={() =>
-                canChoose
-                  ? void selectProvider(request._id, response._id)
-                  : openProviderChat(response)
+                hasMessaged
+                  ? openProviderChat(response)
+                  : void selectProvider(request._id, response._id)
               }
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 ${
+                hasMessaged
+                  ? "bg-cyan-600 hover:bg-cyan-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
             >
               <MessageSquare className="h-4 w-4" />
-              {busy ? "Opening…" : isSelected ? "Open chat" : "Choose & Message"}
+              {busy ? "Opening…" : "Message"}
             </button>
           </div>
         );
@@ -575,7 +579,7 @@ export default function ServiceRequestsPanel({
               {focusedRequest ? (
                 <>
                   <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
-                    Review the offer below and pick a provider to start messaging.
+                    Review the offers below and message any provider you want to talk to.
                   </div>
                   {renderMyRequestCard(focusedRequest)}
                 </>

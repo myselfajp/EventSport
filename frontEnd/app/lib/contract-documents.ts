@@ -29,6 +29,7 @@ export const GAMER_DOC_TYPES: LegalDocType[] = [
 ];
 
 export const COACH_DOC_TYPES: LegalDocType[] = [
+  "distance_selling",
   "coach_agreement",
   "coach_penalties",
   "coach_equipment",
@@ -36,9 +37,7 @@ export const COACH_DOC_TYPES: LegalDocType[] = [
 ];
 
 export const ALL_CONTRACT_DOC_TYPES: LegalDocType[] = [
-  ...LEGAL_DOC_TYPES,
-  ...GAMER_DOC_TYPES,
-  ...COACH_DOC_TYPES,
+  ...new Set([...LEGAL_DOC_TYPES, ...GAMER_DOC_TYPES, ...COACH_DOC_TYPES]),
 ];
 
 export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {

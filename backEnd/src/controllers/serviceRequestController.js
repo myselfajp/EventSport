@@ -11,11 +11,15 @@ import {
     MAX_OFFERS_PER_SERVICE_REQUEST,
     consumeCoachCredit,
     refundCoachCredit,
+    consumePerformanceCredit,
+    refundPerformanceCredit,
 } from '../utils/subscriptionPlanHelper.js';
 import {
     REQUEST_QUESTIONS,
     questionsForTarget,
 } from '../constants/serviceRequestQuestions.js';
+import { writeAuditLog } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
@@ -207,6 +211,22 @@ export const createServiceRequest = async (req, res, next) => {
             answers: normalizeAnswers(req.body?.answers, targetType),
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.SERVICE_REQUEST_CREATED,
+            entityType: 'service_request',
+            entityId: request._id,
+            description:
+                targetType === 'coach'
+                    ? 'Coach Me request created'
+                    : 'Performance Team service request created',
+            metadata: {
+                targetType,
+                performanceBranch: request.performanceBranch,
+                expiresAt: request.expiresAt,
+            },
+        });
         void notifyProvidersOfServiceRequest(request).catch((notifErr) =>
             console.error('notifyProvidersOfServiceRequest failed:', notifErr)
         );
@@ -367,14 +387,20 @@ export const respondToRequest = async (req, res, next) => {
             }
         }
 
-        // Coaches spend 1 reply credit only when submitting a new offer (not message updates).
-        const coachIdForCredits =
+        const providerIdForCredits =
             provider.providerType === 'coach'
                 ? provider.coach?._id || provider.coach || req.user.coach?._id || req.user.coach
-                : null;
+                : provider.performanceMember?._id || provider.performanceMember;
         let consumedReplyCredit = false;
-        if (isNewOffer && coachIdForCredits) {
-            await consumeCoachCredit(coachIdForCredits, 'replyCredits');
+        let consumedCreditType = null;
+        if (isNewOffer && providerIdForCredits) {
+            if (provider.providerType === 'coach') {
+                await consumeCoachCredit(providerIdForCredits, 'replyCredits');
+                consumedCreditType = 'coach';
+            } else {
+                await consumePerformanceCredit(providerIdForCredits, 'replyCredits');
+                consumedCreditType = 'performance';
+            }
             consumedReplyCredit = true;
         }
 
@@ -398,8 +424,12 @@ export const respondToRequest = async (req, res, next) => {
                 { new: true, upsert: true, setDefaultsOnInsert: true }
             );
         } catch (writeErr) {
-            if (consumedReplyCredit) {
-                await refundCoachCredit(coachIdForCredits, 'replyCredits');
+            if (consumedReplyCredit && providerIdForCredits) {
+                if (consumedCreditType === 'performance') {
+                    await refundPerformanceCredit(providerIdForCredits, 'replyCredits');
+                } else {
+                    await refundCoachCredit(providerIdForCredits, 'replyCredits');
+                }
             }
             throw writeErr;
         }
@@ -421,6 +451,38 @@ export const respondToRequest = async (req, res, next) => {
             );
         }
 
+        if (isNewOffer) {
+            await writeAuditLog({
+                req,
+                actorRole: provider.providerType,
+                targetUserId: request.requester,
+                targetRole: 'athlete',
+                action: AUDIT_ACTIONS.SERVICE_RESPONSE_CREATED,
+                entityType: 'service_response',
+                entityId: response._id,
+                description: 'Provider responded to a service request',
+                metadata: {
+                    serviceRequestId: request._id,
+                    providerType: provider.providerType,
+                    replyCreditConsumed: consumedReplyCredit,
+                },
+            });
+            if (consumedReplyCredit) {
+                await writeAuditLog({
+                    req,
+                    actorRole: provider.providerType,
+                    action: AUDIT_ACTIONS.REPLY_CREDIT_CONSUMED,
+                    entityType: 'subscription',
+                    entityId: providerIdForCredits,
+                    description: 'Reply credit consumed for a service request response',
+                    metadata: {
+                        serviceRequestId: request._id,
+                        serviceResponseId: response._id,
+                        amount: 1,
+                    },
+                });
+            }
+        }
         res.status(200).json({
             success: true,
             data: response,
@@ -447,30 +509,56 @@ export const selectResponse = async (req, res, next) => {
         const response = await ServiceRequestResponse.findOne({
             _id: responseId,
             serviceRequest: request._id,
-            status: 'interested',
+            status: { $in: ['interested', 'selected'] },
         });
         if (!response) throw new AppError(404, 'Service request response not found.');
 
-        await ServiceRequestResponse.updateMany(
-            { serviceRequest: request._id, _id: { $ne: response._id }, status: 'interested' },
-            { status: 'rejected' }
-        );
+        const providerUser = await User.findById(response.providerUser).select('_id');
+        if (!providerUser) throw new AppError(404, 'Provider user not found.');
+
+        if (response.status === 'selected') {
+            const conversation = await findOrCreateConversation(req.user._id, providerUser._id);
+            return res.status(200).json({
+                success: true,
+                data: {
+                    request,
+                    response,
+                    conversation,
+                },
+            });
+        }
 
         response.status = 'selected';
         response.selectedAt = new Date();
         await response.save();
 
-        request.status = 'in_conversation';
-        request.selectedResponse = response._id;
-        request.selectedProvider = response.providerUser;
-        request.selectedAt = new Date();
+        if (!request.selectedResponse) {
+            request.selectedResponse = response._id;
+            request.selectedProvider = response.providerUser;
+            request.selectedAt = new Date();
+        }
+        if (request.status === 'open') {
+            request.status = 'in_conversation';
+        }
         await request.save();
-
-        const providerUser = await User.findById(response.providerUser).select('_id');
-        if (!providerUser) throw new AppError(404, 'Provider user not found.');
 
         const conversation = await findOrCreateConversation(req.user._id, providerUser._id);
 
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            targetUserId: providerUser._id,
+            targetRole: response.providerType,
+            action: AUDIT_ACTIONS.SERVICE_RESPONSE_SELECTED,
+            entityType: 'service_response',
+            entityId: response._id,
+            description: 'Athlete selected a service provider response',
+            metadata: {
+                serviceRequestId: request._id,
+                providerType: response.providerType,
+                conversationId: conversation._id,
+            },
+        });
         res.status(200).json({
             success: true,
             data: {

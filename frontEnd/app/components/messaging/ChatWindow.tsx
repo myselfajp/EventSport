@@ -15,6 +15,7 @@ import {
   senderId,
 } from "@/app/lib/messages-api";
 import Avatar from "./Avatar";
+import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 
 interface ChatWindowProps {
   conversationId: string;
@@ -75,6 +76,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingConversation, setDeletingConversation] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteMenuMessageId, setDeleteMenuMessageId] = useState<string | null>(
     null
   );
@@ -330,11 +332,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleDeleteConversation = useCallback(async () => {
     if (deletingConversation) return;
 
-    const confirmed = window.confirm(
-      "This chat will only be deleted for you. The other person will still see it. Continue?"
-    );
-    if (!confirmed) return;
-
     setDeletingConversation(true);
     setError(null);
 
@@ -354,6 +351,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         await deleteConversation(conversationId);
       }
 
+      setShowDeleteConfirm(false);
       queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
       onConversationDeletedCallback?.();
     } catch (e: any) {
@@ -389,7 +387,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         </div>
         <button
           type="button"
-          onClick={handleDeleteConversation}
+          onClick={() => setShowDeleteConfirm(true)}
           disabled={deletingConversation}
           className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-950/30 dark:hover:text-red-400"
           aria-label="Delete chat"
@@ -552,6 +550,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </button>
         </div>
       </div>
+
+      <DeleteChatConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          if (!deletingConversation) setShowDeleteConfirm(false);
+        }}
+        onConfirm={() => void handleDeleteConversation()}
+        otherUserName={fullName(otherUser)}
+        isLoading={deletingConversation}
+      />
     </div>
   );
 };

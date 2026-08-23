@@ -37,6 +37,8 @@ import {
     getBasicPlanAssignmentFields,
     consumeCoachCredit,
     refundCoachCredit,
+    consumePerformanceCredit,
+    refundPerformanceCredit,
 } from '../utils/subscriptionPlanHelper.js';
 import { getListingPricePerSlot } from '../utils/recurrenceHelper.js';
 import EventSeries from '../models/eventSeriesModel.js';
@@ -49,6 +51,8 @@ import {
     notifyGroupInvite,
     notifyJoinRequestApproved,
 } from '../utils/notificationHelper.js';
+import { writeAuditLog, changedKeys } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 /** Build a short human-readable summary of which event fields changed. */
 function summarizeEventChanges(prev, next) {
@@ -113,20 +117,31 @@ function coachDisplayName(user) {
         : 'A coach';
 }
 
+function isEventHostUser(user) {
+    return Boolean(user?.role === 0 || user?.coach || user?.performanceMember);
+}
+
+function eventHostAuditRole(user) {
+    if (user?.role === 0) return 'admin';
+    return user?.coach ? 'coach' : 'performance';
+}
+
 async function createEventInvites({
     inviterCoachId,
+    inviterUserId,
     invitedUserIds = [],
     events = [],
     notificationEvent,
     inviterName,
 }) {
+    const inviterId = inviterUserId || inviterCoachId;
     const uniqueInviteeIds = [
         ...new Set(invitedUserIds.map((id) => String(id)).filter(Boolean)),
     ];
     const eventDocs = events.filter(Boolean);
     const eventIds = eventDocs.map((eventDoc) => String(eventDoc._id)).filter(Boolean);
 
-    if (!inviterCoachId || uniqueInviteeIds.length === 0 || eventIds.length === 0) {
+    if (!inviterId || uniqueInviteeIds.length === 0 || eventIds.length === 0) {
         return { invitedUserCount: 0, inviteRecordCount: 0 };
     }
 
@@ -158,7 +173,7 @@ async function createEventInvites({
             const key = `${inviteeId}:${eventId}`;
             if (!existingKeys.has(key)) {
                 inviteDocs.push({
-                    inviter: inviterCoachId,
+                    inviter: inviterId,
                     invitee: inviteeId,
                     event: eventId,
                 });
@@ -193,10 +208,10 @@ async function processEventInvitesOnEdit({ user, invitedUserIds = [], events = [
     if (!invitedUserIds.length) {
         return { invitedUserCount: 0, inviteRecordCount: 0 };
     }
-    if (!user.coach) {
+    if (!user.coach && !user.performanceMember) {
         throw new AppError(
             400,
-            'A coach profile is required to invite athletes while editing an event.'
+            'A provider profile is required to invite athletes while editing an event.'
         );
     }
 
@@ -210,7 +225,7 @@ async function processEventInvitesOnEdit({ user, invitedUserIds = [], events = [
     }
 
     return createEventInvites({
-        inviterCoachId: user.coach,
+        inviterUserId: user._id,
         invitedUserIds,
         events: futureEvents,
         notificationEvent: futureEvents[0],
@@ -220,7 +235,7 @@ async function processEventInvitesOnEdit({ user, invitedUserIds = [], events = [
 
 export const searchInviteCandidates = async (req, res, next) => {
     try {
-        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
+        if (!req.user || !isEventHostUser(req.user)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -287,6 +302,7 @@ export const createBranch = async (req, res, next) => {
         } = zodValidation.parseCoachProfileFormData(req.body.data);
 
         const freshUser = await User.findById(user._id).select('coach performanceMember').lean();
+        const switchedFromPerformance = !!freshUser?.performanceMember;
         if (freshUser?.performanceMember) {
             if (confirmRoleSwitch !== true) {
                 throw new AppError(
@@ -457,6 +473,41 @@ export const createBranch = async (req, res, next) => {
             }
         }
 
+        await writeAuditLog({
+            req,
+            actorUserId: user._id,
+            actorRole: 'coach',
+            action: isFirstCoachProfile
+                ? AUDIT_ACTIONS.COACH_PROFILE_CREATED
+                : AUDIT_ACTIONS.COACH_PROFILE_UPDATED,
+            entityType: 'coach',
+            entityId: coach._id,
+            changedFields: ['branches'],
+            before: {
+                branchIds: existingBranches.map((branch) => branch._id),
+                sports: existingBranches.map((branch) => branch.sport),
+            },
+            after: {
+                branchIds: newBranches.map((branch) => branch._id),
+                sports: newBranches.map((branch) => branch.sport),
+            },
+            description: isFirstCoachProfile ? 'Coach profile created' : 'Coach profile updated',
+        });
+        if (switchedFromPerformance) {
+            await writeAuditLog({
+                req,
+                actorUserId: user._id,
+                actorRole: 'coach',
+                targetUserId: user._id,
+                targetRole: 'coach',
+                action: AUDIT_ACTIONS.PROVIDER_ROLE_SWITCHED,
+                entityType: 'user',
+                entityId: user._id,
+                description: 'Provider role switched from Performance Team to coach',
+                before: { providerRole: 'performance' },
+                after: { providerRole: 'coach' },
+            });
+        }
         res.status(201).json({
             success: true,
             message: 'Coach/Branch created successfully',
@@ -526,7 +577,7 @@ export const createEvent = async (req, res, next) => {
     try {
         if (Object.keys(req.fileMeta).length !== 2)
             throw new AppError(400, 'Both event banner and event photo is required');
-        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
+        if (!req.user || !isEventHostUser(req.user)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -550,10 +601,10 @@ export const createEvent = async (req, res, next) => {
             ...eventFields
         } = result;
 
-        if (invitedUserIds.length > 0 && !user.coach) {
+        if (invitedUserIds.length > 0 && !user.coach && !user.performanceMember) {
             throw new AppError(
                 400,
-                'A coach profile is required to invite athletes while creating an event.'
+                'A provider profile is required to invite athletes while creating an event.'
             );
         }
 
@@ -626,12 +677,19 @@ export const createEvent = async (req, res, next) => {
 
         const coachName = coachDisplayName(user);
 
-        // Coaches spend 1 event credit per create (one-off or series). Admins without a coach skip.
         const coachIdForCredits = user.coach?._id || user.coach || null;
+        const performanceIdForCredits =
+            user.performanceMember?._id || user.performanceMember || null;
         let consumedEventCredit = false;
+        let consumedCreditType = null;
         if (coachIdForCredits) {
             await consumeCoachCredit(coachIdForCredits, 'eventCredits');
             consumedEventCredit = true;
+            consumedCreditType = 'coach';
+        } else if (performanceIdForCredits) {
+            await consumePerformanceCredit(performanceIdForCredits, 'eventCredits');
+            consumedEventCredit = true;
+            consumedCreditType = 'performance';
         }
 
         try {
@@ -646,13 +704,38 @@ export const createEvent = async (req, res, next) => {
             const firstEvent = seriesResult.events[0]?.toObject?.() ?? seriesResult.events[0];
             if (firstEvent?.secretId) delete firstEvent.secretId;
             const inviteSummary = await createEventInvites({
-                inviterCoachId: user.coach,
+                inviterUserId: user._id,
                 invitedUserIds,
                 events: seriesResult.events,
                 notificationEvent: firstEvent,
                 inviterName: coachName,
             });
 
+            const actorRole = eventHostAuditRole(user);
+            await writeAuditLog({
+                req,
+                actorRole,
+                action: AUDIT_ACTIONS.EVENT_CREATED,
+                entityType: 'event_series',
+                entityId: seriesResult.series._id,
+                description: `Recurring event series created: ${firstEvent?.name || ''}`,
+                metadata: {
+                    sessionCount: seriesResult.events.length,
+                    eventIds: seriesResult.events.map((item) => item._id),
+                    invitedCount: inviteSummary?.created ?? invitedUserIds.length,
+                },
+            });
+            if (consumedEventCredit) {
+                await writeAuditLog({
+                    req,
+                    actorRole,
+                    action: AUDIT_ACTIONS.EVENT_CREDIT_CONSUMED,
+                    entityType: 'subscription',
+                    entityId: coachIdForCredits || performanceIdForCredits,
+                    description: 'Event credit consumed for recurring event creation',
+                    metadata: { eventSeriesId: seriesResult.series._id, amount: 1 },
+                });
+            }
             return res.status(201).json({
                 success: true,
                 message: `Recurring series created with ${seriesResult.events.length} sessions`,
@@ -673,7 +756,7 @@ export const createEvent = async (req, res, next) => {
         const { secretId, ...event } = createEvent.toObject();
 
         const inviteSummary = await createEventInvites({
-            inviterCoachId: user.coach,
+            inviterUserId: user._id,
             invitedUserIds,
             events: [createEvent],
             notificationEvent: createEvent,
@@ -685,6 +768,36 @@ export const createEvent = async (req, res, next) => {
         void notifyAffinityFollowersOfNewEvent(createEvent, user._id);
         void notifyFacilityOwnerOfNewEvent(createEvent, user._id, coachName);
 
+        const actorRole = eventHostAuditRole(user);
+        await writeAuditLog({
+            req,
+            actorRole,
+            action: AUDIT_ACTIONS.EVENT_CREATED,
+            entityType: 'event',
+            entityId: createEvent._id,
+            description: `Event created: ${createEvent.name}`,
+            after: {
+                name: createEvent.name,
+                startTime: createEvent.startTime,
+                endTime: createEvent.endTime,
+                capacity: createEvent.capacity,
+                private: createEvent.private,
+                priceType: createEvent.priceType,
+                participationFee: createEvent.participationFee,
+            },
+            metadata: { invitedCount: inviteSummary?.created ?? invitedUserIds.length },
+        });
+        if (consumedEventCredit) {
+            await writeAuditLog({
+                req,
+                actorRole,
+                action: AUDIT_ACTIONS.EVENT_CREDIT_CONSUMED,
+                entityType: 'subscription',
+                entityId: coachIdForCredits || performanceIdForCredits,
+                description: 'Event credit consumed for event creation',
+                metadata: { eventId: createEvent._id, amount: 1 },
+            });
+        }
         res.status(201).json({
             success: true,
             message: 'Event created successfully',
@@ -693,7 +806,20 @@ export const createEvent = async (req, res, next) => {
         });
         } catch (createErr) {
             if (consumedEventCredit) {
-                await refundCoachCredit(coachIdForCredits, 'eventCredits');
+                if (consumedCreditType === 'performance') {
+                    await refundPerformanceCredit(performanceIdForCredits, 'eventCredits');
+                } else {
+                    await refundCoachCredit(coachIdForCredits, 'eventCredits');
+                }
+                await writeAuditLog({
+                    req,
+                    actorRole: eventHostAuditRole(user),
+                    action: AUDIT_ACTIONS.EVENT_CREDIT_REFUNDED,
+                    entityType: 'subscription',
+                    entityId: coachIdForCredits || performanceIdForCredits,
+                    description: 'Event credit refunded after event creation failed',
+                    metadata: { amount: 1 },
+                });
             }
             throw createErr;
         }
@@ -908,6 +1034,21 @@ export const editEvent = async (req, res, next) => {
                 events: inviteEvents,
             });
 
+            await writeAuditLog({
+                req,
+                actorRole: eventHostAuditRole(user),
+                action: AUDIT_ACTIONS.EVENT_UPDATED,
+                entityType: 'event_series',
+                entityId: eventExists.series,
+                changedFields: Object.keys(updateData).filter((key) => key !== 'secretId'),
+                before: eventExists,
+                after: updatedEvent,
+                description: `Event series updated: ${updatedEvent?.name || eventExists.name}`,
+                metadata: {
+                    scope,
+                    affectedEventIds: seriesOutcome?.eventIds ?? [eventId],
+                },
+            });
             return res.status(200).json({
                 success: true,
                 message: 'Event series updated (this and following sessions)',
@@ -941,6 +1082,17 @@ export const editEvent = async (req, res, next) => {
             events: [updatedEvent],
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.EVENT_UPDATED,
+            entityType: 'event',
+            entityId: updatedEvent._id,
+            changedFields: changedKeys(eventExists, updatedEvent, Object.keys(updateData)),
+            before: eventExists,
+            after: updatedEvent,
+            description: `Event updated: ${updatedEvent.name}`,
+        });
         res.status(200).json({
             success: true,
             message: 'Event updated successfully',
@@ -976,6 +1128,18 @@ export const cancelEvent = async (req, res, next) => {
 
         if (eventExists.series) {
             const outcome = await cancelEventsWithScope(eventExists, scope, user._id);
+            await writeAuditLog({
+                req,
+                actorRole: eventHostAuditRole(user),
+                action: AUDIT_ACTIONS.EVENT_CANCELLED,
+                entityType: 'event_series',
+                entityId: eventExists.series,
+                changedFields: ['status', 'cancelledAt'],
+                before: { status: eventExists.status, cancelledAt: eventExists.cancelledAt },
+                after: { status: 'cancelled', cancelledAt: new Date() },
+                description: `Event series session cancelled: ${eventExists.name}`,
+                metadata: { scope, affectedEventIds: outcome?.eventIds },
+            });
             return res.status(200).json({
                 success: true,
                 message:
@@ -999,6 +1163,17 @@ export const cancelEvent = async (req, res, next) => {
             eventName: updated?.name,
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.EVENT_CANCELLED,
+            entityType: 'event',
+            entityId: updated?._id || eventId,
+            changedFields: ['status', 'cancelledAt'],
+            before: { status: eventExists.status, cancelledAt: eventExists.cancelledAt },
+            after: { status: updated?.status, cancelledAt: updated?.cancelledAt },
+            description: `Event cancelled: ${eventExists.name}`,
+        });
         res.status(200).json({
             success: true,
             message: 'Event cancelled successfully',
@@ -1031,6 +1206,15 @@ export const deleteEvent = async (req, res, next) => {
 
         await Event.findByIdAndDelete(eventId);
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.EVENT_DELETED,
+            entityType: 'event',
+            entityId: eventExists._id,
+            before: eventExists,
+            description: `Event deleted: ${eventExists.name}`,
+        });
         res.status(200).json({
             success: true,
             message: 'Event deleted successfully',
@@ -1118,6 +1302,16 @@ export const createGroup = async (req, res, next) => {
             isApproved: true,
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.GROUP_CREATED,
+            entityType: 'group',
+            entityId: createGroup._id,
+            after: createGroup,
+            description: `Group created: ${createGroup.name || ''}`,
+            metadata: { clubId },
+        });
         res.status(201).json({
             success: true,
             message: 'Group created successfully',
@@ -1156,6 +1350,17 @@ export const editGroup = async (req, res, next) => {
         const groupUpdate = await mergeLocationIntoPayload(result);
         const editGroup = await ClubGroup.findByIdAndUpdate(groupId, { ...groupUpdate }, { new: true });
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.GROUP_UPDATED,
+            entityType: 'group',
+            entityId: editGroup._id,
+            changedFields: changedKeys(groupExists, editGroup, Object.keys(groupUpdate)),
+            before: groupExists,
+            after: editGroup,
+            description: `Group updated: ${editGroup.name || ''}`,
+        });
         res.status(201).json({
             success: true,
             message: 'Group edited successfully',
@@ -1183,6 +1388,15 @@ export const deleteGroup = async (req, res, next) => {
 
         await ClubGroup.findByIdAndDelete(groupId);
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.GROUP_DELETED,
+            entityType: 'group',
+            entityId: groupExists._id,
+            before: groupExists,
+            description: `Group deleted: ${groupExists.name || ''}`,
+        });
         res.status(204).json({
             success: true,
             message: 'Group deleted successfully',
@@ -1239,6 +1453,15 @@ export const createClub = async (req, res, next) => {
             isApproved: true,
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.CLUB_CREATED,
+            entityType: 'club',
+            entityId: createClub._id,
+            after: createClub,
+            description: `Club created: ${createClub.name || ''}`,
+        });
         res.status(201).json({
             success: true,
             message: 'Club created successfully',
@@ -1301,6 +1524,17 @@ export const editClub = async (req, res, next) => {
         const clubUpdate = await mergeLocationIntoPayload(result);
         const editClub = await Club.findByIdAndUpdate(clubId, { ...clubUpdate }, { new: true });
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.CLUB_UPDATED,
+            entityType: 'club',
+            entityId: editClub._id,
+            changedFields: changedKeys(clubExists, editClub, Object.keys(clubUpdate)),
+            before: clubExists,
+            after: editClub,
+            description: `Club updated: ${editClub.name || ''}`,
+        });
         res.status(201).json({
             success: true,
             message: 'Club edited successfully',
@@ -1330,6 +1564,15 @@ export const deleteClub = async (req, res, next) => {
 
         await Club.findByIdAndDelete(clubId);
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            action: AUDIT_ACTIONS.CLUB_DELETED,
+            entityType: 'club',
+            entityId: clubExists._id,
+            before: clubExists,
+            description: `Club deleted: ${clubExists.name || ''}`,
+        });
         res.status(204).json({
             success: true,
             message: 'Club deleted successfully',
@@ -1560,6 +1803,17 @@ export const inviteEvent = async (req, res, next) => {
             console.error('notifyEventInvite failed:', err)
         );
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            targetUserId: result.userId,
+            targetRole: 'athlete',
+            action: AUDIT_ACTIONS.EVENT_INVITE_SENT,
+            entityType: 'invite',
+            entityId: invite._id,
+            description: `Athlete invited to event: ${eventExists.name}`,
+            metadata: { eventId: eventExists._id },
+        });
         res.status(201).json({
             success: true,
             message: 'Invited to event successfully',
@@ -1573,7 +1827,7 @@ export const inviteEvent = async (req, res, next) => {
 export const endPhoto = async (req, res, next) => {
     try {
         if (!req.fileMeta) throw new AppError(400, 'No certificate uploaded');
-        if (!req.user || (req.user.role !== 0 && !req.user.coach)) {
+        if (!req.user || !isEventHostUser(req.user)) {
             throw new AppError(!req.user ? 401 : 403);
         }
 
@@ -1712,6 +1966,7 @@ export const approveReservation = async (req, res, next) => {
         reqExists.isApproved = true;
         await reqExists.save();
 
+        let participantUserId = null;
         // Find the user this reservation belongs to via participant.
         try {
             const participantUser = await User.findOne({
@@ -1720,6 +1975,7 @@ export const approveReservation = async (req, res, next) => {
                 .select('_id')
                 .lean();
             if (participantUser) {
+                participantUserId = participantUser._id;
                 void notifyJoinRequestApproved({
                     userId: participantUser._id.toString(),
                     requestType: 'event',
@@ -1731,6 +1987,20 @@ export const approveReservation = async (req, res, next) => {
             console.error('notifyJoinRequestApproved (event) failed:', err);
         }
 
+        await writeAuditLog({
+            req,
+            actorRole: eventHostAuditRole(user),
+            targetUserId: participantUserId,
+            targetRole: 'athlete',
+            action: AUDIT_ACTIONS.RESERVATION_APPROVED,
+            entityType: 'reservation',
+            entityId: reqExists._id,
+            changedFields: ['isApproved'],
+            before: { isApproved: false },
+            after: { isApproved: true },
+            description: `Event reservation approved: ${eventExists.name}`,
+            metadata: { eventId: eventExists._id },
+        });
         res.status(201).json({
             success: true,
             data: reqExists,
@@ -1834,7 +2104,7 @@ export const getMyCreatedEvents = async (req, res, next) => {
         if (!req.user) {
             throw new AppError(401);
         }
-        if (!req.user.coach && req.user.role !== 0) {
+        if (!req.user.coach && !req.user.performanceMember && req.user.role !== 0) {
             throw new AppError(403);
         }
 
@@ -1899,7 +2169,7 @@ export const getMyCreatedEvents = async (req, res, next) => {
 export const getListingQuote = async (req, res, next) => {
     try {
         if (!req.user) throw new AppError(401);
-        if (!req.user.coach && req.user.role !== 0) {
+        if (!isEventHostUser(req.user)) {
             throw new AppError(403);
         }
 

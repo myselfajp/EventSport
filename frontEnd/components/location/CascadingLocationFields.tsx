@@ -21,6 +21,8 @@ type Props = {
   showPostalCode?: boolean;
   /** Pair fields side-by-side (Country–City, District–Postal Code). */
   twoColumn?: boolean;
+  /** Country, city/province, and district (or state/city) on one row. */
+  threeColumn?: boolean;
 };
 
 const COUNTRY_OPTIONS = [
@@ -45,6 +47,7 @@ export default function CascadingLocationFields({
   note,
   showPostalCode = true,
   twoColumn = false,
+  threeColumn = false,
 }: Props) {
   const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
@@ -164,10 +167,121 @@ export default function CascadingLocationFields({
   };
 
   const rowClass = twoColumn ? "grid grid-cols-2 gap-3" : "space-y-3";
+  const inlineRowClass = "grid grid-cols-1 sm:grid-cols-3 gap-3";
 
   return (
-    <div className={twoColumn ? "space-y-3" : "space-y-3"}>
-      {twoColumn ? (
+    <div className="space-y-3">
+      {threeColumn ? (
+        <>
+          <div className={inlineRowClass}>
+            <div>
+              <label className={labelClass}>Country</label>
+              <select
+                value={country}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                disabled={disabled}
+                className={inputClass}
+              >
+                {COUNTRY_OPTIONS.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {country === "TR" ? (
+              <>
+                <div>
+                  <label className={labelClass}>City (Province)</label>
+                  <select
+                    value={value.provinceSlug || ""}
+                    onChange={(e) => handleProvinceChange(e.target.value)}
+                    disabled={disabled}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select city</option>
+                    {provinces.map((p) => (
+                      <option key={p.slug} value={p.slug}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>District</label>
+                  <select
+                    value={value.districtName || ""}
+                    onChange={(e) => patch({ districtName: e.target.value })}
+                    disabled={disabled || !value.provinceSlug || districtsLoading}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">
+                      {!value.provinceSlug
+                        ? "Select city first"
+                        : districtsLoading
+                          ? "Loading..."
+                          : "Select district"}
+                    </option>
+                    {districts.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className={labelClass}>State</label>
+                  <select
+                    value={value.stateCode || ""}
+                    onChange={(e) => handleStateChange(e.target.value)}
+                    disabled={disabled}
+                    className={inputClass}
+                    required
+                  >
+                    <option value="">Select a state</option>
+                    {states.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>City</label>
+                  <input
+                    type="text"
+                    list={citiesListId}
+                    value={value.city || ""}
+                    onChange={(e) => patch({ city: e.target.value })}
+                    disabled={disabled || !value.stateCode}
+                    placeholder={
+                      value.stateCode
+                        ? "Start typing or pick a city"
+                        : "Select a state first"
+                    }
+                    className={inputClass}
+                    required
+                  />
+                  <datalist id={citiesListId}>
+                    {cities.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+              </>
+            )}
+          </div>
+          {note ? (
+            <p className="text-xs text-gray-500 dark:text-slate-400">{note}</p>
+          ) : null}
+        </>
+      ) : twoColumn ? (
         <>
           <div className={rowClass}>
             <div>

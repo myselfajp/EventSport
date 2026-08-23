@@ -35,6 +35,8 @@ import {
     assertGamerCanReviewCoach,
     refreshCoachRatingSummary,
 } from '../utils/coachReviewHelper.js';
+import { writeAuditLog, changedKeys } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 /**
  * After a successful reservation, check whether this signup just hit the
@@ -101,6 +103,15 @@ export const createProfile = async (req, res, next) => {
             { new: true }
         );
         if (!addToUser) throw new AppError(404);
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.ATHLETE_PROFILE_CREATED,
+            entityType: 'participant',
+            entityId: participant._id,
+            after: result,
+            description: 'Athlete profile created',
+        });
         res.status(201).json({
             success: true,
             data: 'saved',
@@ -123,6 +134,7 @@ export const editProfile = async (req, res, next) => {
             sportGoal: req.body?.sportGoal,
         });
 
+        const previousParticipant = await Participant.findById(user.participant).lean();
         const editParticipant = await Participant.findByIdAndUpdate(
             user.participant,
             { ...result },
@@ -130,6 +142,22 @@ export const editProfile = async (req, res, next) => {
         );
 
         if (!editParticipant) throw new AppError(404);
+        const fields = changedKeys(previousParticipant, editParticipant, [
+            'mainSport',
+            'skillLevel',
+            'sportGoal',
+        ]);
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.ATHLETE_PROFILE_UPDATED,
+            entityType: 'participant',
+            entityId: editParticipant._id,
+            changedFields: fields,
+            before: previousParticipant,
+            after: editParticipant,
+            description: 'Athlete profile updated',
+        });
         res.status(201).json({
             success: true,
             data: 'saved',
@@ -966,6 +994,20 @@ export const makeReservation = async (req, res, next) => {
                 await Reservation.deleteOne({ _id: reservation._id });
                 throw logErr;
             }
+            await writeAuditLog({
+                req,
+                actorRole: 'athlete',
+                action: AUDIT_ACTIONS.EVENT_JOINED,
+                entityType: 'reservation',
+                entityId: reservation._id,
+                description: 'Athlete joined an event',
+                metadata: {
+                    eventId,
+                    isWaitListed: reservation.isWaitListed,
+                    isPaid: reservation.isPaid,
+                    isCheckedIn: reservation.isCheckedIn,
+                },
+            });
             return reservation;
         };
 
@@ -1120,6 +1162,15 @@ export const checkIn = async (req, res, next) => {
         );
         if (!checkIn) throw new AppError(404);
 
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.EVENT_CHECKED_IN,
+            entityType: 'reservation',
+            entityId: checkIn._id,
+            description: 'Athlete checked in to an event',
+            metadata: { eventId },
+        });
         res.status(201).json({
             success: true,
             data: 'saved',
@@ -1167,6 +1218,18 @@ export const confirmPayment = async (req, res, next) => {
         
         await reservation.save();
 
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.EVENT_PAYMENT_CONFIRMED,
+            entityType: 'reservation',
+            entityId: reservation._id,
+            changedFields: autoCheckIn ? ['isPaid', 'isCheckedIn'] : ['isPaid'],
+            before: { isPaid: false, isCheckedIn: !autoCheckIn && reservation.isCheckedIn },
+            after: { isPaid: true, isCheckedIn: reservation.isCheckedIn },
+            description: 'Event payment confirmed',
+            metadata: { eventId, autoCheckIn },
+        });
         res.status(200).json({
             success: true,
             message: autoCheckIn ? 'Payment confirmed and checked in' : 'Payment confirmed',
@@ -1720,6 +1783,19 @@ export const enrollInSeries = async (req, res, next) => {
             logRegistrationConsent,
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.EVENT_SERIES_JOINED,
+            entityType: 'event_series',
+            entityId: result.enrollment.series || parsed.seriesId,
+            description: 'Athlete joined a recurring event series',
+            metadata: {
+                enrollmentId: result.enrollment._id,
+                reservationCount: result.reservationCount,
+                totalFee: result.totalFee,
+            },
+        });
         res.status(201).json({
             success: true,
             message: `Enrolled in ${result.reservationCount} upcoming session(s).`,

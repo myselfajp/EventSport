@@ -26,6 +26,7 @@ import {
   Video,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
+import { getProviderSubscription } from "@/app/lib/subscription-credits";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import ParticipantModal from "./ParticipantModal";
@@ -98,8 +99,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const hasCoachProfile = !!user?.coach;
   const hasGamerProfile = !!user?.participant;
   const hasPerformanceProfile = !!user?.performanceMember;
-  const coachSub =
-    user?.coach && typeof user.coach === "object" ? user.coach : null;
+  const hasProviderProfile = hasCoachProfile || hasPerformanceProfile;
+  const providerSub = getProviderSubscription(user);
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
   const [isApplyChoiceOpen, setIsApplyChoiceOpen] = useState(false);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
@@ -917,43 +918,45 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           {user?.email || ""}
         </p>
 
-        {hasCoachProfile && coachSub && (
+        {hasProviderProfile && providerSub && (
           <div className="w-full mt-2.5 rounded-lg border border-cyan-100 dark:border-cyan-900/40 bg-white dark:bg-gray-800 px-2 py-1.5 shadow-sm">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-baseline gap-1.5 min-w-0">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-400 shrink-0">
-                  Membership
+            <div className="flex items-baseline gap-1.5 min-w-0 mb-1">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-cyan-700 dark:text-cyan-400 shrink-0">
+                Membership
+              </span>
+              <span className="text-xs font-semibold text-gray-900 dark:text-white capitalize truncate">
+                {providerSub.subscriptionTier || "basic"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1 text-[10px] sm:text-xs">
+              <div className="flex items-center gap-1 rounded-md bg-gray-50 dark:bg-gray-900/60 px-1.5 py-1 min-w-0">
+                <span className="text-gray-500 dark:text-gray-400 truncate">
+                  Events left
                 </span>
-                <span className="text-xs font-semibold text-gray-900 dark:text-white capitalize truncate">
-                  {coachSub.subscriptionTier || "basic"}
+                <span className="font-semibold text-gray-900 dark:text-white tabular-nums shrink-0">
+                  {providerSub.eventCredits ?? 0}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 rounded-md bg-gray-50 dark:bg-gray-900/60 px-1.5 py-1 min-w-0">
+                <span className="text-gray-500 dark:text-gray-400 truncate">
+                  Replies left
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-white tabular-nums shrink-0">
+                  {providerSub.replyCredits ?? 0}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => router.push("/upgrade")}
-                className="inline-flex items-center gap-0.5 rounded-md bg-cyan-600 hover:bg-cyan-700 text-white text-[10px] font-semibold px-1.5 py-0.5 transition-colors shrink-0"
+                className="flex flex-col items-center justify-center rounded-md border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 px-1 py-1 transition-colors min-w-0"
               >
-                <ArrowUpCircle className="w-3 h-3" />
-                Upgrade
+                <span className="font-semibold text-cyan-800 dark:text-cyan-200 leading-tight truncate w-full text-center">
+                  Upgrade
+                </span>
+                <span className="text-[9px] text-cyan-700 dark:text-cyan-400 leading-tight truncate w-full text-center">
+                  Plans & credits
+                </span>
               </button>
-            </div>
-            <div className="grid grid-cols-2 gap-1 text-[10px] sm:text-xs">
-              <div className="flex items-center justify-between gap-1 rounded-md bg-gray-50 dark:bg-gray-900/60 px-1.5 py-1">
-                <span className="text-gray-500 dark:text-gray-400 truncate">
-                  Events left
-                </span>
-                <span className="font-semibold text-gray-900 dark:text-white tabular-nums shrink-0">
-                  {coachSub.eventCredits ?? 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-1 rounded-md bg-gray-50 dark:bg-gray-900/60 px-1.5 py-1">
-                <span className="text-gray-500 dark:text-gray-400 truncate">
-                  Replies left
-                </span>
-                <span className="font-semibold text-gray-900 dark:text-white tabular-nums shrink-0">
-                  {coachSub.replyCredits ?? 0}
-                </span>
-              </div>
             </div>
           </div>
         )}
@@ -1048,69 +1051,15 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         />
       </div>
 
-      {hasCoachProfile && (
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <button
-            type="button"
-            onClick={handleOpenCoachModal}
-            className="flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors text-left min-w-0"
-          >
-            <div className="p-1 rounded-md bg-green-100 dark:bg-green-900/50 shrink-0">
-              <Users className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-800 dark:text-white text-xs leading-tight truncate">
-                Edit Coach Profile
-              </div>
-              <div className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5 mt-0.5">
-                <Check className="w-2.5 h-2.5 shrink-0" />
-                <span className="truncate">Active</span>
-              </div>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/upgrade")}
-            className="flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors text-left min-w-0"
-          >
-            <div className="p-1 rounded-md bg-cyan-100 dark:bg-cyan-900/50 shrink-0">
-              <ArrowUpCircle className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-800 dark:text-white text-xs leading-tight truncate">
-                Upgrade
-              </div>
-              <div className="text-[10px] text-cyan-700 dark:text-cyan-400 truncate mt-0.5">
-                Plans & credits
-              </div>
-            </div>
-          </button>
-        </div>
-      )}
-
-      {hasPerformanceProfile && (
-        <button
-          type="button"
-          onClick={handleOpenPerformanceModal}
-          className="w-full mb-4 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-left"
-        >
-          <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/50">
-            <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-gray-800 dark:text-white text-sm">
-              Edit Performance Team Profile
-            </div>
-            <div className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
-              <Check className="w-3 h-3" />
-              Performance profile saved
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-        </button>
-      )}
-
       <div className="space-y-2 mb-6">
+        <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
+          Need specialized accounts?
+        </h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Add or edit your coach or Performance Team profile and manage
+          facility, salon, club, or sport community resources.
+        </p>
+
         {(!hasCoachProfile && !hasPerformanceProfile) && user?.role !== 0 && (
           <button
             type="button"
@@ -1121,7 +1070,71 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           </button>
         )}
 
-        {(hasCoachProfile || hasPerformanceProfile) && user?.role !== 0 && (
+        {hasCoachProfile && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleOpenCoachModal}
+              className="flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors text-left min-w-0"
+            >
+              <div className="p-1 rounded-md bg-green-100 dark:bg-green-900/50 shrink-0">
+                <Users className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-800 dark:text-white text-xs leading-tight truncate">
+                  Edit Coach Profile
+                </div>
+                <div className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5 mt-0.5">
+                  <Check className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">Active</span>
+                </div>
+              </div>
+            </button>
+            {user?.role !== 0 && (
+              <button
+                type="button"
+                onClick={() => setIsApplyChoiceOpen(true)}
+                className="flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors text-left min-w-0"
+              >
+                <div className="p-1 rounded-md bg-amber-100 dark:bg-amber-900/50 shrink-0">
+                  <Briefcase className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 dark:text-white text-[10px] sm:text-xs leading-tight">
+                    Switch provider role
+                  </div>
+                  <div className="text-[9px] sm:text-[10px] text-amber-800 dark:text-amber-200 truncate mt-0.5">
+                    Coach ↔ Performance Team
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+        )}
+
+        {hasPerformanceProfile && (
+          <button
+            type="button"
+            onClick={handleOpenPerformanceModal}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-left"
+          >
+            <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/50">
+              <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-800 dark:text-white text-sm">
+                Edit Performance Team Profile
+              </div>
+              <div className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Performance profile saved
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+        )}
+
+        {hasPerformanceProfile && !hasCoachProfile && user?.role !== 0 && (
           <button
             type="button"
             onClick={() => setIsApplyChoiceOpen(true)}
@@ -1130,14 +1143,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             Switch provider role (Coach ↔ Performance Team)
           </button>
         )}
-
-        <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
-          Need specialized accounts?
-        </h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Add or edit your coach or Performance Team profile and manage
-          facility, salon, club, or sport community resources.
-        </p>
 
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
           <button

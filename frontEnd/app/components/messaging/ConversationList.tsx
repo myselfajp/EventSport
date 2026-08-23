@@ -14,6 +14,7 @@ import {
   senderId,
 } from "@/app/lib/messages-api";
 import Avatar from "./Avatar";
+import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 
 interface ConversationListProps {
   selectedId?: string | null;
@@ -46,6 +47,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const meId = me?._id;
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["messages", "conversations"],
@@ -67,45 +70,47 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
   }, [socket, queryClient, onConversationDeletedCallback]);
 
-  const handleDelete = useCallback(
-    async (e: React.MouseEvent, conv: Conversation) => {
-      e.stopPropagation();
-      if (deletingId) return;
+  const handleDeleteClick = useCallback((e: React.MouseEvent, conv: Conversation) => {
+    e.stopPropagation();
+    if (deletingId) return;
+    setDeleteError("");
+    setPendingDelete(conv);
+  }, [deletingId]);
 
-      const confirmed = window.confirm(
-        `This chat will only be deleted for you. ${fullName(conv.otherUser)} will still see it. Continue?`
-      );
-      if (!confirmed) return;
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete || deletingId) return;
 
-      setDeletingId(conv._id);
-      try {
-        if (socket) {
-          await new Promise<void>((resolve, reject) => {
-            socket.emit(
-              "delete_conversation",
-              { conversationId: conv._id },
-              (res: { success?: boolean; error?: string }) => {
-                if (res?.success) resolve();
-                else reject(new Error(res?.error || "Failed to delete conversation."));
-              }
-            );
-          });
-        } else {
-          await deleteConversation(conv._id);
-        }
+    const conv = pendingDelete;
+    setDeletingId(conv._id);
+    setDeleteError("");
 
-        queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
-        onConversationDeletedCallback?.(conv._id);
-      } catch (err) {
-        window.alert(
-          err instanceof Error ? err.message : "Failed to delete conversation."
-        );
-      } finally {
-        setDeletingId(null);
+    try {
+      if (socket) {
+        await new Promise<void>((resolve, reject) => {
+          socket.emit(
+            "delete_conversation",
+            { conversationId: conv._id },
+            (res: { success?: boolean; error?: string }) => {
+              if (res?.success) resolve();
+              else reject(new Error(res?.error || "Failed to delete conversation."));
+            }
+          );
+        });
+      } else {
+        await deleteConversation(conv._id);
       }
-    },
-    [socket, deletingId, queryClient, onConversationDeletedCallback]
-  );
+
+      setPendingDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
+      onConversationDeletedCallback?.(conv._id);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete conversation."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }, [socket, pendingDelete, deletingId, queryClient, onConversationDeletedCallback]);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-800">
@@ -190,7 +195,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
                   <button
                     type="button"
-                    onClick={(e) => handleDelete(e, conv)}
+                    onClick={(e) => handleDeleteClick(e, conv)}
                     disabled={isDeleting}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-gray-400 opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                     aria-label="Delete chat"
@@ -204,6 +209,20 @@ const ConversationList: React.FC<ConversationListProps> = ({
           </ul>
         )}
       </div>
+
+      <DeleteChatConfirmModal
+        isOpen={Boolean(pendingDelete)}
+        onClose={() => {
+          if (!deletingId) {
+            setPendingDelete(null);
+            setDeleteError("");
+          }
+        }}
+        onConfirm={() => void handleConfirmDelete()}
+        otherUserName={pendingDelete ? fullName(pendingDelete.otherUser) : undefined}
+        isLoading={Boolean(deletingId)}
+        error={deleteError}
+      />
     </div>
   );
 };

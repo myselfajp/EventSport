@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { useMe } from "@/app/hooks/useAuth";
+import { isEventHost } from "@/app/lib/subscription-credits";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import ViewEventModal from "@/components/event/ViewEventModal";
@@ -127,7 +128,7 @@ const ActivityContent: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState<ClubViewModalClub | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<GroupViewModalGroup | null>(null);
 
-  const canHost = !!(user?.coach || user?.role === 0);
+  const canHost = isEventHost(user);
   const hasParticipant = !!user?.participant;
   const isGamerOnly = hasParticipant && !canHost;
 

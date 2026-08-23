@@ -39,6 +39,8 @@ import RegistrationOtp from '../models/registrationOtpModel.js';
 import PasswordResetOtp from '../models/passwordResetOtpModel.js';
 import { assertNotBlacklisted } from '../utils/blacklistHelper.js';
 import { resolveIstanbulDistrictId, buildLocationKey } from '../utils/locationHelper.js';
+import { writeAuditLog, changedKeys, auditRoleForUser } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 export const sendRegistrationOtp = async (req, res, next) => {
     try {
@@ -517,6 +519,11 @@ export const getCurrentUser = async (req, res, next) => {
                 path: 'coach',
                 select:
                     'name membershipLevel isVerified subscriptionTier eventCredits replyCredits ratingAverage ratingCount about',
+            })
+            .populate({
+                path: 'performanceMember',
+                select:
+                    'name branch title status isVerified subscriptionTier eventCredits replyCredits about',
             });
         if (!user) throw new AppError(404, 'User not found.');
 
@@ -555,6 +562,7 @@ export const editUser = async (req, res, next) => {
         }
 
         const result = editUserSchema.parse(body);
+        const beforeUser = await User.findById(req.user._id).select('-password').lean();
 
         // Handle photo upload if file is provided
         if (req.fileMeta) {
@@ -661,6 +669,26 @@ export const editUser = async (req, res, next) => {
 
         if (PasswordChanged) {
         }
+        await writeAuditLog({
+            req,
+            actorRole: auditRoleForUser(req.user),
+            action: AUDIT_ACTIONS.USER_PROFILE_UPDATED,
+            entityType: 'user',
+            entityId: editUser._id,
+            changedFields: changedKeys(beforeUser, editUser, [
+                'firstName',
+                'lastName',
+                'email',
+                'phone',
+                'age',
+                'photo',
+                'location',
+            ]).concat(PasswordChanged ? ['password'] : []),
+            before: beforeUser,
+            after: editUser,
+            description: PasswordChanged ? 'Account profile and password updated' : 'Account profile updated',
+            metadata: { passwordChanged: PasswordChanged },
+        });
         res.status(200).json({
             success: true,
             message: PasswordChanged ? 'Password changed successfully' : 'Data updated',
@@ -739,14 +767,26 @@ export const requestAccountDeletion = async (req, res, next) => {
             throw new AppError(400, 'Admin accounts cannot be deleted this way.');
         }
 
+        const deletionRequestedAt = new Date();
         await User.findByIdAndUpdate(req.user._id, {
             $set: {
                 isActive: false,
-                accountDeletionRequestedAt: new Date(),
+                accountDeletionRequestedAt: deletionRequestedAt,
                 marketingConsent: { agreed: false, consentedAt: null },
             },
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: auditRoleForUser(req.user),
+            action: AUDIT_ACTIONS.ACCOUNT_DELETION_REQUESTED,
+            entityType: 'user',
+            entityId: req.user._id,
+            changedFields: ['isActive', 'accountDeletionRequestedAt'],
+            before: { isActive: true, accountDeletionRequestedAt: null },
+            after: { isActive: false, accountDeletionRequestedAt: deletionRequestedAt },
+            description: 'Account deletion requested',
+        });
         res.status(200).json({
             success: true,
             message:

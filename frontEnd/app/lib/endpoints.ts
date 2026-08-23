@@ -373,6 +373,31 @@ export const EP = {
       byUser: (userId: string) =>
         `${ADMIN_API}/users/${userId}/contract-acceptances`,
     },
+    auditLogs: {
+      catalog: `${ADMIN_API}/audit-logs/catalog`,
+      list: (params?: {
+        role?: "athlete" | "coach" | "performance";
+        action?: string;
+        entityType?: string;
+        userSearch?: string;
+        from?: string;
+        to?: string;
+        page?: number;
+        limit?: number;
+      }) => {
+        const q = new URLSearchParams();
+        if (params?.role) q.set("role", params.role);
+        if (params?.action) q.set("action", params.action);
+        if (params?.entityType) q.set("entityType", params.entityType);
+        if (params?.userSearch) q.set("userSearch", params.userSearch);
+        if (params?.from) q.set("from", params.from);
+        if (params?.to) q.set("to", params.to);
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        const qs = q.toString();
+        return `${ADMIN_API}/audit-logs${qs ? `?${qs}` : ""}`;
+      },
+    },
     suggestions: `${ADMIN_API}/suggestions`,
     reports: {
       list: `${ADMIN_API}/reports`,

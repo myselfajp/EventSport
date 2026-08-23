@@ -6,6 +6,8 @@ import SalonCalendar from '../models/salonCalendarModel.js';
 import { Sport, SportGroup } from '../models/referenceDataModel.js';
 import * as zodValidation from '../utils/validation.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
+import { writeAuditLog, changedKeys, auditRoleForUser } from '../utils/auditLogger.js';
+import { AUDIT_ACTIONS } from '../constants/auditActions.js';
 
 export const createFacility = async (req, res, next) => {
     try {
@@ -36,6 +38,15 @@ export const createFacility = async (req, res, next) => {
             $push: { facility: newFacility._id },
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: auditRoleForUser(user),
+            action: AUDIT_ACTIONS.FACILITY_CREATED,
+            entityType: 'facility',
+            entityId: newFacility._id,
+            after: newFacility,
+            description: `Facility created: ${newFacility.name || ''}`,
+        });
         res.status(201).json({
             success: true,
             message: 'Facility created successfully',
@@ -58,7 +69,7 @@ export const editFacility = async (req, res, next) => {
         if (Object.keys(result).length === 0 && !req.fileMeta)
             throw new AppError(400, 'At least one field must be provided.');
 
-        const facilityExists = await Facility.exists({ _id: facilityId });
+        const facilityExists = await Facility.findById(facilityId);
         if (!facilityExists) throw new AppError(404, 'Facility not found');
 
         if (result.mainSport) {
@@ -89,6 +100,17 @@ export const editFacility = async (req, res, next) => {
             { new: true }
         );
 
+        await writeAuditLog({
+            req,
+            actorRole: auditRoleForUser(user),
+            action: AUDIT_ACTIONS.FACILITY_UPDATED,
+            entityType: 'facility',
+            entityId: updatedFacility._id,
+            changedFields: changedKeys(facilityExists, updatedFacility, Object.keys(updatePayload)),
+            before: facilityExists,
+            after: updatedFacility,
+            description: `Facility updated: ${updatedFacility.name || ''}`,
+        });
         res.status(200).json({
             success: true,
             message: 'Facility updated successfully',
@@ -108,7 +130,7 @@ export const deleteFacility = async (req, res, next) => {
         const user = req.user;
         const facilityId = zodValidation.mongoObjectId.parse(req.params.facilityId);
 
-        const facilityExists = await Facility.exists({ _id: facilityId });
+        const facilityExists = await Facility.findById(facilityId);
         if (!facilityExists) throw new AppError(404, 'Facility not found');
 
         // Check if user is owner of facility
@@ -124,6 +146,15 @@ export const deleteFacility = async (req, res, next) => {
             $pull: { facility: facilityId },
         });
 
+        await writeAuditLog({
+            req,
+            actorRole: auditRoleForUser(user),
+            action: AUDIT_ACTIONS.FACILITY_DELETED,
+            entityType: 'facility',
+            entityId: facilityExists._id,
+            before: facilityExists,
+            description: `Facility deleted: ${facilityExists.name || ''}`,
+        });
         res.status(204).json({
             success: true,
             message: 'Facility deleted successfully',
