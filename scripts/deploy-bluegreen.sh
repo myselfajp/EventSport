@@ -197,10 +197,22 @@ if [ -n "$missing" ]; then
     printf '%s\n' "$missing"
 fi
 
+step "Starting shared services"
+# mongodb and nginx carry no profile, so this is also what creates them on the
+# first deploy. --no-recreate is load-bearing: both are shared by the colours,
+# and recreating them mid-deploy would restart the database out from under the
+# colour that is still serving traffic and drop every in-flight request through
+# nginx — the exact outage blue/green exists to avoid.
+compose up -d --no-recreate mongodb nginx \
+  || die "failed to bring up mongodb/nginx"
+ok "mongodb and nginx running"
+
 step "Starting $TARGET"
-# mongodb and nginx carry no profile, so this also brings them up on first run.
+# The new colour does get force-recreated: the container name is fixed per
+# colour, so without this compose would keep the existing container and the new
+# image would never be picked up.
 compose --profile "$TARGET" up -d --force-recreate \
-    "backend_${TARGET}" "frontend_${TARGET}" mongodb nginx \
+    "backend_${TARGET}" "frontend_${TARGET}" \
   || die "failed to start $TARGET containers"
 ok "containers up"
 
