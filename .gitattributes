@@ -1,0 +1,11 @@
+# Default: let git normalise text in the repo, checkout native on each platform.
+* text=auto
+
+# These are executed by bash on the Linux server. A CRLF checkout makes the
+# shebang line end in \r and the script dies with "bash\r: No such file or
+# directory" — so force LF regardless of the platform that committed them.
+*.sh              text eol=lf
+nginx/*.conf      text eol=lf
+*.yml             text eol=lf
+*.yaml            text eol=lf
+.env.example      text eol=lf

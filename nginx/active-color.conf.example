@@ -1,0 +1,16 @@
+# GENERATED FILE — rewritten by scripts/deploy-bluegreen.sh on every flip.
+# Edit the script, not this file.
+#
+# This is the whole blue/green switch: it names which colour's containers the
+# server block in eventsport.conf proxies to. `map` is used rather than a plain
+# variable because nginx has no http-level `set`, and it has to live at http
+# level so both files see it.
+#
+# Keyed on $host with a single `default`, i.e. deliberately constant — the map
+# is a mechanism for defining an http-scoped variable, not real per-host routing.
+#
+# The deploy script rewrites this file IN PLACE (`cat >`, never `mv`/`sed -i`):
+# it is bind-mounted into the nginx container as a single file, so replacing it
+# with a new inode would leave the container reading the old one.
+map $host $active_backend  { default "backend_blue:3000"; }
+map $host $active_frontend { default "frontend_blue:3001"; }

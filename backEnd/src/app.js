@@ -11,6 +11,7 @@ if (process.env.MONGODB_URI) {
 }
 
 import express from 'express';
+import mongoose from 'mongoose';
 import authRouter from './routes/authRouter.js';
 import participantRouter from './routes/participantRouter.js';
 import referenceDataRouter from './routes/referenceDataRouter.js';
@@ -84,6 +85,21 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+
+// --- Health probe -----------------------------------------------------------
+// Mounted ahead of the CSRF and rate-limit middleware on purpose: the
+// blue-green deploy polls this on every release, and a 429 or a missing CSRF
+// token here would abort an otherwise healthy rollout. Reports mongoose's live
+// connection state, so a container that is listening but cannot reach MongoDB
+// is reported unhealthy and the deploy refuses to switch traffic to it.
+app.get('/api/health', (req, res) => {
+    const dbUp = mongoose.connection.readyState === 1;
+    res.status(dbUp ? 200 : 503).json({
+        status: dbUp ? 'ok' : 'degraded',
+        db: dbUp ? 'connected' : 'disconnected',
+        uptime: process.uptime(),
+    });
+});
 
 app.use(generateCSRFToken);
 app.use(generalRateLimiter);

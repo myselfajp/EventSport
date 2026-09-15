@@ -150,3 +150,11 @@ EventSport-db-seed-toolkit.zip
 # --- Yedek arşivleri (gerçek veri / şifre hash'leri; GitHub'a gitmez) ---
 backup.rar
 *.rar
+
+# Blue/green runtime state — which colour nginx currently serves.
+# Rewritten on every deploy; must never be tracked, or a `git checkout --force`
+# on the server would silently reset the live colour. See active-color.conf.example.
+nginx/active-color.conf
+
+# Server access notes — contains the droplet password.
+access.txt

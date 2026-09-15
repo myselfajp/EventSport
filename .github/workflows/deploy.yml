@@ -1,0 +1,143 @@
+# EventSport — release on tag.
+#
+# Tagging is the deploy trigger: `git tag v1.2.0 && git push origin v1.2.0`
+# builds both images, pushes them to GHCR, and rolls them onto the server with a
+# blue/green switch. Pushing to main does nothing on its own.
+#
+# Images are built here rather than on the droplet on purpose: the Next.js build
+# wants ~4GB and used to OOM on the old 2GB box, which is why the frontend was
+# being built outside Docker with scripts/build-frontend-prebuilt.sh. A GitHub
+# runner has the headroom, so the server only ever pulls.
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing image tag to (re)deploy, e.g. v1.2.0'
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  # Lowercased below — GHCR rejects uppercase paths and the owner is "myselfajp"
+  # while the repo is "EventSport".
+  IMAGE_PREFIX: ghcr.io/myselfajp
+
+concurrency:
+  # One release at a time. Two overlapping runs would fight over which colour is
+  # active and could flip nginx to a half-started container.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Resolve release tag
+        run: echo "tag=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backEnd
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/eventsport-backend:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_PREFIX }}/eventsport-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      # NEXT_PUBLIC_* are baked into the client bundle at build time, so the
+      # public origin has to be known here, not at container start. It lives in
+      # repo variables so changing the server address is a settings edit, not a
+      # code change.
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontEnd
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_V1_BASE=${{ vars.NEXT_PUBLIC_API_V1_BASE }}
+            NEXT_PUBLIC_API_ASSETS_BASE=${{ vars.NEXT_PUBLIC_API_ASSETS_BASE }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/eventsport-frontend:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_PREFIX }}/eventsport-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  deploy:
+    name: Blue/green deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      # Lets the server pull the images with this run's GITHUB_TOKEN, so no
+      # long-lived registry PAT has to be stored anywhere.
+      packages: read
+    steps:
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Install deploy key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      # The remote script arrives on stdin rather than as an ssh argument, so it
+      # only has to survive one round of shell quoting instead of two.
+      # REGISTRY_TOKEN is the run-scoped GITHUB_TOKEN, not a stored PAT: it is
+      # briefly visible in the server's process list and expires when the job
+      # ends, which is the trade being made for keeping no registry PAT at rest.
+      - name: Deploy
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+              "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+              "TAG='$TAG' REGISTRY_USER='$REGISTRY_USER' REGISTRY_TOKEN='$REGISTRY_TOKEN' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /home/EventSport
+          # The image comes from the registry, but the compose file, nginx config
+          # and deploy script come from the checkout — they have to be the ones
+          # that were tagged, not whatever main happens to be at.
+          git fetch --all --tags --prune
+          git checkout --force "refs/tags/$TAG"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          scripts/deploy-bluegreen.sh "$TAG"
+          REMOTE
+
+      - name: Report result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### Deployed \`${{ needs.build.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Deploy of \`${{ needs.build.outputs.tag }}\` failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Traffic was left on the previous colour. Check the Deploy step log." >> "$GITHUB_STEP_SUMMARY"
+          fi
