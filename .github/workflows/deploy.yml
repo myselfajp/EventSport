@@ -129,7 +129,10 @@ jobs:
           git fetch --all --tags --prune
           git checkout --force "refs/tags/$TAG"
           printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
-          scripts/deploy-bluegreen.sh "$TAG"
+          # Invoked through bash rather than as ./script: the repo is committed
+          # from Windows, where core.fileMode is false, so a lost +x bit is a
+          # recurring failure mode here and must not be able to break a release.
+          bash scripts/deploy-bluegreen.sh "$TAG"
           REMOTE
 
       - name: Report result
