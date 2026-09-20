@@ -158,7 +158,7 @@ const createDummyEvents = async () => {
         ];
 
         const eventTypes = ['Indoor', 'Outdoor', 'Online'];
-        const priceTypes = ['Free', 'Stable', 'Manual'];
+        const priceTypes = ['Free', 'One-Timer', 'Bundle'];
         
         // Create 15 events
         const events = [];

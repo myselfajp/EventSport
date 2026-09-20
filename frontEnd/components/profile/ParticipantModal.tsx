@@ -87,6 +87,8 @@ const ParticipantModal: React.FC<ParticipantModalProps> = ({
   useEffect(() => {
     if (isVisible && (!userLoading || adminUserId)) {
       loadData();
+      if (sportGroups.length === 0) fetchSportGroups();
+      if (sportGoals.length === 0) fetchSportGoals();
     }
   }, [isVisible, participantId, userLoading, adminUserId]);
 

@@ -937,10 +937,10 @@ export const createEventSchema = z
                         : { message: 'Invalid Sport.' },
             })
             .regex(MongoObjectIdRegex, 'Provide a valid sport ID.'),
-        priceType: z.enum(['Manual', 'Stable', 'Free'], {
+        priceType: z.enum(['Free', 'One-Timer', 'Bundle', 'Manual', 'Stable'], {
             errorMap: (iss) =>
                 iss.code === 'invalid_enum_value'
-                    ? { message: 'Event type must be one of: Manual, Stable, Free.' }
+                    ? { message: 'Price type must be one of: Free, One-Timer, Bundle.' }
                     : iss.input === undefined
                         ? { message: 'Price type is required.' }
                         : { message: 'Invalid Price type.' },

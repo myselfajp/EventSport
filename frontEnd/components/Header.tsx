@@ -473,7 +473,19 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          <div className="header-logo-wrap px-1">
+          <div
+            className="header-logo-wrap px-1 cursor-pointer transition-opacity hover:opacity-85"
+            onClick={() => router.push("/")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                router.push("/");
+              }
+            }}
+            aria-label="Go to home page"
+          >
             {headerLogoUrl ? (
               <img
                 src={headerLogoUrl}

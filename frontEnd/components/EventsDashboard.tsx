@@ -119,15 +119,21 @@ const EventsDashboard = () => {
       if (!user) setLeftSidebarOpen(true);
     };
 
+    const gamerProfileHandler = () => {
+      openGamerProfile();
+    };
+
     window.addEventListener("eventsport:open-coach-me", coachMeHandler);
     window.addEventListener("eventsport:open-service-requests", coachMeHandler);
     window.addEventListener("eventsport:open-login", loginHandler);
+    window.addEventListener("eventsport:open-gamer-profile", gamerProfileHandler);
     return () => {
       window.removeEventListener("eventsport:open-coach-me", coachMeHandler);
       window.removeEventListener("eventsport:open-service-requests", coachMeHandler);
       window.removeEventListener("eventsport:open-login", loginHandler);
+      window.removeEventListener("eventsport:open-gamer-profile", gamerProfileHandler);
     };
-  }, [openCoachMe, openServiceRequests, user, isUserPending]);
+  }, [openCoachMe, openServiceRequests, openGamerProfile, user, isUserPending]);
   const isCoach = user?.coach != null;
   const canManageEvents = isEventHost(user);
 

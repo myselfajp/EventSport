@@ -102,8 +102,8 @@ const eventSchema = new mongoose.Schema(
             type: String,
             required: true,
             enum: {
-                values: ['Manual', 'Stable', 'Free'],
-                message: 'Should be Manual, Stable, Free',
+                values: ['Free', 'One-Timer', 'Bundle', 'Manual', 'Stable'],
+                message: 'Should be Free, One-Timer, Bundle',
             },
         },
         participationFee: {

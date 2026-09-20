@@ -156,7 +156,10 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
   } | null>(null);
   const [budgetAmount, setBudgetAmount] = useState("");
 
-  const answerSteps = useMemo(() => questionsForTarget(targetType), [targetType]);
+  const answerSteps = useMemo(
+    () => questionsForTarget(targetType, targetType === "performance" ? performanceBranch : undefined),
+    [targetType, performanceBranch]
+  );
   const steps = useMemo(
     () => [{ id: "target" as const }, ...answerSteps.map((q) => ({ id: q.key, question: q }))],
     [answerSteps]
@@ -261,7 +264,7 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
     setStepIndex(0);
     setError("");
     setStepVisible(true);
-  }, [targetType]);
+  }, [targetType, performanceBranch]);
 
   const transitionToStep = (nextIndex: number, direction: "forward" | "back") => {
     setSlideDirection(direction);

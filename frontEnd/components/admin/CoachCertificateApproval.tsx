@@ -98,6 +98,9 @@ export default function CoachCertificateApproval() {
 
       if (response?.success) {
         fetchPendingBranches();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("eventsport:admin-pending-refresh"));
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to approve certificate");
@@ -120,6 +123,9 @@ export default function CoachCertificateApproval() {
           );
         }
         fetchPendingBranches();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("eventsport:admin-pending-refresh"));
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to reject certificate");

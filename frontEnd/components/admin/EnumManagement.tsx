@@ -79,9 +79,9 @@ export default function EnumManagement() {
   const [priceTypes, setPriceTypes] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("admin_priceTypes");
-      return stored ? JSON.parse(stored) : ["Manual", "Stable", "Free"];
+      return stored ? JSON.parse(stored) : ["Free", "One-Timer", "Bundle"];
     }
-    return ["Manual", "Stable", "Free"];
+    return ["Free", "One-Timer", "Bundle"];
   });
   const [membershipLevels, setMembershipLevels] = useState<string[]>(() => {
     if (typeof window !== "undefined") {

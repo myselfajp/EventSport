@@ -32,8 +32,8 @@ const serviceRequestActionUrl = (tab, requestId = null) => {
 const serviceRequestFocusUrl = (requestId, tab = 'mine') =>
     serviceRequestActionUrl(tab, requestId);
 
-function normalizeAnswers(input, targetType) {
-    const catalog = questionsForTarget(targetType);
+function normalizeAnswers(input, targetType, performanceBranch = null) {
+    const catalog = questionsForTarget(targetType, performanceBranch);
     const byKey = new Map();
     if (Array.isArray(input)) {
         for (const item of input) {
@@ -208,7 +208,11 @@ export const createServiceRequest = async (req, res, next) => {
             title:
                 trim(req.body?.title, 160) ||
                 (targetType === 'coach' ? 'Coach Me' : `${performanceBranch} service request`),
-            answers: normalizeAnswers(req.body?.answers, targetType),
+            answers: normalizeAnswers(
+                req.body?.answers,
+                targetType,
+                targetType === 'performance' ? performanceBranch : null
+            ),
         });
 
         await writeAuditLog({

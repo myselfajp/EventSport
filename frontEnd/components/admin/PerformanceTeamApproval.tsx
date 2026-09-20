@@ -81,6 +81,9 @@ export default function PerformanceTeamApproval() {
     });
     if (response?.success) {
       await fetchApplications();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("eventsport:admin-pending-refresh"));
+      }
     } else {
       setError(response?.message || "Application could not be approved.");
     }
@@ -94,6 +97,9 @@ export default function PerformanceTeamApproval() {
     });
     if (response?.success) {
       await fetchApplications();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("eventsport:admin-pending-refresh"));
+      }
     } else {
       setError(response?.message || "Application could not be rejected.");
     }

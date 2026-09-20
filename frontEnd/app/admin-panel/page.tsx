@@ -50,6 +50,7 @@ type TabType =
 const TAB_ORDER: TabType[] = [
   "users",
   "blacklist",
+  "reports",
   "coaches",
   "performance",
   "enums",
@@ -64,7 +65,6 @@ const TAB_ORDER: TabType[] = [
   "dashboard-hero",
   "welcome-page",
   "suggestions",
-  "reports",
   "audit-logs",
   "permission-groups",
 ];
@@ -124,6 +124,8 @@ export default function AdminPanelPage() {
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("users");
   const [unreadReportsCount, setUnreadReportsCount] = useState(0);
+  const [pendingCoachesCount, setPendingCoachesCount] = useState(0);
+  const [pendingPerformanceCount, setPendingPerformanceCount] = useState(0);
 
   const perms = adminData?.permissions ?? [];
   const isFullAdmin = adminData?.isFullAdmin === true;
@@ -142,6 +144,8 @@ export default function AdminPanelPage() {
 
   const visibleTabs = useMemo(() => TAB_ORDER.filter((t) => canTab(t)), [canTab]);
   const canViewReports = canTab("reports");
+  const canViewCoaches = canTab("coaches");
+  const canViewPerformance = canTab("performance");
 
   const fetchUnreadReportsCount = useCallback(async () => {
     if (!canViewReports) return;
@@ -155,6 +159,35 @@ export default function AdminPanelPage() {
     }
   }, [canViewReports]);
 
+  const fetchPendingApprovalsCount = useCallback(async () => {
+    if (canViewCoaches) {
+      try {
+        const res = await fetchJSON(EP.ADMIN.coaches.pending, {
+          method: "POST",
+          body: { perPage: 1, pageNumber: 1, status: "Pending" },
+        });
+        if (res?.success) {
+          setPendingCoachesCount(typeof res.total === "number" ? res.total : 0);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (canViewPerformance) {
+      try {
+        const res = await fetchJSON(EP.ADMIN.performance.applications, {
+          method: "POST",
+          body: { perPage: 1, pageNumber: 1, status: "Pending" },
+        });
+        if (res?.success) {
+          setPendingPerformanceCount(typeof res.total === "number" ? res.total : 0);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [canViewCoaches, canViewPerformance]);
+
   const markReportsViewed = useCallback(async () => {
     if (!canViewReports) return;
     try {
@@ -166,15 +199,28 @@ export default function AdminPanelPage() {
   }, [canViewReports]);
 
   useEffect(() => {
-    if (!canViewReports) return;
+    if (!canViewReports && !canViewCoaches && !canViewPerformance) return;
     void fetchUnreadReportsCount();
+    void fetchPendingApprovalsCount();
+
+    const onPendingRefresh = () => {
+      void fetchPendingApprovalsCount();
+      void fetchUnreadReportsCount();
+    };
+    window.addEventListener("eventsport:admin-pending-refresh", onPendingRefresh);
+
     const interval = setInterval(() => {
       if (activeTab !== "reports") {
         void fetchUnreadReportsCount();
       }
+      void fetchPendingApprovalsCount();
     }, 30000);
-    return () => clearInterval(interval);
-  }, [canViewReports, activeTab, fetchUnreadReportsCount]);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("eventsport:admin-pending-refresh", onPendingRefresh);
+    };
+  }, [canViewReports, canViewCoaches, canViewPerformance, activeTab, fetchUnreadReportsCount, fetchPendingApprovalsCount]);
 
   useEffect(() => {
     if (activeTab === "reports" && canViewReports) {
@@ -287,6 +333,22 @@ export default function AdminPanelPage() {
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {TAB_LABEL[tab]}
+                    {tab === "coaches" && pendingCoachesCount > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60"
+                        title={`${pendingCoachesCount} pending coach certificate${pendingCoachesCount === 1 ? "" : "s"}`}
+                      >
+                        ({pendingCoachesCount})
+                      </span>
+                    )}
+                    {tab === "performance" && pendingPerformanceCount > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60"
+                        title={`${pendingPerformanceCount} pending performance application${pendingPerformanceCount === 1 ? "" : "s"}`}
+                      >
+                        ({pendingPerformanceCount})
+                      </span>
+                    )}
                     {tab === "reports" && unreadReportsCount > 0 && (
                       <span
                         className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0"

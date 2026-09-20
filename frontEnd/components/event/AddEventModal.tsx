@@ -2206,8 +2206,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   >
                     <option value="">Select Price Type</option>
                     <option value="Free">Free</option>
-                    <option value="Manual">Manual</option>
-                    <option value="Stable">Stable</option>
+                    <option value="One-Timer">One-Timer</option>
+                    <option value="Bundle">Bundle</option>
                   </select>
                 </div>
 

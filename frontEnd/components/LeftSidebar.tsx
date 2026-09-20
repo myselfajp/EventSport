@@ -78,6 +78,13 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const [showRegistration, setShowRegistration] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
+  React.useEffect(() => {
+    if (isLoggedIn) {
+      setShowRegistration(false);
+      setShowForgotPassword(false);
+    }
+  }, [isLoggedIn]);
+
   const handleLogout = () => {
     signOut();
     setShowRegistration(false);

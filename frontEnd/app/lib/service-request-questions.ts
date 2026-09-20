@@ -16,6 +16,8 @@ export type ServiceRequestQuestion = {
   options?: string[];
   targets: ServiceRequestTargetType[];
   helperText?: string;
+  onlyBranches?: string[];
+  excludeBranches?: string[];
 };
 
 export const SPORTS_GOAL_OPTIONS = [
@@ -26,6 +28,13 @@ export const SPORTS_GOAL_OPTIONS = [
   "I want to keep up with intermediates",
   "I want to keep up with professionals",
   "I want to be a champion and have long term commitment",
+] as const;
+
+export const MANAGER_GOAL_OPTIONS = [
+  "I am in the youth academy and want to move up to the first team",
+  "I am already on a team but want to switch teams",
+  "I am an individual athlete looking to join a team or club",
+  "I generally need an agent",
 ] as const;
 
 export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
@@ -49,6 +58,15 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     type: "single_choice",
     options: [...SPORTS_GOAL_OPTIONS],
     targets: ["coach", "performance"],
+    excludeBranches: ["manager"],
+  },
+  {
+    key: "sportsGoal",
+    question: "Goal",
+    type: "single_choice",
+    options: [...MANAGER_GOAL_OPTIONS],
+    targets: ["performance"],
+    onlyBranches: ["manager"],
   },
   {
     key: "sessionFormat",
@@ -63,6 +81,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     type: "single_choice",
     options: ["No preference", "Male instructor", "Female instructor"],
     targets: ["coach", "performance"],
+    excludeBranches: ["manager"],
   },
   {
     key: "location",
@@ -84,6 +103,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     type: "multi_choice",
     options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     targets: ["coach", "performance"],
+    excludeBranches: ["manager"],
   },
   {
     key: "availableTimes",
@@ -96,6 +116,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
       "Night (9pm+)",
     ],
     targets: ["coach", "performance"],
+    excludeBranches: ["manager"],
   },
   {
     key: "facilityPreference",
@@ -110,6 +131,7 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
     type: "single_choice",
     options: ["Online", "Face to face"],
     targets: ["performance"],
+    excludeBranches: ["manager"],
   },
   {
     key: "additionalDetails",
@@ -127,6 +149,15 @@ export const SERVICE_REQUEST_QUESTIONS: ServiceRequestQuestion[] = [
   },
 ];
 
-export function questionsForTarget(targetType: ServiceRequestTargetType) {
-  return SERVICE_REQUEST_QUESTIONS.filter((q) => q.targets.includes(targetType));
+export function questionsForTarget(targetType: ServiceRequestTargetType, performanceBranch?: string) {
+  return SERVICE_REQUEST_QUESTIONS.filter((q) => {
+    if (!q.targets.includes(targetType)) return false;
+    if (targetType === "performance" && performanceBranch) {
+      if (q.onlyBranches && !q.onlyBranches.includes(performanceBranch)) return false;
+      if (q.excludeBranches && q.excludeBranches.includes(performanceBranch)) return false;
+    } else if (q.onlyBranches) {
+      return false;
+    }
+    return true;
+  });
 }

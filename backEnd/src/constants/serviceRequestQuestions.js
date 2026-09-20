@@ -8,6 +8,13 @@ export const SPORTS_GOAL_OPTIONS = [
     'I want to be a champion and have long term commitment',
 ];
 
+export const MANAGER_GOAL_OPTIONS = [
+    'I am in the youth academy and want to move up to the first team',
+    'I am already on a team but want to switch teams',
+    'I am an individual athlete looking to join a team or club',
+    'I generally need an agent',
+];
+
 export const REQUEST_QUESTIONS = [
     {
         key: 'sportGroupBranch',
@@ -27,6 +34,15 @@ export const REQUEST_QUESTIONS = [
         type: 'single_choice',
         options: SPORTS_GOAL_OPTIONS,
         targets: ['coach', 'performance'],
+        excludeBranches: ['manager'],
+    },
+    {
+        key: 'sportsGoal',
+        question: 'Goal',
+        type: 'single_choice',
+        options: MANAGER_GOAL_OPTIONS,
+        targets: ['performance'],
+        onlyBranches: ['manager'],
     },
     {
         key: 'sessionFormat',
@@ -41,6 +57,7 @@ export const REQUEST_QUESTIONS = [
         type: 'single_choice',
         options: ['No preference', 'Male instructor', 'Female instructor'],
         targets: ['coach', 'performance'],
+        excludeBranches: ['manager'],
     },
     {
         key: 'location',
@@ -61,6 +78,7 @@ export const REQUEST_QUESTIONS = [
         type: 'multi_choice',
         options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
         targets: ['coach', 'performance'],
+        excludeBranches: ['manager'],
     },
     {
         key: 'availableTimes',
@@ -73,6 +91,7 @@ export const REQUEST_QUESTIONS = [
             'Night (9pm+)',
         ],
         targets: ['coach', 'performance'],
+        excludeBranches: ['manager'],
     },
     {
         key: 'facilityPreference',
@@ -87,6 +106,7 @@ export const REQUEST_QUESTIONS = [
         type: 'single_choice',
         options: ['Online', 'Face to face'],
         targets: ['performance'],
+        excludeBranches: ['manager'],
     },
     {
         key: 'additionalDetails',
@@ -102,10 +122,19 @@ export const REQUEST_QUESTIONS = [
     },
 ];
 
-export function questionsForTarget(targetType) {
-    return REQUEST_QUESTIONS.filter((q) => q.targets.includes(targetType));
+export function questionsForTarget(targetType, performanceBranch = null) {
+    return REQUEST_QUESTIONS.filter((q) => {
+        if (!q.targets.includes(targetType)) return false;
+        if (targetType === 'performance' && performanceBranch) {
+            if (q.onlyBranches && !q.onlyBranches.includes(performanceBranch)) return false;
+            if (q.excludeBranches && q.excludeBranches.includes(performanceBranch)) return false;
+        } else if (q.onlyBranches) {
+            return false;
+        }
+        return true;
+    });
 }
 
-export function expectedAnswerCountForTarget(targetType) {
-    return questionsForTarget(targetType).length;
+export function expectedAnswerCountForTarget(targetType, performanceBranch = null) {
+    return questionsForTarget(targetType, performanceBranch).length;
 }

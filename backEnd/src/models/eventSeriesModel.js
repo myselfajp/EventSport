@@ -52,7 +52,7 @@ const eventSeriesSchema = new mongoose.Schema(
         },
         priceType: {
             type: String,
-            enum: ['Manual', 'Stable', 'Free'],
+            enum: ['Free', 'One-Timer', 'Bundle', 'Manual', 'Stable'],
             default: 'Free',
         },
     },

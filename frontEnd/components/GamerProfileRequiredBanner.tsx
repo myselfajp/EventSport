@@ -15,6 +15,15 @@ export default function GamerProfileRequiredBanner({
 }: GamerProfileRequiredBannerProps) {
   const { openGamerProfile } = useGamerProfilePrompt();
 
+  const handleOpenProfile = () => {
+    if (openGamerProfile) {
+      openGamerProfile();
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("eventsport:open-gamer-profile"));
+    }
+  };
+
   if (compact) {
     return (
       <div
@@ -25,7 +34,7 @@ export default function GamerProfileRequiredBanner({
           To join events, create your{" "}
           <button
             type="button"
-            onClick={openGamerProfile}
+            onClick={handleOpenProfile}
             className="font-semibold underline text-cyan-700 dark:text-cyan-400 hover:text-cyan-800"
           >
             {ATHLETE_LABELS.profileShort}
@@ -53,7 +62,7 @@ export default function GamerProfileRequiredBanner({
           </p>
           <button
             type="button"
-            onClick={openGamerProfile}
+            onClick={handleOpenProfile}
             className="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
           >
             <User className="w-4 h-4" />

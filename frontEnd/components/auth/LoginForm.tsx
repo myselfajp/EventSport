@@ -17,8 +17,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
   onLogin,
   loginError,
 }) => {
-  const [email, setEmail] = useState("admin@eventsport.com");
-  const [password, setPassword] = useState("Admin123!@#");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const { mutate: signIn, isPending, error, data } = useSignIn();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +41,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
           <div className="text-white text-xl font-bold">G</div>
         </div>
         <h1 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-2">
-          Sign In to Good
+          Sign In
         </h1>
         <p className="text-sm text-gray-600 dark:text-slate-400">
           New Here?{" "}
@@ -113,21 +113,6 @@ const LoginForm: React.FC<LoginFormProps> = ({
             {isPending ? "Signing in..." : "Continue"}
           </button>
         </form>
-      </div>
-
-      {/* Demo Credentials */}
-      <div className="mt-5 p-3 bg-gradient-to-r from-orange-50 to-blue-50 dark:from-orange-900/20 dark:to-blue-900/20 border border-gray-200 dark:border-slate-700 rounded-lg">
-        <p className="text-sm text-gray-700 dark:text-slate-300 font-medium mb-2">
-          Demo Credentials:
-        </p>
-        <div className="space-y-1">
-          <p className="text-xs text-gray-600 dark:text-slate-400">
-            <span className="font-medium">Email:</span> admin@eventsport.com
-          </p>
-          <p className="text-xs text-gray-600 dark:text-slate-400">
-            <span className="font-medium">Password:</span> Admin123!@#
-          </p>
-        </div>
       </div>
     </div>
   );

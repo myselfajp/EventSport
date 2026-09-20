@@ -19,7 +19,10 @@ export function useSignIn() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: signIn,
-        onSuccess: async () => {
+        onSuccess: async (data) => {
+            if (data) {
+                qc.setQueryData(["auth", "me"], data);
+            }
             await qc.invalidateQueries({ queryKey: ["auth", "me"] });
         },
     });
@@ -29,7 +32,10 @@ export function useSignUp() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: signUp,
-        onSuccess: async () => {
+        onSuccess: async (data) => {
+            if (data) {
+                qc.setQueryData(["auth", "me"], data);
+            }
             await qc.invalidateQueries({ queryKey: ["auth", "me"] });
         },
     });
