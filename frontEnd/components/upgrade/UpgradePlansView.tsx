@@ -75,10 +75,7 @@ export default function UpgradePlansView() {
   return (
     <div className="space-y-8">
       <section className="text-center max-w-2xl mx-auto">
-        <p className="text-sm font-semibold tracking-wide text-cyan-700 dark:text-cyan-400 uppercase">
-          EventSport
-        </p>
-        <h1 className="mt-2 text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
           Upgrade
         </h1>
         <p className="mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-300">

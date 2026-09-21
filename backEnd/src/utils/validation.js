@@ -1201,6 +1201,10 @@ export const createGroupSchema = z.object({
     mainSport: mongoObjectId.optional(),
 
     district: mongoObjectId.optional(),
+    country: countryCodeInput.optional(),
+    state: optionalTrimmedText().optional(),
+    city: optionalTrimmedText().optional(),
+    districtName: optionalTrimmedText().optional(),
     addressLine: z.string().trim().optional(),
 });
 
@@ -1224,6 +1228,10 @@ export const editGroupSchema = z
         mainSport: mongoObjectId.optional(),
 
         district: mongoObjectId.optional(),
+        country: countryCodeInput.optional(),
+        state: optionalTrimmedText().optional(),
+        city: optionalTrimmedText().optional(),
+        districtName: optionalTrimmedText().optional(),
         addressLine: z.string().trim().optional(),
     })
     .refine(
@@ -1234,6 +1242,10 @@ export const editGroupSchema = z
                 'photo',
                 'mainSport',
                 'district',
+                'country',
+                'state',
+                'city',
+                'districtName',
                 'addressLine',
             ];
             return keysToCheck.some((key) => data[key] !== undefined);
@@ -1254,6 +1266,10 @@ export const createClubSchema = z
         mainSport: mongoObjectId.optional(),
 
         district: mongoObjectId.optional(),
+        country: countryCodeInput.optional(),
+        state: optionalTrimmedText().optional(),
+        city: optionalTrimmedText().optional(),
+        districtName: optionalTrimmedText().optional(),
         addressLine: z.string().trim().optional(),
 
         vision: z
@@ -1286,6 +1302,10 @@ export const editClubSchema = z
         mainSport: mongoObjectId.optional(),
 
         district: mongoObjectId.optional(),
+        country: countryCodeInput.optional(),
+        state: optionalTrimmedText().optional(),
+        city: optionalTrimmedText().optional(),
+        districtName: optionalTrimmedText().optional(),
         addressLine: z.string().trim().optional(),
 
         vision: z
@@ -1319,6 +1339,10 @@ export const editClubSchema = z
                 'coaches',
                 'mainSport',
                 'district',
+                'country',
+                'state',
+                'city',
+                'districtName',
                 'addressLine',
             ];
             return keysToCheck.some((key) => data[key] !== undefined);

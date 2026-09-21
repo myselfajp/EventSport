@@ -2022,8 +2022,8 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                     className="text-cyan-600 dark:text-cyan-400 underline font-medium"
                   >
                     event conditions
-                  </a>{" "}
-                  (logged on the server when you join).
+                  </a>
+                  .
                 </span>
               </label>
             </div>

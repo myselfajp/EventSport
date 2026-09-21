@@ -3,6 +3,7 @@
 import React, { Dispatch, SetStateAction, useState } from "react";
 import { useSignIn } from "@/app/hooks/useAuth";
 import PasswordInput from "./PasswordInput";
+import AuthLogo from "./AuthLogo";
 
 interface LoginFormProps {
   onToggleForm: () => void;
@@ -37,9 +38,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
     <div className="p-4 h-full flex flex-col justify-center bg-gradient-to-br from-gray-50 to-white dark:from-slate-900 dark:to-slate-800">
       {/* Logo/Brand Section */}
       <div className="text-center mb-6">
-        <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
-          <div className="text-white text-xl font-bold">G</div>
-        </div>
+        <AuthLogo />
         <h1 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-2">
           Sign In
         </h1>

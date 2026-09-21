@@ -10,11 +10,16 @@ export function applyLocationFilter(targetFilter, { district }, field = 'locatio
 
 export function pickLocationFromBody(body = {}) {
     const loc = {};
+    if (body.country) loc.country = String(body.country).trim().toUpperCase();
+    if (body.state) loc.state = String(body.state).trim();
+    if (body.city) loc.city = String(body.city).trim();
     if (body.district) loc.district = body.district;
+    if (body.districtName) loc.districtName = String(body.districtName).trim();
+    if (body.postalCode) loc.postalCode = String(body.postalCode).trim();
     if (body.addressLine != null && String(body.addressLine).trim()) {
         loc.addressLine = String(body.addressLine).trim();
     }
-    return loc.district || loc.addressLine ? loc : null;
+    return Object.keys(loc).length > 0 ? loc : null;
 }
 
 export function normalizeLocationPayload(data = {}) {
@@ -22,7 +27,12 @@ export function normalizeLocationPayload(data = {}) {
         return pickLocationFromBody(data.location);
     }
     return pickLocationFromBody({
+        country: data.country,
+        state: data.state,
+        city: data.city,
         district: data.district,
+        districtName: data.districtName,
+        postalCode: data.postalCode,
         addressLine: data.addressLine,
     });
 }
@@ -30,10 +40,14 @@ export function normalizeLocationPayload(data = {}) {
 export async function resolveLocationLabels(location) {
     if (!location) return [];
     const parts = [];
-    if (location.district) {
+    if (location.districtName) {
+        parts.push(location.districtName);
+    } else if (location.district) {
         const doc = await District.findById(location.district).select('name').lean();
         if (doc?.name) parts.push(doc.name);
     }
+    if (location.city) parts.push(location.city);
+    if (location.state) parts.push(location.state);
     if (location.addressLine) parts.push(location.addressLine);
     return parts;
 }
@@ -41,9 +55,7 @@ export async function resolveLocationLabels(location) {
 export async function buildAddressString(location) {
     const parts = await resolveLocationLabels(location);
     if (parts.length === 0) return '';
-    const districtName = parts[0];
-    const rest = parts.slice(1).join(', ');
-    return rest ? `${districtName}, ${rest}` : `${districtName}, Istanbul`;
+    return parts.join(', ');
 }
 
 /** Turkish-aware slug used to match province / district names regardless of case or diacritics. */

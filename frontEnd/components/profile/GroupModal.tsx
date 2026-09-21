@@ -5,10 +5,10 @@ import { X, Upload, Loader, Check, Search as SearchIcon, Layers } from "lucide-r
 import { getClubs } from "@/app/lib/club-api";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
-import LocationFields, {
-  emptyLocationValue,
-} from "@/components/location/LocationFields";
-import type { LocationValue } from "@/app/lib/location-api";
+import CascadingLocationFields, {
+  normalizeCountry,
+} from "@/components/location/CascadingLocationFields";
+import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -27,6 +27,14 @@ interface GroupFormData {
   name: string;
   description: string;
   photo: string;
+  mainSport?: string;
+  district?: string;
+  location?: LocationValue;
+  country?: string;
+  city?: string;
+  state?: string;
+  districtName?: string;
+  addressLine?: string;
 }
 
 interface ClubSearchResult {
@@ -130,6 +138,43 @@ const GroupModal: React.FC<GroupModalProps> = ({
         setClubSearch(initialData.clubName);
       }
 
+      if (initialData.mainSport) {
+        setMainSport(initialData.mainSport);
+      }
+
+      if (initialData.location) {
+        setLocationValue({
+          country: initialData.location.country || "TR",
+          state: initialData.location.state || "",
+          stateCode: initialData.location.stateCode || "",
+          city: initialData.location.city || "",
+          provinceSlug: initialData.location.provinceSlug || "",
+          district: initialData.location.district || "",
+          districtName: initialData.location.districtName || "",
+          postalCode: initialData.location.postalCode || "",
+          addressLine: initialData.location.addressLine || "",
+        });
+      } else if (
+        initialData.country ||
+        initialData.city ||
+        initialData.districtName ||
+        initialData.district
+      ) {
+        setLocationValue({
+          country: initialData.country || "TR",
+          state: initialData.state || "",
+          stateCode: "",
+          city: initialData.city || "",
+          provinceSlug: "",
+          district: initialData.district || "",
+          districtName: initialData.districtName || "",
+          postalCode: "",
+          addressLine: initialData.addressLine || "",
+        });
+      } else {
+        setLocationValue(emptyLocationValue());
+      }
+
       if (initialData.photo) {
         setPhotoPreview(initialData.photo);
       }
@@ -155,6 +200,8 @@ const GroupModal: React.FC<GroupModalProps> = ({
     setClubSearch("");
     setClubResults([]);
     setOwnerCoachId("");
+    setMainSport("");
+    setLocationValue(emptyLocationValue());
   };
 
   const handleInputChange = (
@@ -232,9 +279,19 @@ const GroupModal: React.FC<GroupModalProps> = ({
       };
 
       if (mainSport) groupData.mainSport = mainSport;
-      if (locationValue.district) {
-        groupData.district = locationValue.district;
-        if (locationValue.addressLine) groupData.addressLine = locationValue.addressLine;
+
+      const c = normalizeCountry(locationValue.country);
+      groupData.country = c;
+      if (c === "TR") {
+        if (locationValue.city) groupData.city = locationValue.city.trim();
+        if (locationValue.districtName) groupData.districtName = locationValue.districtName.trim();
+        if (locationValue.district) groupData.district = locationValue.district;
+      } else {
+        if (locationValue.state) groupData.state = locationValue.state.trim();
+        if (locationValue.city) groupData.city = locationValue.city.trim();
+      }
+      if (locationValue.addressLine) {
+        groupData.addressLine = locationValue.addressLine.trim();
       }
       
       if (formData.description) groupData.description = formData.description;
@@ -425,13 +482,32 @@ const GroupModal: React.FC<GroupModalProps> = ({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Istanbul district
+                      Location
                     </label>
-                    <LocationFields
+                    <CascadingLocationFields
                       value={locationValue}
                       onChange={setLocationValue}
+                      showPostalCode={false}
                       disabled={isLoading}
                     />
+                    <div className="mt-3">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                        Street / details (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={locationValue.addressLine || ""}
+                        onChange={(e) =>
+                          setLocationValue((prev) => ({
+                            ...prev,
+                            addressLine: e.target.value,
+                          }))
+                        }
+                        disabled={isLoading}
+                        placeholder="Building, street, etc."
+                        className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 transition-colors disabled:opacity-50"
+                      />
+                    </div>
                   </div>
 
                   <div>
