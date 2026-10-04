@@ -512,21 +512,51 @@ export default function ServiceRequestWizard({ onClose, onSubmitted }: Props) {
             )}
           </div>
         );
-      case "location":
+      case "location": {
+        const registeredCountry = (user?.location as { country?: string })?.country || "";
         return (
-          <div className="grid gap-4 sm:grid-cols-3">
-            {(["country", "city", "district"] as const).map((field) => (
-              <label key={field} className="space-y-2">
-                <span className="text-sm font-medium capitalize text-gray-700 dark:text-gray-300">{field}</span>
-                <input
-                  value={location[field]}
-                  onChange={(event) => setLocation((prev) => ({ ...prev, [field]: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-700"
-                />
-              </label>
-            ))}
+          <div className="space-y-3">
+            <div className="grid gap-4 sm:grid-cols-3">
+              {(["country", "city", "district"] as const).map((field) => {
+                const isCountry = field === "country";
+                const isLocked = isCountry && Boolean(registeredCountry);
+                return (
+                  <label key={field} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
+                        {field}
+                      </span>
+                      {isLocked && (
+                        <span className="text-[11px] font-normal text-amber-600 dark:text-amber-400">
+                          Locked
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      value={location[field]}
+                      readOnly={isLocked}
+                      disabled={isLocked}
+                      onChange={(event) =>
+                        setLocation((prev) => ({ ...prev, [field]: event.target.value }))
+                      }
+                      className={`w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-700 ${
+                        isLocked
+                          ? "cursor-not-allowed bg-gray-100 opacity-75 dark:bg-gray-800"
+                          : ""
+                      }`}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+            {registeredCountry && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Country is locked to your registered profile country ({registeredCountry}) for security and fraud prevention. You can specify any city and district within your country.
+              </p>
+            )}
           </div>
         );
+      }
       case "multi_choice":
         return (
           <div className="flex flex-wrap gap-2">

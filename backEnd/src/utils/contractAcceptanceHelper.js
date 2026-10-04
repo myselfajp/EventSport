@@ -1,6 +1,8 @@
 import LegalDocument from '../models/legalDocumentModel.js';
 import StaticPage from '../models/staticPageModel.js';
 import ContractAcceptance from '../models/contractAcceptanceModel.js';
+import User from '../models/userModel.js';
+import Event from '../models/eventModel.js';
 import { AppError } from './appError.js';
 import { Types } from 'mongoose';
 import { COACH_PROFILE_REQUIRED_DOC_TYPES } from '../constants/contractDocuments.js';
@@ -35,6 +37,78 @@ export async function validateActiveLegalDocument(versionId, expectedDocType) {
     return doc;
 }
 
+export function renderContractContent(html, user, event = null, date = new Date()) {
+    if (!html) return '';
+    const dateFormatted = new Date(date).toLocaleDateString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    });
+
+    const fullName = user
+        ? [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+          user.participant?.name ||
+          user.coach?.name ||
+          ''
+        : '';
+    const email = user?.email || '';
+    const phone = user?.phone || user?.phoneNumber || '';
+
+    let locationText = '';
+    if (user?.location) {
+        const loc = user.location;
+        const districtName =
+            typeof loc.district === 'object' && loc.district !== null
+                ? loc.district.name || ''
+                : typeof loc.district === 'string'
+                ? loc.district
+                : '';
+        locationText = [districtName, loc.city, loc.country].filter(Boolean).join(' / ');
+    }
+
+    let coachBranch = '';
+    if (user?.coach?.branches && user.coach.branches.length > 0) {
+        coachBranch = user.coach.branches
+            .map((b) => (typeof b === 'object' && b !== null ? b.name : b))
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    const eventName = event?.name || '';
+    const eventPrice =
+        event?.participationFee != null
+            ? `${event.participationFee} ${event.currency || 'TRY'}`
+            : '';
+
+    const replacements = {
+        '{{ALICI_AD_SOYAD}}': fullName || '[Alıcı Adı Soyadı]',
+        '{{BUYER_FULL_NAME}}': fullName || '[Buyer Full Name]',
+        '{{BUYER_NAME}}': fullName || '[Buyer Name]',
+        '{{ALICI_EPOSTA}}': email || '[Alıcı E-posta]',
+        '{{BUYER_EMAIL}}': email || '[Buyer Email]',
+        '{{ALICI_TELEFON}}': phone || '[Alıcı Telefon]',
+        '{{BUYER_PHONE}}': phone || '[Buyer Phone]',
+        '{{ALICI_KONUM}}': locationText || '[Alıcı İl / İlçe]',
+        '{{ALICI_ADRES}}': locationText || '[Alıcı Adres]',
+        '{{BUYER_LOCATION}}': locationText || '[Buyer Location]',
+        '{{KOC_BRANS}}': coachBranch || '[Antrenörlük Branşı]',
+        '{{COACH_BRANCH}}': coachBranch || '[Coaching Branch]',
+        '{{ETKINLIK_ADI}}': eventName || '[Etkinlik]',
+        '{{EVENT_NAME}}': eventName || '[Event Name]',
+        '{{UCRET}}': eventPrice || '[Ücret]',
+        '{{PRICE}}': eventPrice || '[Price]',
+        '{{TARIH}}': dateFormatted,
+        '{{DATE}}': dateFormatted,
+    };
+
+    let result = html;
+    for (const [placeholder, val] of Object.entries(replacements)) {
+        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        result = result.replace(regex, val);
+    }
+    return result;
+}
+
 export async function recordLegalAcceptance(req, userId, opts) {
     const {
         versionId,
@@ -48,6 +122,35 @@ export async function recordLegalAcceptance(req, userId, opts) {
     const doc = await validateActiveLegalDocument(versionId, expectedDocType);
     const meta = clientMetaFromRequest(req);
 
+    let userDoc = opts.user || req.user || null;
+    if (!userDoc && userId) {
+        try {
+            userDoc = await User.findById(userId).lean();
+        } catch {
+            userDoc = null;
+        }
+    }
+
+    let eventDoc = opts.event || null;
+    if (!eventDoc && eventId) {
+        try {
+            eventDoc = await Event.findById(eventId).select('name participationFee currency').lean();
+        } catch {
+            eventDoc = null;
+        }
+    }
+
+    let renderedContent = null;
+    if (doc.content) {
+        renderedContent = renderContractContent(doc.content, userDoc, eventDoc, acceptedAt);
+    }
+
+    const signerName = userDoc
+        ? [userDoc.firstName, userDoc.lastName].filter(Boolean).join(' ').trim()
+        : null;
+    const signerEmail = userDoc?.email || null;
+    const signerPhone = userDoc?.phone || null;
+
     return ContractAcceptance.create({
         user: userId,
         contractKey: doc.docType,
@@ -59,6 +162,10 @@ export async function recordLegalAcceptance(req, userId, opts) {
         event: eventId,
         reservation: reservationId,
         acceptedAt,
+        renderedContent,
+        signerName,
+        signerEmail,
+        signerPhone,
         ...meta,
     });
 }

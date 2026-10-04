@@ -350,6 +350,32 @@ export default function LegalManagement({
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 resize-y"
                     placeholder="Plain text or HTML content…"
                   />
+                  <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                    <span className="font-semibold block mb-1">Dynamic Placeholders (automatically populated when signed):</span>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { tag: "{{ALICI_AD_SOYAD}}", label: "Buyer Full Name" },
+                        { tag: "{{ALICI_EPOSTA}}", label: "Buyer Email" },
+                        { tag: "{{ALICI_TELEFON}}", label: "Buyer Phone" },
+                        { tag: "{{ALICI_KONUM}}", label: "Buyer Location" },
+                        { tag: "{{ETKINLIK_ADI}}", label: "Event Name" },
+                        { tag: "{{UCRET}}", label: "Event Fee" },
+                        { tag: "{{TARIH}}", label: "Sign Date" },
+                        { tag: "{{KOC_BRANS}}", label: "Coach Branch" },
+                      ].map(({ tag, label }) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, content: prev.content + " " + tag }))}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 rounded border border-cyan-200 dark:border-cyan-800 text-[11px] hover:bg-cyan-100"
+                          title={`Insert ${tag} (${label})`}
+                        >
+                          <code>{tag}</code>
+                          <span className="text-[10px] text-gray-500 dark:text-slate-400">({label})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2 p-6 border-t border-gray-200 dark:border-slate-700">

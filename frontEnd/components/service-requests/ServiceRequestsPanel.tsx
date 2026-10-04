@@ -247,6 +247,9 @@ export default function ServiceRequestsPanel({
       }
       await loadData();
       setInterestMessage((prev) => ({ ...prev, [requestId]: "" }));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("eventsport:incoming-requests-updated"));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Interest could not be sent.");
     }

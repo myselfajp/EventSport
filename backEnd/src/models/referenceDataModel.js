@@ -73,7 +73,31 @@ const eventStyleSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+const appEnumSchema = new mongoose.Schema(
+    {
+        category: {
+            type: String,
+            required: true,
+            enum: ['eventType', 'priceType', 'membershipLevel'],
+            index: true,
+        },
+        value: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        order: {
+            type: Number,
+            default: 0,
+        },
+    },
+    { timestamps: true }
+);
+
+appEnumSchema.index({ category: 1, value: 1 }, { unique: true });
+
 export const Sport = mongoose.model('Sport', sportSchema);
 export const SportGroup = mongoose.model('SportGroup', sportGroupSchema);
 export const SportGoal = mongoose.model('SportGoal', sportGoalSchema);
 export const EventStyle = mongoose.model('EventStyle', eventStyleSchema);
+export const AppEnum = mongoose.model('AppEnum', appEnumSchema);

@@ -37,6 +37,7 @@ import EventLikeButton from "@/components/favorite/EventLikeButton";
 import { showAppToast } from "@/app/lib/app-toast";
 import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { formatEventFee } from "@/app/lib/event-currencies";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
 
 /** Temporarily hide event Pay button; flip to true when payment UI is needed again. */
 const SHOW_EVENT_PAY_BUTTON = false;
@@ -251,6 +252,18 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
     distanceSellingId: string | null;
     eventContractId: string | null;
   }>({ distanceSellingId: null, eventContractId: null });
+  const [distanceSellingDoc, setDistanceSellingDoc] = useState<{
+    _id?: string;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [eventContractDoc, setEventContractDoc] = useState<{
+    _id?: string;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [showDistanceSellingPopup, setShowDistanceSellingPopup] = useState(false);
+  const [showEventContractPopup, setShowEventContractPopup] = useState(false);
   const [legalVersionsLoading, setLegalVersionsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
@@ -560,9 +573,17 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           eventContractId:
             eventRes?.success && eventRes?.data?._id ? String(eventRes.data._id) : null,
         });
+        if (distRes?.success && distRes?.data) {
+          setDistanceSellingDoc(distRes.data);
+        }
+        if (eventRes?.success && eventRes?.data) {
+          setEventContractDoc(eventRes.data);
+        }
       } catch {
         if (!cancelled) {
           setLegalVersions({ distanceSellingId: null, eventContractId: null });
+          setDistanceSellingDoc(null);
+          setEventContractDoc(null);
         }
       } finally {
         if (!cancelled) setLegalVersionsLoading(false);
@@ -1993,14 +2014,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 />
                 <span>
                   I accept the{" "}
-                  <a
-                    href="/contracts#distance-selling"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-600 dark:text-cyan-400 underline font-medium"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowDistanceSellingPopup(true);
+                    }}
+                    className="text-cyan-600 dark:text-cyan-400 underline font-medium hover:text-cyan-700 dark:hover:text-cyan-300 cursor-pointer"
                   >
                     distance selling agreement
-                  </a>
+                  </button>
                   .
                 </span>
               </label>
@@ -2015,14 +2038,16 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                 />
                 <span>
                   I accept the{" "}
-                  <a
-                    href="/contracts#event-contract"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-600 dark:text-cyan-400 underline font-medium"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowEventContractPopup(true);
+                    }}
+                    className="text-cyan-600 dark:text-cyan-400 underline font-medium hover:text-cyan-700 dark:hover:text-cyan-300 cursor-pointer"
                   >
                     event conditions
-                  </a>
+                  </button>
                   .
                 </span>
               </label>
@@ -2292,6 +2317,162 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
             className="max-h-[92vh] max-w-full object-contain rounded-lg shadow-2xl select-none"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+      {/* Distance Selling Agreement In-Place Modal */}
+      {showDistanceSellingPopup && distanceSellingDoc && (
+        <div className="fixed inset-0 bg-black/70 dark:bg-black/85 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {distanceSellingDoc.title || "Distance Selling Agreement (Athlete)"}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Personalized agreement for {user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "Athlete"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDistanceSellingPopup(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Athlete Info Summary Banner */}
+            <div className="bg-cyan-50 dark:bg-cyan-950/40 border-b border-cyan-100 dark:border-cyan-900/50 px-6 py-2.5 text-xs text-cyan-900 dark:text-cyan-200 flex flex-wrap gap-x-6 gap-y-1">
+              <span><strong>Athlete:</strong> {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "—"}</span>
+              <span><strong>Email:</strong> {user?.email || "—"}</span>
+              <span><strong>Phone:</strong> {user?.phone || user?.phoneNumber || "—"}</span>
+              <span><strong>Event:</strong> {event.name}</span>
+            </div>
+
+            {/* Scrollable Agreement Body */}
+            <div className="flex-1 overflow-y-auto p-6 text-sm text-gray-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-slate-800">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: replaceContractPlaceholders(
+                    distanceSellingDoc.content,
+                    user,
+                    {
+                      eventName: event.name,
+                      price: event.priceType === "Free" ? "Free" : formatEventFee(event.participationFee, event.currency),
+                    }
+                  ),
+                }}
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex-wrap">
+              <a
+                href="/contracts"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1.5 py-1"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                View All Agreements
+              </a>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDistanceSellingPopup(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConsent((c) => ({ ...c, acceptDistantSelling: true }));
+                    setShowDistanceSellingPopup(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  I Have Read and Agree
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event Agreement In-Place Modal */}
+      {showEventContractPopup && eventContractDoc && (
+        <div className="fixed inset-0 bg-black/70 dark:bg-black/85 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {eventContractDoc.title || "Event Agreement"}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Terms and conditions for {event.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEventContractPopup(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 text-sm text-gray-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-slate-800">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: replaceContractPlaceholders(
+                    eventContractDoc.content,
+                    user,
+                    {
+                      eventName: event.name,
+                      price: event.priceType === "Free" ? "Free" : formatEventFee(event.participationFee, event.currency),
+                    }
+                  ),
+                }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex-wrap">
+              <a
+                href="/contracts"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1.5 py-1"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                View All Agreements
+              </a>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEventContractPopup(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConsent((c) => ({ ...c, acceptEventPurchaseTerms: true }));
+                    setShowEventContractPopup(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  I Have Read and Agree
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

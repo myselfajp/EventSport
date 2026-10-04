@@ -9,6 +9,7 @@ export type LegalDocType =
   | "cookie_policy"
   | "coach_me_consent"
   | "distance_selling"
+  | "coach_distance_selling"
   | "event_contract"
   | "coach_agreement"
   | "coach_penalties"
@@ -29,7 +30,7 @@ export const GAMER_DOC_TYPES: LegalDocType[] = [
 ];
 
 export const COACH_DOC_TYPES: LegalDocType[] = [
-  "distance_selling",
+  "coach_distance_selling",
   "coach_agreement",
   "coach_penalties",
   "coach_equipment",
@@ -46,7 +47,8 @@ export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
   commercial_messages: "Commercial Electronic Messages Consent (IYS)",
   cookie_policy: "Cookie Policy",
   coach_me_consent: "Coach Me Email Contact Consent",
-  distance_selling: "Distance Selling Agreement",
+  distance_selling: "Distance Selling Agreement (Athlete)",
+  coach_distance_selling: "Distance Selling Agreement (Coach)",
   event_contract: "Event Agreement",
   coach_agreement: "Coach Agreement",
   coach_penalties: "Penalty Terms",
@@ -61,7 +63,8 @@ export const DEFAULT_TITLES: Record<LegalDocType, string> = {
   commercial_messages: "Commercial Electronic Messages Consent (IYS)",
   cookie_policy: "Cookie Policy",
   coach_me_consent: "Coach Me Email Contact Consent",
-  distance_selling: "Distance Selling Agreement",
+  distance_selling: "Distance Selling Agreement (Athlete)",
+  coach_distance_selling: "Distance Selling Agreement (Coach)",
   event_contract: "Event Agreement",
   coach_agreement: "Coach Agreement",
   coach_penalties: "Penalty Terms",
@@ -85,6 +88,7 @@ export const CONTRACTS_SECTION_ANCHORS: Record<LegalDocType, string> = {
   cookie_policy: "cookie-policy",
   coach_me_consent: "coach-me-consent",
   distance_selling: "distance-selling",
+  coach_distance_selling: "coach-distance-selling",
   event_contract: "event-contract",
   coach_agreement: "coach-agreement",
   coach_penalties: "coach-penalties",

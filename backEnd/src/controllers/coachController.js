@@ -32,6 +32,7 @@ import {
     notifyAffinityFollowersOfNewEvent,
     notifyFacilityOwnerOfNewEvent,
 } from '../utils/eventDistrictHelper.js';
+import { assertCreationAllowedByLocation } from '../utils/geoFraudHelper.js';
 import { createRecurringEventSeries, cancelEventsWithScope, applyEventEditWithScope } from '../utils/eventSeriesService.js';
 import {
     getBasicPlanAssignmentFields,
@@ -675,6 +676,13 @@ export const createEvent = async (req, res, next) => {
         eventFields.districtName = resolvedLoc.districtName;
         eventFields.locationKey = resolvedLoc.locationKey;
 
+        assertCreationAllowedByLocation({
+            req,
+            user,
+            targetCountry: resolvedLoc.country || eventFields.country,
+            actionLabel: 'event',
+        });
+
         const coachName = coachDisplayName(user);
 
         const coachIdForCredits = user.coach?._id || user.coach || null;
@@ -982,6 +990,13 @@ export const editEvent = async (req, res, next) => {
                 updateData.city = resolvedLoc.city;
                 updateData.districtName = resolvedLoc.districtName;
                 updateData.locationKey = resolvedLoc.locationKey;
+
+                assertCreationAllowedByLocation({
+                    req,
+                    user,
+                    targetCountry: resolvedLoc.country,
+                    actionLabel: 'event',
+                });
             }
         }
 

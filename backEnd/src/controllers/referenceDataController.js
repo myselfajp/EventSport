@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Sport, SportGoal, SportGroup, EventStyle } from '../models/referenceDataModel.js';
+import { Sport, SportGoal, SportGroup, EventStyle, AppEnum } from '../models/referenceDataModel.js';
 import { AppError } from '../utils/appError.js';
 import {
     mongoObjectId,
@@ -506,6 +506,160 @@ export const deleteEventStyle = async (req, res, next) => {
         if (!deleteEventStyle) throw new AppError(404);
 
         res.status(204).json({
+            success: true,
+            data: null,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Default enums to seed if collection is empty
+const DEFAULT_ENUMS = {
+    eventType: ['Indoor', 'Outdoor', 'Online'],
+    priceType: ['Free', 'One-Timer', 'Bundle'],
+    membershipLevel: ['Gold', 'Platinum', 'Bronze', 'Silver'],
+};
+
+export const getEnums = async (req, res, next) => {
+    try {
+        const { category } = req.query || {};
+        const query = category ? { category } : {};
+        
+        let docs = await AppEnum.find(query).sort({ order: 1, createdAt: 1 });
+
+        // If no records found and no category filter, or specific category is empty, check and seed defaults
+        const categoriesToCheck = category ? [category] : ['eventType', 'priceType', 'membershipLevel'];
+        let seeded = false;
+
+        for (const cat of categoriesToCheck) {
+            const hasCat = docs.some((d) => d.category === cat);
+            if (!hasCat && DEFAULT_ENUMS[cat]) {
+                const seedDocs = DEFAULT_ENUMS[cat].map((val, idx) => ({
+                    category: cat,
+                    value: val,
+                    order: idx,
+                }));
+                await AppEnum.insertMany(seedDocs);
+                seeded = true;
+            }
+        }
+
+        if (seeded) {
+            docs = await AppEnum.find(query).sort({ order: 1, createdAt: 1 });
+        }
+
+        // Format as grouped object { eventType: string[], priceType: string[], membershipLevel: string[] }
+        // and also raw items with IDs for admin management
+        const grouped = {
+            eventType: docs.filter((d) => d.category === 'eventType').map((d) => d.value),
+            priceType: docs.filter((d) => d.category === 'priceType').map((d) => d.value),
+            membershipLevel: docs.filter((d) => d.category === 'membershipLevel').map((d) => d.value),
+        };
+
+        res.status(200).json({
+            success: true,
+            data: {
+                grouped,
+                items: docs,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const createEnum = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const { category, value } = req.body || {};
+        if (!category || !['eventType', 'priceType', 'membershipLevel'].includes(category)) {
+            throw new AppError(400, 'Invalid enum category');
+        }
+        if (!value || typeof value !== 'string' || !value.trim()) {
+            throw new AppError(400, 'Enum value is required');
+        }
+
+        const trimmedValue = value.trim();
+
+        // Check if exists
+        const existing = await AppEnum.findOne({ category, value: { $regex: `^${trimmedValue}$`, $options: 'i' } });
+        if (existing) {
+            throw new AppError(400, 'This value already exists in this category');
+        }
+
+        const count = await AppEnum.countDocuments({ category });
+        const doc = await AppEnum.create({
+            category,
+            value: trimmedValue,
+            order: count,
+        });
+
+        res.status(201).json({
+            success: true,
+            data: doc,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateEnum = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const { enumId } = req.params;
+        const { value } = req.body || {};
+        if (!value || typeof value !== 'string' || !value.trim()) {
+            throw new AppError(400, 'Enum value is required');
+        }
+
+        const trimmedValue = value.trim();
+        const currentDoc = await AppEnum.findById(enumId);
+        if (!currentDoc) {
+            throw new AppError(404, 'Enum not found');
+        }
+
+        // Check if another item with this value exists in same category
+        const duplicate = await AppEnum.findOne({
+            _id: { $ne: enumId },
+            category: currentDoc.category,
+            value: { $regex: `^${trimmedValue}$`, $options: 'i' },
+        });
+        if (duplicate) {
+            throw new AppError(400, 'This value already exists in this category');
+        }
+
+        currentDoc.value = trimmedValue;
+        await currentDoc.save();
+
+        res.status(200).json({
+            success: true,
+            data: currentDoc,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const deleteEnum = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const { enumId } = req.params;
+        const deleted = await AppEnum.findByIdAndDelete(enumId);
+        if (!deleted) {
+            throw new AppError(404, 'Enum not found');
+        }
+
+        res.status(200).json({
             success: true,
             data: null,
         });

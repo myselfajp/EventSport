@@ -78,6 +78,25 @@ const contractAcceptanceSchema = new mongoose.Schema(
             analytics: { type: Boolean },
             marketing: { type: Boolean },
         },
+        renderedContent: {
+            type: String,
+            default: null,
+        },
+        signerName: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+        signerEmail: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+        signerPhone: {
+            type: String,
+            default: null,
+            trim: true,
+        },
     },
     { timestamps: true }
 );

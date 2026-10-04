@@ -6,6 +6,7 @@ const router = express.Router();
 router.get('/questions', serviceRequestController.getQuestionCatalog);
 router.get('/mine', serviceRequestController.listMyRequests);
 router.get('/incoming', serviceRequestController.listIncomingRequests);
+router.get('/incoming-count', serviceRequestController.getIncomingRequestsCount);
 router.post('/', serviceRequestController.createServiceRequest);
 router.post('/:requestId/respond', serviceRequestController.respondToRequest);
 router.post(

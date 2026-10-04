@@ -386,7 +386,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
                 : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
             }`}
           >
-            All {activeTab === "all" ? `(${pagination.total})` : ""}
+            All Active {activeTab === "all" ? `(${pagination.total})` : ""}
           </button>
           <button
             onClick={() => canSeeMyEvents && setActiveTab("my")}
@@ -438,9 +438,19 @@ const EventsTable: React.FC<EventsTableProps> = ({
             Participated{" "}
             {activeTab === "participated" ? `(${pagination.total})` : ""}
           </button>
+          <button
+            onClick={() => setActiveTab("past")}
+            className={`pb-2 text-sm font-semibold whitespace-nowrap transition-colors ${
+              activeTab === "past"
+                ? "text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400"
+                : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+            }`}
+          >
+            Past {activeTab === "past" ? `(${pagination.total})` : ""}
+          </button>
         </div>
 
-        {activeTab === "all" ? (
+        {activeTab === "all" || activeTab === "past" ? (
           <>
             <div className="relative flex-1 min-w-[140px] basis-[12rem]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 w-4 h-4" />

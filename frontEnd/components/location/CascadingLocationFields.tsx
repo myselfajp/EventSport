@@ -15,6 +15,10 @@ type Props = {
   value: LocationValue;
   onChange: (next: LocationValue) => void;
   disabled?: boolean;
+  /** When true, country selector is locked/disabled (e.g. anti-fraud policy) */
+  countryDisabled?: boolean;
+  /** Optional message displayed when country is locked */
+  countryLockNotice?: React.ReactNode;
   /** Optional note rendered under the country selector (e.g. detection hint). */
   note?: React.ReactNode;
   /** When false, postal / ZIP fields are hidden (e.g. event creation). */
@@ -44,6 +48,8 @@ export default function CascadingLocationFields({
   value,
   onChange,
   disabled = false,
+  countryDisabled = false,
+  countryLockNotice,
   note,
   showPostalCode = true,
   twoColumn = false,
@@ -179,7 +185,7 @@ export default function CascadingLocationFields({
               <select
                 value={country}
                 onChange={(e) => handleCountryChange(e.target.value)}
-                disabled={disabled}
+                disabled={disabled || countryDisabled}
                 className={inputClass}
               >
                 {COUNTRY_OPTIONS.map((item) => (
@@ -188,6 +194,11 @@ export default function CascadingLocationFields({
                   </option>
                 ))}
               </select>
+              {countryDisabled && (
+                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                  {countryLockNotice || "Country locked to profile"}
+                </p>
+              )}
             </div>
 
             {country === "TR" ? (
@@ -289,7 +300,7 @@ export default function CascadingLocationFields({
               <select
                 value={country}
                 onChange={(e) => handleCountryChange(e.target.value)}
-                disabled={disabled}
+                disabled={disabled || countryDisabled}
                 className={inputClass}
               >
                 {COUNTRY_OPTIONS.map((item) => (
@@ -298,6 +309,11 @@ export default function CascadingLocationFields({
                   </option>
                 ))}
               </select>
+              {countryDisabled && (
+                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                  {countryLockNotice || "Country locked to profile"}
+                </p>
+              )}
             </div>
 
             {country === "TR" ? (
@@ -436,7 +452,7 @@ export default function CascadingLocationFields({
         <select
           value={country}
           onChange={(e) => handleCountryChange(e.target.value)}
-          disabled={disabled}
+          disabled={disabled || countryDisabled}
           className={inputClass}
         >
           {COUNTRY_OPTIONS.map((item) => (
@@ -445,6 +461,11 @@ export default function CascadingLocationFields({
             </option>
           ))}
         </select>
+        {countryDisabled && (
+          <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+            {countryLockNotice || "Country locked to profile"}
+          </p>
+        )}
         {note ? (
           <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{note}</p>
         ) : null}

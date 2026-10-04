@@ -916,6 +916,7 @@ async function logRegistrationConsent(req, user, eventId, reservationId, consent
             context: 'event_reservation',
             eventId,
             reservationId,
+            user,
         }),
         recordLegalAcceptance(req, user._id, {
             versionId: legalVersionIds.eventContractVersionId,
@@ -923,6 +924,7 @@ async function logRegistrationConsent(req, user, eventId, reservationId, consent
             context: 'event_reservation',
             eventId,
             reservationId,
+            user,
         }),
     ]);
 }

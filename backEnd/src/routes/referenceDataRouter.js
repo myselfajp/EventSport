@@ -35,4 +35,11 @@ router.post('/create-event-style/', referenceDataController.createEventStyle);
 router.post('/get-event-style/', referenceDataController.getEventStyle);
 router.put('/update-event-style/:eventStyleId', referenceDataController.updateEventStyle);
 router.delete('/delete-event-style/:eventStyleId', referenceDataController.deleteEventStyle);
+
+// app enums (Event Types, Price Types, Membership Levels)
+router.get('/enums', referenceDataController.getEnums);
+router.post('/create-enum', referenceDataController.createEnum);
+router.put('/update-enum/:enumId', referenceDataController.updateEnum);
+router.delete('/delete-enum/:enumId', referenceDataController.deleteEnum);
+
 export default router;

@@ -14,10 +14,10 @@ import {
 } from "@/app/lib/company-types";
 import { EP } from "@/app/lib/endpoints";
 import { fetchJSON } from "@/app/lib/api";
-import LocationFields, {
-  emptyLocationValue,
-} from "@/components/location/LocationFields";
-import type { LocationValue } from "@/app/lib/location-api";
+import CascadingLocationFields, {
+  normalizeCountry,
+} from "@/components/location/CascadingLocationFields";
+import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
 
 type CompanyModalInitialData = Omit<CompanyFormData, "photo"> & {
   _id?: string;
@@ -40,6 +40,11 @@ interface CompanyFormData {
   companyType: CompanyType | "";
   mainSport: string;
   district?: string;
+  location?: LocationValue;
+  country?: string;
+  city?: string;
+  state?: string;
+  districtName?: string;
   addressLine?: string;
 }
 
@@ -111,12 +116,45 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
             ? initialData.mainSport
             : (initialData.mainSport as { _id?: string })?._id || "",
       });
-      const loc = (initialData as { location?: { district?: string; addressLine?: string } })
+      const loc = (initialData as { location?: LocationValue & { district?: string | { _id: string }; addressLine?: string } })
         .location;
-      if (loc?.district) {
+      if (loc) {
+        const distId =
+          typeof loc.district === "object"
+            ? (loc.district as any)?._id || ""
+            : loc.district || "";
         setLocationValue({
-          district: String(loc.district),
+          country: loc.country || "TR",
+          state: loc.state || "",
+          stateCode: loc.stateCode || "",
+          city: loc.city || "",
+          provinceSlug: loc.provinceSlug || "",
+          district: distId,
+          districtName: loc.districtName || "",
+          postalCode: loc.postalCode || "",
           addressLine: loc.addressLine || "",
+        });
+      } else if (
+        (initialData as any).country ||
+        (initialData as any).city ||
+        (initialData as any).districtName ||
+        (initialData as any).district
+      ) {
+        const init = initialData as any;
+        const distId =
+          typeof init.district === "object"
+            ? init.district?._id || ""
+            : init.district || "";
+        setLocationValue({
+          country: init.country || "TR",
+          state: init.state || "",
+          stateCode: "",
+          city: init.city || "",
+          provinceSlug: "",
+          district: distId,
+          districtName: init.districtName || "",
+          postalCode: "",
+          addressLine: init.addressLine || init.address || "",
         });
       } else {
         setLocationValue(emptyLocationValue());
@@ -171,8 +209,25 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     e.preventDefault();
     setError("");
 
-    if (!formData.name || (!locationValue.district && !formData.address?.trim())) {
-      setError("Name and Istanbul district (or address) are required");
+    const c = normalizeCountry(locationValue.country);
+    if (!formData.name) {
+      setError("Company Name is required");
+      return;
+    }
+
+    if (
+      c === "TR" &&
+      (!locationValue.city || !locationValue.districtName) &&
+      !formData.address?.trim()
+    ) {
+      setError("City and district (or address) are required");
+      return;
+    } else if (
+      c === "US" &&
+      (!locationValue.state || !locationValue.city) &&
+      !formData.address?.trim()
+    ) {
+      setError("State and city (or address) are required");
       return;
     }
 
@@ -194,14 +249,27 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
       return;
     }
 
-    onSubmit({
+    const payload: any = {
       ...formData,
-      district: locationValue.district,
-      addressLine: locationValue.addressLine,
-    });
+      country: c,
+    };
+    if (c === "TR") {
+      if (locationValue.city) payload.city = locationValue.city.trim();
+      if (locationValue.districtName) payload.districtName = locationValue.districtName.trim();
+      if (locationValue.district) payload.district = locationValue.district;
+    } else {
+      if (locationValue.state) payload.state = locationValue.state.trim();
+      if (locationValue.city) payload.city = locationValue.city.trim();
+    }
+    if (locationValue.addressLine) {
+      payload.addressLine = locationValue.addressLine.trim();
+    }
+
+    onSubmit(payload);
     onClose();
     setFormData(emptyForm);
     setPhotoPreview(null);
+    setLocationValue(emptyLocationValue());
   };
 
   const handleClose = () => {
@@ -209,6 +277,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     setError("");
     setFormData(emptyForm);
     setPhotoPreview(null);
+    setLocationValue(emptyLocationValue());
   };
 
   if (!isOpen) return null;
@@ -307,12 +376,30 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Istanbul district <span className="text-red-500">*</span>
+                  Location <span className="text-red-500">*</span>
                 </label>
-                <LocationFields
+                <CascadingLocationFields
                   value={locationValue}
                   onChange={setLocationValue}
+                  showPostalCode={false}
                 />
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                    Street / details (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={locationValue.addressLine || ""}
+                    onChange={(e) =>
+                      setLocationValue((prev) => ({
+                        ...prev,
+                        addressLine: e.target.value,
+                      }))
+                    }
+                    placeholder="Building, street, etc."
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 transition-colors"
+                  />
+                </div>
               </div>
 
               {/* Phone */}

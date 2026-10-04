@@ -237,6 +237,26 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
     emptyLocationValue()
   );
 
+  // Sync country with user's registered profile country on new event creation
+  useEffect(() => {
+    if (!isEditMode && isOpen && user?.location?.country) {
+      const userCountry = normalizeCountry(user.location.country);
+      setLocationValue((prev) => {
+        if (prev.country === userCountry) return prev;
+        return {
+          ...prev,
+          country: userCountry,
+          state: "",
+          stateCode: "",
+          city: "",
+          provinceSlug: "",
+          district: "",
+          districtName: "",
+        };
+      });
+    }
+  }, [isEditMode, isOpen, user?.location?.country]);
+
   const [listingQuote, setListingQuote] = useState<{
     unitPrice: number;
     totalAmount: number;
@@ -255,6 +275,16 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const [sports, setSports] = useState<Sport[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [salons, setSalons] = useState<Salon[]>([]);
+  const [availableEventTypes, setAvailableEventTypes] = useState<string[]>([
+    "Indoor",
+    "Outdoor",
+    "Online",
+  ]);
+  const [availablePriceTypes, setAvailablePriceTypes] = useState<string[]>([
+    "Free",
+    "One-Timer",
+    "Bundle",
+  ]);
 
   const [showClubDropdown, setShowClubDropdown] = useState(false);
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
@@ -668,6 +698,35 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       })();
     }
   }, [initialData, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+    const loadEnums = async () => {
+      try {
+        const res = await fetchJSON(EP.REFERENCE.enums.get, {
+          method: "GET",
+        });
+        if (!cancelled && res?.success && res?.data?.grouped) {
+          const { eventType, priceType } = res.data.grouped;
+          if (Array.isArray(eventType) && eventType.length > 0) {
+            setAvailableEventTypes(eventType);
+          }
+          if (Array.isArray(priceType) && priceType.length > 0) {
+            setAvailablePriceTypes(priceType);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic enums, using defaults:", err);
+      }
+    };
+
+    void loadEnums();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   const isSeriesEdit = isEditMode && !!(initialData?.series?._id || initialData?.series);
 
@@ -1272,7 +1331,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       listingPurchaseConfirmed: false,
       editScope: "single",
     });
-    setLocationValue(emptyLocationValue());
+    const userCountry = user?.location?.country
+      ? normalizeCountry(user.location.country)
+      : "TR";
+    setLocationValue({
+      ...emptyLocationValue(),
+      country: userCountry,
+    });
     setListingQuote(null);
     setBannerFile(null);
     setPhotoFile(null);
@@ -2048,6 +2113,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     onChange={setLocationValue}
                     showPostalCode={false}
                     threeColumn
+                    countryDisabled={Boolean(user?.location?.country)}
+                    countryLockNotice="Locked to your registered country (fraud prevention)"
                   />
                 </div>
               )}
@@ -2162,9 +2229,16 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     required
                   >
                     <option value="">Select Type</option>
-                    <option value="Indoor">Indoor</option>
-                    <option value="Outdoor">Outdoor</option>
-                    <option value="Online">Online</option>
+                    {formData.type && !availableEventTypes.includes(formData.type) && (
+                      <option key={formData.type} value={formData.type}>
+                        {formData.type}
+                      </option>
+                    )}
+                    {availableEventTypes.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -2205,9 +2279,16 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     required
                   >
                     <option value="">Select Price Type</option>
-                    <option value="Free">Free</option>
-                    <option value="One-Timer">One-Timer</option>
-                    <option value="Bundle">Bundle</option>
+                    {formData.priceType && !availablePriceTypes.includes(formData.priceType) && (
+                      <option key={formData.priceType} value={formData.priceType}>
+                        {formData.priceType}
+                      </option>
+                    )}
+                    {availablePriceTypes.map((pt) => (
+                      <option key={pt} value={pt}>
+                        {pt}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

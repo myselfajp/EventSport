@@ -6,9 +6,12 @@ import SitePageShell from "@/components/SitePageShell";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { DOC_TYPE_LABELS, isLegalDocType } from "@/app/lib/contract-documents";
+import { useMe } from "@/app/hooks/useAuth";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
 
 export default function LegalPublicPage() {
   const params = useParams();
+  const { data: user } = useMe();
   const raw = typeof params?.docType === "string" ? params.docType : "";
   const docType = isLegalDocType(raw) ? raw : null;
 
@@ -87,7 +90,7 @@ export default function LegalPublicPage() {
           </h1>
           <div
             className="static-page-content bg-white dark:bg-slate-800 rounded-xl shadow-md border border-gray-100 dark:border-slate-700 p-6 sm:p-8"
-            dangerouslySetInnerHTML={{ __html: doc.content }}
+            dangerouslySetInnerHTML={{ __html: replaceContractPlaceholders(doc.content, user) }}
           />
         </article>
       ) : null}

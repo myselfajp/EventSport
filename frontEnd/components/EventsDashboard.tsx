@@ -237,8 +237,9 @@ const EventsDashboard = () => {
         payload.reservationScope = activeTab;
       }
 
-      // Only apply filters for "all" tab
-      if (activeTab === "all") {
+      if (activeTab === "all" || activeTab === "past") {
+        payload.timeScope = activeTab === "past" ? "past" : "active";
+
         if (filters.search && filters.search.length >= 2) {
           payload.search = filters.search;
         }
@@ -486,6 +487,9 @@ const EventsDashboard = () => {
           setCoachMeAutoWizard(false);
           setCoachMeFocusRequestId(null);
           clearServiceRequestsUrlParam();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("eventsport:incoming-requests-updated"));
+          }
         }}
         hasGamerProfile={!!user?.participant}
         isProvider={!!user?.coach || !!user?.performanceMember}

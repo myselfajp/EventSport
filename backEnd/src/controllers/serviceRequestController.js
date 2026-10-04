@@ -20,6 +20,7 @@ import {
 } from '../constants/serviceRequestQuestions.js';
 import { writeAuditLog } from '../utils/auditLogger.js';
 import { AUDIT_ACTIONS } from '../constants/auditActions.js';
+import { assertCreationAllowedByLocation, parseCountryFromLocation } from '../utils/geoFraudHelper.js';
 
 const trim = (value, max = 1000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : value;
@@ -200,6 +201,22 @@ export const createServiceRequest = async (req, res, next) => {
             throw new AppError(400, 'Invalid performance branch.');
         }
 
+        const rawAnswers = req.body?.answers;
+        let targetCountry = '';
+        if (Array.isArray(rawAnswers)) {
+            const locItem = rawAnswers.find((a) => a?.key === 'location');
+            targetCountry = parseCountryFromLocation(locItem?.answer);
+        } else if (rawAnswers && typeof rawAnswers === 'object') {
+            targetCountry = parseCountryFromLocation(rawAnswers.location);
+        }
+
+        assertCreationAllowedByLocation({
+            req,
+            user: req.user,
+            targetCountry,
+            actionLabel: 'service request',
+        });
+
         const request = await ServiceRequest.create({
             requester: req.user._id,
             participant: req.user.participant,
@@ -334,6 +351,61 @@ export const listIncomingRequests = async (req, res, next) => {
                 ...request,
                 myResponse: responseMap.get(String(request._id)) || null,
             })),
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getIncomingRequestsCount = async (req, res, next) => {
+    try {
+        const providerProfiles = [];
+
+        try {
+            providerProfiles.push(await getProviderProfile(req.user, 'coach'));
+        } catch {
+        }
+        try {
+            providerProfiles.push(await getProviderProfile(req.user, 'performance'));
+        } catch {
+        }
+        if (providerProfiles.length === 0) {
+            return res.status(200).json({ success: true, count: 0 });
+        }
+
+        const or = providerProfiles.map((provider) =>
+            provider.providerType === 'coach'
+                ? { targetType: 'coach' }
+                : {
+                    targetType: 'performance',
+                    performanceBranch: provider.performanceMember.branch,
+                }
+        );
+
+        const myResponses = await ServiceRequestResponse.find({
+            providerUser: req.user._id,
+            status: { $ne: 'withdrawn' },
+        })
+            .select('serviceRequest')
+            .lean();
+        const respondedIds = myResponses.map((r) => r.serviceRequest);
+
+        const query = {
+            status: 'open',
+            expiresAt: { $gt: new Date() },
+            $or: or,
+            requester: { $ne: req.user._id },
+        };
+
+        if (respondedIds.length > 0) {
+            query._id = { $nin: respondedIds };
+        }
+
+        const count = await ServiceRequest.countDocuments(query);
+
+        res.status(200).json({
+            success: true,
+            count,
         });
     } catch (err) {
         next(err);

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, X } from "lucide-react";
 import { fetchJSON, apiFetch } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
 import CoachModal from "../profile/CoachModal";
 import ParticipantModal from "../profile/ParticipantModal";
 import FacilityModal from "../profile/FacilityModal";
@@ -162,6 +163,7 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [viewingSignedContract, setViewingSignedContract] = useState<any | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [showParticipantModal, setShowParticipantModal] = useState(false);
@@ -316,14 +318,18 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
 
   const handleEditProfile = (user: User) => {
     setEditingProfileUser(user);
-    if (user.coach) {
+    if (activeTab === 'coach') {
+      setShowCoachModal(true);
+    } else if (activeTab === 'participant') {
+      setShowParticipantModal(true);
+    } else if (activeTab === 'facility' && user.facility && user.facility.length > 0) {
+      setEditingFacility(user.facility[0]);
+      setShowFacilityModal(true);
+    } else if (user.coach) {
       setShowCoachModal(true);
     } else if (user.participant) {
       setShowParticipantModal(true);
     } else if (user.facility && user.facility.length > 0) {
-      // For facility, we need to fetch the facility details first
-      // For now, we'll just open the modal with the first facility
-      // In a real scenario, you might want to show a list to select which facility to edit
       setEditingFacility(user.facility[0]);
       setShowFacilityModal(true);
     }
@@ -757,6 +763,17 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
 
       if (user.performanceMember && typeof user.performanceMember === "object") {
         details.performance = user.performanceMember;
+      }
+
+      try {
+        const acceptancesRes = await fetchJSON(EP.ADMIN.contractAcceptances.byUser(user._id), {
+          method: "GET",
+        });
+        if (acceptancesRes?.success && Array.isArray(acceptancesRes.data)) {
+          details.contractAcceptances = acceptancesRes.data;
+        }
+      } catch (err) {
+        console.error("Failed to fetch contract acceptances:", err);
       }
 
       setDetailsData(details);
@@ -1846,13 +1863,143 @@ export default function UsersManagement({ isFullAdmin = true }: { isFullAdmin?: 
                   </div>
                 )}
 
-                {!detailsData?.coach && !detailsData?.participant && !detailsData?.facility && !detailsData?.club && !detailsData?.performance && (
+                {/* Accepted Contracts & Agreements */}
+                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                  <h4 className="font-bold text-lg mb-3 text-gray-900 dark:text-slate-100 flex items-center justify-between">
+                    <span>Accepted Agreements & Contracts</span>
+                    {detailsData?.contractAcceptances?.length ? (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200 font-semibold">
+                        {detailsData.contractAcceptances.length} accepted
+                      </span>
+                    ) : null}
+                  </h4>
+                  {detailsData?.contractAcceptances && detailsData.contractAcceptances.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-100 dark:bg-slate-700 text-left">
+                            <th className="p-2.5">Date</th>
+                            <th className="p-2.5">Agreement</th>
+                            <th className="p-2.5">Context</th>
+                            <th className="p-2.5">Event</th>
+                            <th className="p-2.5 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailsData.contractAcceptances.map((c: any) => (
+                            <tr key={c._id} className="border-t border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                              <td className="p-2.5 whitespace-nowrap text-gray-600 dark:text-slate-400">
+                                {new Date(c.acceptedAt).toLocaleString("tr-TR")}
+                              </td>
+                              <td className="p-2.5 font-medium text-gray-900 dark:text-slate-100">
+                                {c.title || c.contractKey} {c.version != null && <span className="text-[11px] text-gray-500 font-normal">v{c.version}</span>}
+                              </td>
+                              <td className="p-2.5 text-gray-600 dark:text-slate-400">
+                                {c.context === "event_reservation" ? "Event Registration" : c.context === "signup" ? "Sign-up" : c.context}
+                              </td>
+                              <td className="p-2.5 text-gray-600 dark:text-slate-400">
+                                {c.event?.name || "—"}
+                              </td>
+                              <td className="p-2.5 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingSignedContract(c)}
+                                  className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded font-medium transition-colors text-xs"
+                                >
+                                  View Contract
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-slate-400">No signed agreements recorded for this user yet.</p>
+                  )}
+                </div>
+
+                {!detailsData?.coach && !detailsData?.participant && !detailsData?.facility && !detailsData?.club && !detailsData?.performance && (!detailsData?.contractAcceptances || detailsData.contractAcceptances.length === 0) && (
                   <div className="text-center py-8 text-gray-500 dark:text-slate-400">
                     No profile details available for this user.
                   </div>
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* View Signed Contract Modal */}
+      {viewingSignedContract && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {viewingSignedContract.title || viewingSignedContract.contractKey}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Accepted on {new Date(viewingSignedContract.acceptedAt).toLocaleString("tr-TR")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingSignedContract(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Signer Info Summary Banner */}
+            <div className="bg-cyan-50 dark:bg-cyan-950/40 border-b border-cyan-100 dark:border-cyan-900/50 px-6 py-3 text-xs text-cyan-900 dark:text-cyan-200 flex flex-wrap gap-x-6 gap-y-1.5">
+              <span><strong>Signer:</strong> {viewingSignedContract.signerName || (selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : "—")}</span>
+              <span><strong>Email:</strong> {viewingSignedContract.signerEmail || selectedUser?.email || "—"}</span>
+              <span><strong>Phone:</strong> {viewingSignedContract.signerPhone || selectedUser?.phone || "—"}</span>
+              {viewingSignedContract.event && (
+                <span><strong>Event:</strong> {viewingSignedContract.event.name || viewingSignedContract.event}</span>
+              )}
+              {viewingSignedContract.ip && <span><strong>IP:</strong> {viewingSignedContract.ip}</span>}
+              {viewingSignedContract.version != null && <span><strong>Version:</strong> v{viewingSignedContract.version}</span>}
+            </div>
+
+            {/* Contract Body */}
+            <div className="flex-1 overflow-y-auto p-6 text-sm text-gray-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-slate-800">
+              {viewingSignedContract.renderedContent ? (
+                <div dangerouslySetInnerHTML={{ __html: viewingSignedContract.renderedContent }} />
+              ) : viewingSignedContract.legalDocumentId?.content ? (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: replaceContractPlaceholders(
+                      viewingSignedContract.legalDocumentId.content,
+                      selectedUser,
+                      {
+                        eventName: viewingSignedContract.event?.name,
+                        date: viewingSignedContract.acceptedAt,
+                      }
+                    ),
+                  }}
+                />
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-slate-400">
+                  <p>No contract text snapshot saved for this record.</p>
+                  <p className="text-xs mt-1 text-gray-400">Key: {viewingSignedContract.contractKey} • Version: {viewingSignedContract.version ?? "N/A"}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <button
+                type="button"
+                onClick={() => setViewingSignedContract(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

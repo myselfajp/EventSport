@@ -693,6 +693,8 @@ export const SearchQuerySchema = z
         owner: z.string().regex(MongoObjectIdRegex, 'OwnerId must be a valid ID').optional(),
         /** Admin event list: active | cancelled | all (handled in get-event extraFilter) */
         status: z.enum(['active', 'cancelled', 'all']).optional(),
+        /** Event list timeScope: active (endTime >= now) | past (endTime < now) */
+        timeScope: z.enum(['active', 'past', 'all']).optional(),
         startTime: z.string().optional(),
         endTime: z.string().optional(),
         district: z.string().regex(MongoObjectIdRegex, 'DistrictId must be a valid ID').optional(),
@@ -899,14 +901,15 @@ export const createEventSchema = z
                     ? { message: 'Level is required.' }
                     : { message: 'Invalid level.' },
         }),
-        type: z.enum(['Indoor', 'Outdoor', 'Online'], {
-            errorMap: (iss) =>
-                iss.code === 'invalid_enum_value'
-                    ? { message: 'Event type must be one of: Indoor, Outdoor, Online.' }
-                    : iss.input === undefined
+        type: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
                         ? { message: 'Event type is required.' }
                         : { message: 'Invalid event type.' },
-        }),
+            })
+            .trim()
+            .min(1, 'Event type is required.'),
         style: z
             .string({
                 error: (iss) =>
@@ -937,14 +940,15 @@ export const createEventSchema = z
                         : { message: 'Invalid Sport.' },
             })
             .regex(MongoObjectIdRegex, 'Provide a valid sport ID.'),
-        priceType: z.enum(['Free', 'One-Timer', 'Bundle', 'Manual', 'Stable'], {
-            errorMap: (iss) =>
-                iss.code === 'invalid_enum_value'
-                    ? { message: 'Price type must be one of: Free, One-Timer, Bundle.' }
-                    : iss.input === undefined
+        priceType: z
+            .string({
+                error: (iss) =>
+                    iss.input === undefined
                         ? { message: 'Price type is required.' }
                         : { message: 'Invalid Price type.' },
-        }),
+            })
+            .trim()
+            .min(1, 'Price type is required.'),
         participationFee: z.number({
             error: (iss) =>
                 iss.input === undefined
@@ -1464,6 +1468,10 @@ export const createFacilitySchema = z
         .optional(),
 
     district: mongoObjectId.optional(),
+    country: countryCodeInput.optional(),
+    state: optionalTrimmedText().optional(),
+    city: optionalTrimmedText().optional(),
+    districtName: optionalTrimmedText().optional(),
     addressLine: z.string().trim().optional(),
 
     phone: z.string({
@@ -1499,9 +1507,18 @@ export const createFacilitySchema = z
 
     private: z.boolean().optional(),
 })
-    .refine((data) => Boolean(data.district), {
-        message: 'Istanbul district is required.',
-    });
+    .refine(
+        (data) => {
+            const ctry = String(data.country || 'TR').trim().toUpperCase();
+            if (ctry === 'TR') {
+                return Boolean(data.district || (data.city && data.districtName));
+            }
+            return Boolean((data.state && data.city) || data.address || data.district);
+        },
+        {
+            message: 'Valid location is required.',
+        }
+    );
 
 export const editFacilitySchema = z.object({
     name: z
@@ -1517,6 +1534,10 @@ export const editFacilitySchema = z.object({
         .optional(),
 
     district: mongoObjectId.optional(),
+    country: countryCodeInput.optional(),
+    state: optionalTrimmedText().optional(),
+    city: optionalTrimmedText().optional(),
+    districtName: optionalTrimmedText().optional(),
     addressLine: z.string().trim().optional(),
 
     phone: z
@@ -1741,6 +1762,10 @@ export const createCompanySchema = z
         .optional(),
 
     district: mongoObjectId.optional(),
+    country: countryCodeInput.optional(),
+    state: optionalTrimmedText().optional(),
+    city: optionalTrimmedText().optional(),
+    districtName: optionalTrimmedText().optional(),
     addressLine: z.string().trim().optional(),
 
     mainSport: mongoObjectId.optional(),
@@ -1766,9 +1791,14 @@ export const createCompanySchema = z
     }),
 })
     .refine(
-        (data) =>
-            (data.address && String(data.address).trim()) || Boolean(data.district),
-        { message: 'Select an Istanbul district or enter a legacy address.' }
+        (data) => {
+            const ctry = String(data.country || 'TR').trim().toUpperCase();
+            if (ctry === 'TR') {
+                return Boolean(data.district || (data.city && data.districtName) || data.address);
+            }
+            return Boolean((data.state && data.city) || data.address || data.district);
+        },
+        { message: 'Valid location or address is required.' }
     );
 
 export const editCompanySchema = z.object({
@@ -1785,6 +1815,10 @@ export const editCompanySchema = z.object({
         .optional(),
 
     district: mongoObjectId.optional(),
+    country: countryCodeInput.optional(),
+    state: optionalTrimmedText().optional(),
+    city: optionalTrimmedText().optional(),
+    districtName: optionalTrimmedText().optional(),
     addressLine: z.string().trim().optional(),
 
     mainSport: mongoObjectId.optional(),

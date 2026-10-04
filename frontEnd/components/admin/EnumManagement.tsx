@@ -48,6 +48,13 @@ interface EventStyle {
   updatedAt: string;
 }
 
+interface AppEnumItem {
+  _id: string;
+  category: "eventType" | "priceType" | "membershipLevel";
+  value: string;
+  order: number;
+}
+
 type TabType = "sports" | "sportGoals" | "eventStyles" | "enums";
 
 export default function EnumManagement() {
@@ -69,32 +76,20 @@ export default function EnumManagement() {
   const [showEventStyleModal, setShowEventStyleModal] = useState(false);
   const [editingEventStyle, setEditingEventStyle] = useState<EventStyle | null>(null);
   
-  const [eventTypes, setEventTypes] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("admin_eventTypes");
-      return stored ? JSON.parse(stored) : ["Indoor", "Outdoor", "Online"];
-    }
-    return ["Indoor", "Outdoor", "Online"];
-  });
-  const [priceTypes, setPriceTypes] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("admin_priceTypes");
-      return stored ? JSON.parse(stored) : ["Free", "One-Timer", "Bundle"];
-    }
-    return ["Free", "One-Timer", "Bundle"];
-  });
-  const [membershipLevels, setMembershipLevels] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("admin_membershipLevels");
-      return stored ? JSON.parse(stored) : ["Gold", "Platinum", "Bronze", "Silver"];
-    }
-    return ["Gold", "Platinum", "Bronze", "Silver"];
-  });
+  const [rawEnums, setRawEnums] = useState<AppEnumItem[]>([]);
+  const [eventTypes, setEventTypes] = useState<string[]>(["Indoor", "Outdoor", "Online"]);
+  const [priceTypes, setPriceTypes] = useState<string[]>(["Free", "One-Timer", "Bundle"]);
+  const [membershipLevels, setMembershipLevels] = useState<string[]>([
+    "Gold",
+    "Platinum",
+    "Bronze",
+    "Silver",
+  ]);
   const [showEventTypeModal, setShowEventTypeModal] = useState(false);
   const [showPriceTypeModal, setShowPriceTypeModal] = useState(false);
   const [showMembershipLevelModal, setShowMembershipLevelModal] = useState(false);
   const [editingEnumValue, setEditingEnumValue] = useState<string>("");
-  const [editingEnumIndex, setEditingEnumIndex] = useState<number>(-1);
+  const [editingEnumId, setEditingEnumId] = useState<string | null>(null);
   const [enumType, setEnumType] = useState<"eventType" | "priceType" | "membershipLevel">("eventType");
   
   const [loading, setLoading] = useState(false);
@@ -116,6 +111,8 @@ export default function EnumManagement() {
       fetchSportGoals();
     } else if (activeTab === "eventStyles") {
       fetchEventStyles();
+    } else if (activeTab === "enums") {
+      fetchEnums();
     }
   }, [activeTab]);
 
@@ -219,6 +216,34 @@ export default function EnumManagement() {
       }
     } catch (err: any) {
       setError(err.message || err.response?.data?.message || "Failed to fetch event styles");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEnums = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await fetchJSON(EP.REFERENCE.enums.get, {
+        method: "GET",
+      });
+
+      if (response?.success && response?.data) {
+        const { grouped, items } = response.data;
+        if (items) {
+          setRawEnums(items);
+        }
+        if (grouped) {
+          if (Array.isArray(grouped.eventType)) setEventTypes(grouped.eventType);
+          if (Array.isArray(grouped.priceType)) setPriceTypes(grouped.priceType);
+          if (Array.isArray(grouped.membershipLevel)) setMembershipLevels(grouped.membershipLevel);
+        }
+      } else {
+        setError(response?.message || response?.error || "Failed to fetch enums");
+      }
+    } catch (err: any) {
+      setError(err.message || err.response?.data?.message || "Failed to fetch enums");
     } finally {
       setLoading(false);
     }
@@ -560,7 +585,7 @@ export default function EnumManagement() {
   const handleCreateEnum = (type: "eventType" | "priceType" | "membershipLevel") => {
     setEnumType(type);
     setEditingEnumValue("");
-    setEditingEnumIndex(-1);
+    setEditingEnumId(null);
     if (type === "eventType") {
       setShowEventTypeModal(true);
     } else if (type === "priceType") {
@@ -570,18 +595,10 @@ export default function EnumManagement() {
     }
   };
 
-  const handleEditEnum = (type: "eventType" | "priceType" | "membershipLevel", index: number) => {
+  const handleEditEnum = (type: "eventType" | "priceType" | "membershipLevel", value: string, id?: string) => {
     setEnumType(type);
-    let value = "";
-    if (type === "eventType") {
-      value = eventTypes[index];
-    } else if (type === "priceType") {
-      value = priceTypes[index];
-    } else {
-      value = membershipLevels[index];
-    }
     setEditingEnumValue(value);
-    setEditingEnumIndex(index);
+    setEditingEnumId(id || null);
     if (type === "eventType") {
       setShowEventTypeModal(true);
     } else if (type === "priceType") {
@@ -591,91 +608,91 @@ export default function EnumManagement() {
     }
   };
 
-  const handleDeleteEnum = (type: "eventType" | "priceType" | "membershipLevel", index: number) => {
-    if (!confirm("Are you sure you want to delete this value?")) {
+  const handleDeleteEnum = async (type: "eventType" | "priceType" | "membershipLevel", value: string, id?: string) => {
+    if (!confirm(`Are you sure you want to delete "${value}"?`)) {
       return;
     }
 
-    if (type === "eventType") {
-      const newTypes = eventTypes.filter((_, i) => i !== index);
-      setEventTypes(newTypes);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("admin_eventTypes", JSON.stringify(newTypes));
+    // Try finding the item ID from rawEnums if not passed
+    const targetId = id || rawEnums.find((i) => i.category === type && i.value === value)?._id;
+    if (!targetId) {
+      // Local fallback
+      if (type === "eventType") {
+        setEventTypes((prev) => prev.filter((v) => v !== value));
+      } else if (type === "priceType") {
+        setPriceTypes((prev) => prev.filter((v) => v !== value));
+      } else {
+        setMembershipLevels((prev) => prev.filter((v) => v !== value));
       }
-    } else if (type === "priceType") {
-      const newTypes = priceTypes.filter((_, i) => i !== index);
-      setPriceTypes(newTypes);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("admin_priceTypes", JSON.stringify(newTypes));
+      return;
+    }
+
+    try {
+      setError("");
+      setLoading(true);
+      const res = await fetchJSON(EP.REFERENCE.enums.delete(targetId), {
+        method: "DELETE",
+      });
+      if (res?.success) {
+        await fetchEnums();
+      } else {
+        setError(res?.message || res?.error || "Failed to delete enum");
       }
-    } else {
-      const newTypes = membershipLevels.filter((_, i) => i !== index);
-      setMembershipLevels(newTypes);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("admin_membershipLevels", JSON.stringify(newTypes));
-      }
+    } catch (err: any) {
+      setError(err?.message || err?.response?.data?.message || "Failed to delete enum");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmitEnum = (e: React.FormEvent) => {
+  const handleSubmitEnum = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingEnumValue.trim()) {
+    const val = editingEnumValue.trim();
+    if (!val) {
       setError("Value cannot be empty");
       return;
     }
 
-    if (enumType === "eventType") {
-      if (editingEnumIndex >= 0) {
-        const newTypes = [...eventTypes];
-        newTypes[editingEnumIndex] = editingEnumValue.trim();
-        setEventTypes(newTypes);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("admin_eventTypes", JSON.stringify(newTypes));
+    try {
+      setError("");
+      setLoading(true);
+
+      if (editingEnumId) {
+        // Update existing enum
+        const res = await fetchJSON(EP.REFERENCE.enums.update(editingEnumId), {
+          method: "PUT",
+          body: { value: val },
+        });
+        if (res?.success) {
+          await fetchEnums();
+        } else {
+          setError(res?.message || res?.error || "Failed to update enum");
+          return;
         }
       } else {
-        const newTypes = [...eventTypes, editingEnumValue.trim()];
-        setEventTypes(newTypes);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("admin_eventTypes", JSON.stringify(newTypes));
+        // Create new enum
+        const res = await fetchJSON(EP.REFERENCE.enums.create, {
+          method: "POST",
+          body: { category: enumType, value: val },
+        });
+        if (res?.success) {
+          await fetchEnums();
+        } else {
+          setError(res?.message || res?.error || "Failed to create enum");
+          return;
         }
       }
+
       setShowEventTypeModal(false);
-    } else if (enumType === "priceType") {
-      if (editingEnumIndex >= 0) {
-        const newTypes = [...priceTypes];
-        newTypes[editingEnumIndex] = editingEnumValue.trim();
-        setPriceTypes(newTypes);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("admin_priceTypes", JSON.stringify(newTypes));
-        }
-      } else {
-        const newTypes = [...priceTypes, editingEnumValue.trim()];
-        setPriceTypes(newTypes);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("admin_priceTypes", JSON.stringify(newTypes));
-        }
-      }
       setShowPriceTypeModal(false);
-    } else {
-      if (editingEnumIndex >= 0) {
-        const newTypes = [...membershipLevels];
-        newTypes[editingEnumIndex] = editingEnumValue.trim();
-        setMembershipLevels(newTypes);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("admin_membershipLevels", JSON.stringify(newTypes));
-        }
-      } else {
-        const newTypes = [...membershipLevels, editingEnumValue.trim()];
-        setMembershipLevels(newTypes);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("admin_membershipLevels", JSON.stringify(newTypes));
-        }
-      }
       setShowMembershipLevelModal(false);
+      setEditingEnumValue("");
+      setEditingEnumId(null);
+    } catch (err: any) {
+      setError(err?.message || err?.response?.data?.message || "Failed to save enum");
+    } finally {
+      setLoading(false);
     }
-    setEditingEnumValue("");
-    setEditingEnumIndex(-1);
-    setError("");
   };
 
   return (
@@ -1022,30 +1039,33 @@ export default function EnumManagement() {
                   No event types
                 </p>
               ) : (
-                eventTypes.map((type, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
-                  >
-                    <span className="font-medium text-gray-900 dark:text-slate-100">
-                      {type}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditEnum("eventType", index)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEnum("eventType", index)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
+                eventTypes.map((type, index) => {
+                  const item = rawEnums.find((e) => e.category === "eventType" && e.value === type);
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-slate-100">
+                        {type}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditEnum("eventType", type, item?._id)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEnum("eventType", type, item?._id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
             <button
@@ -1068,30 +1088,33 @@ export default function EnumManagement() {
                   No price types
                 </p>
               ) : (
-                priceTypes.map((type, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
-                  >
-                    <span className="font-medium text-gray-900 dark:text-slate-100">
-                      {type}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditEnum("priceType", index)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEnum("priceType", index)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
+                priceTypes.map((type, index) => {
+                  const item = rawEnums.find((e) => e.category === "priceType" && e.value === type);
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-slate-100">
+                        {type}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditEnum("priceType", type, item?._id)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEnum("priceType", type, item?._id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
             <button
@@ -1114,30 +1137,33 @@ export default function EnumManagement() {
                   No membership levels
                 </p>
               ) : (
-                membershipLevels.map((level, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
-                  >
-                    <span className="font-medium text-gray-900 dark:text-slate-100">
-                      {level}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditEnum("membershipLevel", index)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEnum("membershipLevel", index)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
+                membershipLevels.map((level, index) => {
+                  const item = rawEnums.find((e) => e.category === "membershipLevel" && e.value === level);
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-slate-100">
+                        {level}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditEnum("membershipLevel", level, item?._id)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEnum("membershipLevel", level, item?._id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
             <button
@@ -1446,7 +1472,7 @@ export default function EnumManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 p-6 rounded-lg w-full max-w-md">
             <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-slate-100">
-              {editingEnumIndex >= 0 ? "Edit" : "Create"}{" "}
+              {editingEnumId ? "Edit" : "Create"}{" "}
               {enumType === "eventType"
                 ? "Event Type"
                 : enumType === "priceType"
@@ -1471,7 +1497,7 @@ export default function EnumManagement() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
                 >
-                  {editingEnumIndex >= 0 ? "Update" : "Create"}
+                  {editingEnumId ? "Update" : "Create"}
                 </button>
                 <button
                   type="button"
@@ -1480,7 +1506,7 @@ export default function EnumManagement() {
                     setShowPriceTypeModal(false);
                     setShowMembershipLevelModal(false);
                     setEditingEnumValue("");
-                    setEditingEnumIndex(-1);
+                    setEditingEnumId(null);
                   }}
                   className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                 >

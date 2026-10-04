@@ -84,9 +84,29 @@ const Header: React.FC<HeaderProps> = ({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [incomingRequestsCount, setIncomingRequestsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
   const [headerLogoAlt, setHeaderLogoAlt] = useState("EventSport");
+
+  const isProvider = !!(user?.coach || user?.performanceMember);
+
+  const fetchIncomingRequestsCount = useCallback(async () => {
+    if (!user || !(user.coach || user.performanceMember)) {
+      setIncomingRequestsCount(0);
+      return;
+    }
+    try {
+      const response = await fetchJSON(EP.SERVICE_REQUESTS.incomingCount, {
+        method: "GET",
+      });
+      if (response?.success) {
+        setIncomingRequestsCount(response.count || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch incoming requests count:", err);
+    }
+  }, [user]);
 
   const handleCoachMeClick = () => {
     if (isUserPending) return;
@@ -98,15 +118,16 @@ const Header: React.FC<HeaderProps> = ({
       }
       return;
     }
+    const targetTab = isProvider ? "incoming" : "mine";
     if (pathname === "/") {
       window.dispatchEvent(
         new CustomEvent("eventsport:open-coach-me", {
-          detail: { tab: "mine", autoWizard: false },
+          detail: { tab: targetTab, autoWizard: false },
         })
       );
       return;
     }
-    router.push("/?coachMe=1");
+    router.push(targetTab === "incoming" ? "/?serviceRequests=incoming" : "/?coachMe=1");
   };
 
   const updateMenuPosition = useCallback(() => {
@@ -261,20 +282,33 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIncomingRequestsCount(0);
+      return;
+    }
 
     fetchNotifications();
     fetchUnreadCount();
     fetchMessageUnreadCount();
+    fetchIncomingRequestsCount();
 
-    // Poll for new notifications and unread messages every 30 seconds
+    // Poll for new notifications, unread messages, and incoming service requests every 30 seconds
     const interval = setInterval(() => {
       fetchUnreadCount();
       fetchMessageUnreadCount();
+      fetchIncomingRequestsCount();
     }, 30000);
 
-    return () => clearInterval(interval);
-  }, [user]);
+    const handleIncomingUpdated = () => {
+      fetchIncomingRequestsCount();
+    };
+    window.addEventListener("eventsport:incoming-requests-updated", handleIncomingUpdated);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("eventsport:incoming-requests-updated", handleIncomingUpdated);
+    };
+  }, [user, fetchIncomingRequestsCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -516,10 +550,15 @@ const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={handleCoachMeClick}
               disabled={isUserPending}
-              className="header-coach-me-btn inline-flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500 to-green-500 px-3 py-2 sm:px-4 sm:py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-600 hover:to-green-600 hover:shadow-emerald-500/40 disabled:cursor-wait disabled:opacity-70 shrink-0"
+              className="relative header-coach-me-btn inline-flex items-center gap-2 rounded-xl border border-emerald-400/40 bg-gradient-to-r from-emerald-500 to-green-500 px-3 py-2 sm:px-4 sm:py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-600 hover:to-green-600 hover:shadow-emerald-500/40 disabled:cursor-wait disabled:opacity-70 shrink-0"
             >
               <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" strokeWidth={2} />
               <span className="header-coach-me-label whitespace-nowrap">Coach Me</span>
+              {incomingRequestsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-[1.25rem] px-1 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm animate-pulse leading-none">
+                  {incomingRequestsCount > 99 ? "99+" : incomingRequestsCount}
+                </span>
+              )}
             </button>
 
             <div className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-gray-200/70 dark:border-slate-700/70 bg-gray-50/60 dark:bg-slate-800/40 px-1 py-1 sm:px-1.5 sm:py-1.5 shrink-0">

@@ -106,6 +106,12 @@ export const getAllUsers = async (req, res, next) => {
 
         if (profileType === 'participant') {
             query.participant = { $exists: true, $ne: null };
+            query.coach = { $in: [null, undefined] };
+            query.performanceMember = { $in: [null, undefined] };
+            query.role = { $ne: 0 };
+            query.$nor = [
+                { facility: { $exists: true, $ne: null, $not: { $size: 0 } } },
+            ];
         } else if (profileType === 'coach') {
             query.coach = { $exists: true, $ne: null };
         } else if (profileType === 'facility') {

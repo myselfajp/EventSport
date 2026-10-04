@@ -51,10 +51,7 @@ const eventSchema = new mongoose.Schema(
         type: {
             type: String,
             required: true,
-            enum: {
-                values: ['Indoor', 'Outdoor', 'Online'],
-                message: 'Should be Indoor, Outdoor, Online',
-            },
+            trim: true,
         },
         style: {
             type: mongoose.Schema.Types.ObjectId,
@@ -101,10 +98,7 @@ const eventSchema = new mongoose.Schema(
         priceType: {
             type: String,
             required: true,
-            enum: {
-                values: ['Free', 'One-Timer', 'Bundle', 'Manual', 'Stable'],
-                message: 'Should be Free, One-Timer, Bundle',
-            },
+            trim: true,
         },
         participationFee: {
             type: Number,

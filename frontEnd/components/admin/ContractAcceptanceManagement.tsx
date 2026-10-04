@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { fetchJSON } from "../../app/lib/api";
 import { EP } from "../../app/lib/endpoints";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
 
 type AcceptanceUser = {
   _id: string;
   firstName?: string;
   lastName?: string;
   email?: string;
+  phone?: string;
 };
 
 type AcceptanceRow = {
@@ -21,13 +24,19 @@ type AcceptanceRow = {
   acceptedAt: string;
   user?: AcceptanceUser | string | null;
   visitorKey?: string | null;
+  renderedContent?: string | null;
+  signerName?: string | null;
+  signerEmail?: string | null;
+  signerPhone?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
   cookiePreferences?: {
     choice?: "accept_all" | "essential_only" | "custom";
     functional?: boolean;
     analytics?: boolean;
     marketing?: boolean;
   } | null;
-  legalDocumentId?: { docType?: string; version?: number; title?: string } | string;
+  legalDocumentId?: { docType?: string; version?: number; title?: string; content?: string } | string;
   staticPageId?: { name?: string; title?: string } | string;
   event?: { name?: string } | string;
 };
@@ -88,6 +97,7 @@ export default function ContractAcceptanceManagement() {
   const [contractKey, setContractKey] = useState("");
   const [context, setContext] = useState("");
   const [userId, setUserId] = useState("");
+  const [viewingContract, setViewingContract] = useState<AcceptanceRow | null>(null);
 
   const fetchList = useCallback(async () => {
     try {
@@ -212,6 +222,7 @@ export default function ContractAcceptanceManagement() {
                   <th className="p-3">Context</th>
                   <th className="p-3">Preferences</th>
                   <th className="p-3">Event</th>
+                  <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,6 +258,15 @@ export default function ContractAcceptanceManagement() {
                         ? row.event.name ?? "—"
                         : "—"}
                     </td>
+                    <td className="p-3 text-xs text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setViewingContract(row)}
+                        className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        View Contract
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -276,6 +296,80 @@ export default function ContractAcceptanceManagement() {
           >
             Next
           </button>
+        </div>
+      )}
+
+      {/* View Contract Modal */}
+      {viewingContract && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {viewingContract.title || viewingContract.contractKey}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Accepted on {formatDate(viewingContract.acceptedAt)} • {CONTEXT_LABELS[viewingContract.context] ?? viewingContract.context}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingContract(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Signer Info Summary Banner */}
+            <div className="bg-cyan-50 dark:bg-cyan-950/40 border-b border-cyan-100 dark:border-cyan-900/50 px-6 py-3 text-xs text-cyan-900 dark:text-cyan-200 flex flex-wrap gap-x-6 gap-y-1.5">
+              <span><strong>Signer:</strong> {viewingContract.signerName || (typeof viewingContract.user === "object" && viewingContract.user ? [viewingContract.user.firstName, viewingContract.user.lastName].filter(Boolean).join(" ") : "—")}</span>
+              <span><strong>Email:</strong> {viewingContract.signerEmail || (typeof viewingContract.user === "object" && viewingContract.user?.email) || "—"}</span>
+              <span><strong>Phone:</strong> {viewingContract.signerPhone || (typeof viewingContract.user === "object" && viewingContract.user?.phone) || "—"}</span>
+              {viewingContract.event && typeof viewingContract.event === "object" && (
+                <span><strong>Event:</strong> {viewingContract.event.name}</span>
+              )}
+              {viewingContract.ip && <span><strong>IP:</strong> {viewingContract.ip}</span>}
+              {viewingContract.version != null && <span><strong>Version:</strong> v{viewingContract.version}</span>}
+            </div>
+
+            {/* Contract Body */}
+            <div className="flex-1 overflow-y-auto p-6 text-sm text-gray-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-slate-800">
+              {viewingContract.renderedContent ? (
+                <div dangerouslySetInnerHTML={{ __html: viewingContract.renderedContent }} />
+              ) : typeof viewingContract.legalDocumentId === "object" && viewingContract.legalDocumentId?.content ? (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: replaceContractPlaceholders(
+                      viewingContract.legalDocumentId.content,
+                      typeof viewingContract.user === "object" ? viewingContract.user : null,
+                      {
+                        eventName: typeof viewingContract.event === "object" ? viewingContract.event?.name : undefined,
+                        date: viewingContract.acceptedAt,
+                      }
+                    ),
+                  }}
+                />
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-slate-400">
+                  <p>No contract text snapshot saved for this record.</p>
+                  <p className="text-xs mt-1 text-gray-400">Key: {viewingContract.contractKey} • Version: {viewingContract.version ?? "N/A"}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <button
+                type="button"
+                onClick={() => setViewingContract(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

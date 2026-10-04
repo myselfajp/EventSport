@@ -483,6 +483,12 @@ export const EP = {
       delete: (eventStyleId: string) =>
         `${REFERENCE_DATA_API}/delete-event-style/${eventStyleId}`,
     },
+    enums: {
+      get: `${REFERENCE_DATA_API}/enums`,
+      create: `${REFERENCE_DATA_API}/create-enum`,
+      update: (enumId: string) => `${REFERENCE_DATA_API}/update-enum/${enumId}`,
+      delete: (enumId: string) => `${REFERENCE_DATA_API}/delete-enum/${enumId}`,
+    },
   },
   PARTICIPANT: {
     createProfile: `${PARTICIPANT_DATA_API}/create-profile`,
@@ -617,6 +623,7 @@ export const EP = {
     create: `${SERVICE_REQUESTS_API}`,
     mine: `${SERVICE_REQUESTS_API}/mine`,
     incoming: `${SERVICE_REQUESTS_API}/incoming`,
+    incomingCount: `${SERVICE_REQUESTS_API}/incoming-count`,
     respond: (requestId: string) =>
       `${SERVICE_REQUESTS_API}/${requestId}/respond`,
     selectResponse: (requestId: string, responseId: string) =>

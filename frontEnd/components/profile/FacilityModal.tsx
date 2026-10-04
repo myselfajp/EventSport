@@ -27,10 +27,10 @@ import {
   normalizePhoneForDisplay,
   isPhoneComplete,
 } from "@/app/lib/phone-utils";
-import LocationFields, {
-  emptyLocationValue,
-} from "@/components/location/LocationFields";
-import type { LocationValue } from "@/app/lib/location-api";
+import CascadingLocationFields, {
+  normalizeCountry,
+} from "@/components/location/CascadingLocationFields";
+import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
 
 interface FacilityModalProps {
   isOpen: boolean;
@@ -50,6 +50,13 @@ interface FacilityFormData {
   photo: string;
   mainSport: string | { _id: string; name: string };
   isPrivate: boolean;
+  district?: string | { _id: string; name: string };
+  location?: LocationValue;
+  country?: string;
+  city?: string;
+  state?: string;
+  districtName?: string;
+  addressLine?: string;
 }
 
 interface SalonFormData {
@@ -107,6 +114,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   // Dirty Checking State
   const initialFormState = useRef<string>("");
   const initialSalonsState = useRef<string>("");
+  const initialLocationState = useRef<string>("");
 
   // UI State
   const [expandedSection, setExpandedSection] = useState<
@@ -159,6 +167,47 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       setFormData(initialForm);
       initialFormState.current = JSON.stringify(initialForm);
 
+      let initialLoc = emptyLocationValue();
+      if (initialData.location) {
+        initialLoc = {
+          country: initialData.location.country || "TR",
+          state: initialData.location.state || "",
+          stateCode: initialData.location.stateCode || "",
+          city: initialData.location.city || "",
+          provinceSlug: initialData.location.provinceSlug || "",
+          district:
+            typeof initialData.location.district === "object"
+              ? (initialData.location.district as any)?._id || ""
+              : initialData.location.district || "",
+          districtName: initialData.location.districtName || "",
+          postalCode: initialData.location.postalCode || "",
+          addressLine: initialData.location.addressLine || "",
+        };
+      } else if (
+        initialData.country ||
+        initialData.city ||
+        initialData.districtName ||
+        initialData.district
+      ) {
+        const distId =
+          typeof initialData.district === "object"
+            ? (initialData.district as any)?._id || ""
+            : initialData.district || "";
+        initialLoc = {
+          country: initialData.country || "TR",
+          state: initialData.state || "",
+          stateCode: "",
+          city: initialData.city || "",
+          provinceSlug: "",
+          district: distId,
+          districtName: initialData.districtName || "",
+          postalCode: "",
+          addressLine: initialData.addressLine || initialData.address || "",
+        };
+      }
+      setLocationValue(initialLoc);
+      initialLocationState.current = JSON.stringify(initialLoc);
+
       if (initialData.photo) {
         setPhotoPreview(initialData.photo);
       }
@@ -209,6 +258,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     initialFormState.current = JSON.stringify(emptyForm);
     setPhotoPreview(null);
     setPhotoFile(null);
+    setLocationValue(emptyLocationValue());
+    initialLocationState.current = JSON.stringify(emptyLocationValue());
     setSalons([]);
     setSalonPhotoFiles({});
     setSalonPhotosRemoved(new Set());
@@ -388,6 +439,15 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       newErrors.phone = `Enter full Turkish phone (9 digits after ${PHONE_PREFIX})`;
     }
 
+    const c = normalizeCountry(locationValue.country);
+    if (!initialData) {
+      if (c === "TR" && (!locationValue.city || !locationValue.districtName)) {
+        newErrors.location = "City and district are required";
+      } else if (c === "US" && (!locationValue.state || !locationValue.city)) {
+        newErrors.location = "State and city are required";
+      }
+    }
+
     // Salon Validation
     salons.forEach((salon, index) => {
       if (!salon.name) newErrors[`salon_${index}_name`] = "Name is required";
@@ -408,7 +468,10 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
 
   const isFacilityDirty = () => {
     if (photoFile) return true; // Photo changed
-    return JSON.stringify(formData) !== initialFormState.current;
+    return (
+      JSON.stringify(formData) !== initialFormState.current ||
+      JSON.stringify(locationValue) !== initialLocationState.current
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -429,16 +492,28 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       // 1. Save Facility (Only if dirty or new)
       if (!initialData || isFacilityDirty()) {
         const submitData = new FormData();
-        const facilityData = {
+        const c = normalizeCountry(locationValue.country);
+        const facilityData: any = {
           name: formData.name,
           address: formData.address,
           phone: formData.phone,
           email: formData.email,
           mainSport: formData.mainSport,
           private: formData.isPrivate,
-          district: locationValue.district || undefined,
-          addressLine: locationValue.addressLine || undefined,
+          country: c,
         };
+
+        if (c === "TR") {
+          if (locationValue.city) facilityData.city = locationValue.city.trim();
+          if (locationValue.districtName) facilityData.districtName = locationValue.districtName.trim();
+          if (locationValue.district) facilityData.district = locationValue.district;
+        } else {
+          if (locationValue.state) facilityData.state = locationValue.state.trim();
+          if (locationValue.city) facilityData.city = locationValue.city.trim();
+        }
+        if (locationValue.addressLine) {
+          facilityData.addressLine = locationValue.addressLine.trim();
+        }
 
         submitData.append("data", JSON.stringify(facilityData));
         if (photoFile) {
@@ -638,16 +713,37 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Istanbul district{" "}
-                            {!initialData && (
-                              <span className="text-red-500">*</span>
-                            )}
+                            Location {!initialData && <span className="text-red-500">*</span>}
                           </label>
-                          <LocationFields
+                          <CascadingLocationFields
                             value={locationValue}
                             onChange={setLocationValue}
+                            showPostalCode={false}
                             disabled={isLoading}
                           />
+                          <div className="mt-3">
+                            <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
+                              Street / details (optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={locationValue.addressLine || ""}
+                              onChange={(e) =>
+                                setLocationValue((prev) => ({
+                                  ...prev,
+                                  addressLine: e.target.value,
+                                }))
+                              }
+                              disabled={isLoading}
+                              placeholder="Building, street, etc."
+                              className="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:focus:border-cyan-400 transition-colors disabled:opacity-50"
+                            />
+                          </div>
+                          {errors.location && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {errors.location}
+                            </p>
+                          )}
                           {errors.address && (
                             <p className="mt-1 text-xs text-red-500">
                               {errors.address}

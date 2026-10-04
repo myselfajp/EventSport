@@ -32,13 +32,17 @@ type CatalogData = {
   coach: CatalogDoc[];
 };
 
+import { useMe } from "@/app/hooks/useAuth";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
+
 const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach"];
 
 const PROSE_CLASS =
   "text-sm text-gray-700 dark:text-slate-300 contracts-prose max-w-none [&_a]:text-cyan-600 dark:[&_a]:text-cyan-400 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6";
 
-function SectionBody({ html }: { html: string }) {
-  return <div className={PROSE_CLASS} dangerouslySetInnerHTML={{ __html: html }} />;
+function SectionBody({ html, user }: { html: string; user?: any }) {
+  const renderedHtml = replaceContractPlaceholders(html, user);
+  return <div className={PROSE_CLASS} dangerouslySetInnerHTML={{ __html: renderedHtml }} />;
 }
 
 function slugToDocType(slug: string): LegalDocType | null {
@@ -61,6 +65,7 @@ function findDoc(catalog: CatalogData, docType: LegalDocType): CatalogDoc | unde
 export default function ContractsContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: user } = useMe();
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
@@ -321,7 +326,7 @@ export default function ContractsContent() {
                     </p>
                   )}
                   <div className="rounded-lg border border-gray-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-5 sm:p-8">
-                    <SectionBody html={activeDoc.content ?? ""} />
+                    <SectionBody html={activeDoc.content ?? ""} user={user} />
                   </div>
                 </article>
               ) : (

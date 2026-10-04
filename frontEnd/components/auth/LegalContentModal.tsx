@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { useMe } from "@/app/hooks/useAuth";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
 
 interface LegalContentModalProps {
   title: string;
@@ -13,6 +15,10 @@ export default function LegalContentModal({
   content,
   onClose,
 }: LegalContentModalProps) {
+  const { data: user } = useMe();
+  const renderedContent = replaceContractPlaceholders(content || "", user);
+  const isHtml = /<[a-z][\s\S]*>/i.test(renderedContent);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
@@ -30,9 +36,16 @@ export default function LegalContentModal({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap">
-            {content || "(No content)"}
-          </div>
+          {isHtml ? (
+            <div
+              className="text-sm text-gray-700 dark:text-slate-300 contracts-prose max-w-none"
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
+            />
+          ) : (
+            <div className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap">
+              {renderedContent || "(No content)"}
+            </div>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700">
           <button

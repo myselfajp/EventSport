@@ -24,13 +24,31 @@ const activeEventStatusFilter = {
 
 const eventListExtraFilter = (req) => {
     const status = req.body?.status;
+    const timeScope = req.body?.timeScope;
     const isAdmin = req.user?.role === 0 || req.user?.role === '0';
+
+    const filter = {};
+
+    // 1. Status filter
     if (isAdmin) {
-        if (status === 'cancelled') return { status: 'cancelled' };
-        if (status === 'all') return {};
-        return activeEventStatusFilter;
+        if (status === 'cancelled') {
+            filter.status = 'cancelled';
+        } else if (status !== 'all') {
+            Object.assign(filter, activeEventStatusFilter);
+        }
+    } else {
+        Object.assign(filter, activeEventStatusFilter);
     }
-    return activeEventStatusFilter;
+
+    // 2. Time scope filter (active: endTime >= now, past: endTime < now)
+    const now = new Date();
+    if (timeScope === 'past') {
+        filter.endTime = { $lt: now };
+    } else if (timeScope === 'active') {
+        filter.endTime = { $gte: now };
+    }
+
+    return filter;
 };
 
 // club

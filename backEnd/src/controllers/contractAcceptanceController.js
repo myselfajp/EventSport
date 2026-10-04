@@ -40,8 +40,8 @@ export const listForAdmin = async (req, res, next) => {
                 .sort({ acceptedAt: -1 })
                 .skip(skip)
                 .limit(limit)
-                .populate('user', 'firstName lastName email')
-                .populate('legalDocumentId', 'docType version title')
+                .populate('user', 'firstName lastName email phone')
+                .populate('legalDocumentId', 'docType version title content')
                 .populate('staticPageId', 'name title')
                 .populate('event', 'name')
                 .lean(),
@@ -75,7 +75,8 @@ export const listByUserForAdmin = async (req, res, next) => {
 
         const items = await ContractAcceptance.find({ user: userId })
             .sort({ acceptedAt: -1 })
-            .populate('legalDocumentId', 'docType version title')
+            .populate('user', 'firstName lastName email phone')
+            .populate('legalDocumentId', 'docType version title content')
             .populate('staticPageId', 'name title')
             .populate('event', 'name')
             .lean();
