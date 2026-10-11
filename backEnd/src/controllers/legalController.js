@@ -8,6 +8,7 @@ import {
     GAMER_DOC_TYPES,
     COACH_DOC_TYPES,
 } from '../constants/contractDocuments.js';
+import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
 
 const DOC_TYPES = ALL_CONTRACT_DOC_TYPES;
 
@@ -233,6 +234,49 @@ export const getActiveCatalog = async (req, res, next) => {
                 gamer: group(GAMER_DOC_TYPES, 'gamer'),
                 coach: group(COACH_DOC_TYPES, 'coach'),
             },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * Record user acceptance of a legal document (e.g. coach upgrade distance selling agreement)
+ */
+export const acceptDocument = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw new AppError(401);
+        }
+        const user = req.user;
+        const { docType, versionId, planKey, planName, planPrice, context } = req.body || {};
+        if (!docType) {
+            throw new AppError(400, 'docType is required.');
+        }
+
+        let targetDoc = null;
+        if (versionId) {
+            targetDoc = await LegalDocument.findById(versionId).lean();
+        } else {
+            targetDoc = await LegalDocument.findOne({ docType, isActive: true }).lean();
+        }
+        if (!targetDoc) {
+            throw new AppError(404, `Active document for ${docType} not found.`);
+        }
+
+        const acceptance = await recordLegalAcceptance(req, user._id, {
+            versionId: targetDoc._id,
+            expectedDocType: targetDoc.docType,
+            context: context || 'upgrade',
+            user,
+            planName: planName || planKey,
+            planPrice,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Agreement accepted successfully.',
+            data: acceptance,
         });
     } catch (err) {
         next(err);

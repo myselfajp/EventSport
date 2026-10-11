@@ -1,4 +1,7 @@
 import express from 'express';
+import mongoose from 'mongoose';
+import User from '../models/userModel.js';
+import Coach from '../models/coachModel.js';
 import {
     createSearchController,
     getCoachList,
@@ -57,13 +60,31 @@ router.post(
     createSearchController(Club, {
         searchFields: ['name'],
         allowedFilters: ['mainSport'],
+        populate: [
+            { path: 'coaches', select: 'firstName lastName email' },
+            { path: 'mainSport', select: 'name' },
+        ],
+        extraFilter: (req) => {
+            const creator = req.body?.creator;
+            if (creator && mongoose.Types.ObjectId.isValid(creator)) {
+                const cOid = new mongoose.Types.ObjectId(creator);
+                return {
+                    $or: [{ creator: cOid }, { coaches: cOid }],
+                };
+            }
+            return {};
+        },
     })
 );
 router.post(
-    '/get-group/:clubId',
+    ['/get-group', '/get-group/:clubId'],
     createSearchController(ClubGroup, {
-        searchFields: ['clubName'],
-        extraFilter: (req) => ({ clubId: req.params.clubId }),
+        searchFields: ['name', 'clubName'],
+        populate: [
+            { path: 'coaches', select: 'firstName lastName email' },
+            { path: 'mainSport', select: 'name' },
+        ],
+        extraFilter: (req) => (req.params.clubId ? { clubId: req.params.clubId } : {}),
     })
 );
 
@@ -72,6 +93,29 @@ router.post(
     createSearchController(ClubGroup, {
         searchFields: ['name', 'clubName'],
         allowedFilters: ['mainSport'],
+        populate: [
+            { path: 'coaches', select: 'firstName lastName email' },
+            { path: 'mainSport', select: 'name' },
+        ],
+        extraFilter: async (req) => {
+            const owner = req.body?.owner;
+            const explicitUserId = req.body?.userId;
+            if (owner && mongoose.Types.ObjectId.isValid(owner)) {
+                const ownerOid = new mongoose.Types.ObjectId(owner);
+                const orConditions = [{ owner: ownerOid }, { coaches: ownerOid }];
+
+                if (explicitUserId && mongoose.Types.ObjectId.isValid(explicitUserId)) {
+                    orConditions.push({ coaches: new mongoose.Types.ObjectId(explicitUserId) });
+                } else {
+                    const userDoc = await User.findOne({ coach: ownerOid }).select('_id').lean();
+                    if (userDoc?._id) {
+                        orConditions.push({ coaches: userDoc._id });
+                    }
+                }
+                return { $or: orConditions };
+            }
+            return {};
+        },
     })
 );
 

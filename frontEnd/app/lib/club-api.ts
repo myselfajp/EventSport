@@ -7,7 +7,6 @@ export interface Club {
   name: string;
   vision?: string;
   conditions?: string;
-  president?: string;
   coaches: string[];
   photo?: {
     path: string;
@@ -65,12 +64,14 @@ export const getCreatedClubs = async (
 export const getCreatedGroups = async (
   ownerId: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 20,
+  userId?: string
 ): Promise<PaginatedResponse<Group>> => {
   return fetchJSON(EP.CLUB_GROUPS.getClubGroups, {
     method: "POST",
     body: {
       owner: ownerId,
+      ...(userId ? { userId } : {}),
       pageNumber: page,
       perPage: limit,
     },
@@ -119,8 +120,9 @@ export async function deleteClub(id: string) {
 }
 
 // Group CRUD operations
-export async function createGroup(clubId: string, formData: FormData) {
-  const res = await apiFetch(EP.CLUB_GROUPS.createGroup(clubId), {
+export async function createGroup(clubId: string | undefined | null, formData: FormData) {
+  const url = clubId ? EP.CLUB_GROUPS.createGroup(clubId) : EP.CLUB_GROUPS.createGroup();
+  const res = await apiFetch(url, {
     method: "POST",
     body: formData,
   });

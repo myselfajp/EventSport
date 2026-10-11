@@ -24,6 +24,7 @@ import {
   Briefcase,
   ArrowUpCircle,
   Video,
+  AlertTriangle,
 } from "lucide-react";
 import { useMe } from "@/app/hooks/useAuth";
 import { getProviderSubscription } from "@/app/lib/subscription-credits";
@@ -59,6 +60,9 @@ import {
 import { editUserPhoto } from "@/app/lib/auth-api";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import FacilityDetailsModal from "./FacilityDetailsModal";
+import CompanyDetailsModal from "./CompanyDetailsModal";
+import ClubViewModal from "@/components/ClubViewModal";
+import GroupViewModal from "@/components/GroupViewModal";
 import UserProfileModal from "@/components/UserProfileModal";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import GamerProfileRequiredBanner from "@/components/GamerProfileRequiredBanner";
@@ -69,7 +73,8 @@ import { ATHLETE_LABELS } from "@/app/lib/athlete-labels";
 import { primaryBranchCoachBadgeUrl } from "@/app/lib/coach-badge-utils";
 import { useFavorites } from "@/app/hooks/useFavorites";
 import { useFollows } from "@/app/hooks/useFollows";
-import { fetchJSON } from "@/app/lib/api";
+import { fetchJSON, apiFetch } from "@/app/lib/api";
+import { showAppToast } from "@/app/lib/app-toast";
 import BlogManagement from "@/components/blog/BlogManagement";
 import VideoManagement from "@/components/video/VideoManagement";
 import PerformanceApplyModal from "./PerformanceApplyModal";
@@ -101,6 +106,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const hasPerformanceProfile = !!user?.performanceMember;
   const hasProviderProfile = hasCoachProfile || hasPerformanceProfile;
   const providerSub = getProviderSubscription(user);
+  const isAthlete = !hasProviderProfile && user?.role !== 0;
+  const [selectedClubForView, setSelectedClubForView] = useState<any | null>(null);
+  const [selectedGroupForView, setSelectedGroupForView] = useState<any | null>(null);
+  const [selectedFacilityForView, setSelectedFacilityForView] = useState<any | null>(null);
+  const [selectedCompanyForView, setSelectedCompanyForView] = useState<any | null>(null);
   const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
   const [isApplyChoiceOpen, setIsApplyChoiceOpen] = useState(false);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
@@ -116,6 +126,47 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
+  const [confirmSwitchToAthleteOpen, setConfirmSwitchToAthleteOpen] = useState(false);
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+
+  const userRoleLabel = React.useMemo(() => {
+    if (!user) return "";
+    if (user.role === 0) return "Admin";
+    if (user.coach) return "Coach";
+    if (user.performanceMember) {
+      const pm = user.performanceMember as any;
+      const branch = pm.branch;
+      if (branch === "manager") return "Manager";
+      if (branch === "psychologist") return "Psychologist";
+      if (branch === "dietitian") return "Dietitian";
+      if (branch === "psychotherapist") return "Psychotherapist";
+      if (pm.title) return pm.title;
+      return "Performance Team";
+    }
+    return "Athlete";
+  }, [user]);
+
+  const handleSwitchToAthleteConfirm = async () => {
+    setIsSwitchingRole(true);
+    try {
+      const res = await fetchJSON(EP.PARTICIPANT.switchToAthlete, {
+        method: "POST",
+        body: { confirmRoleSwitch: true },
+      });
+      if (res?.success) {
+        showAppToast("Successfully switched to Athlete account", "success");
+        setConfirmSwitchToAthleteOpen(false);
+        setIsApplyChoiceOpen(false);
+        await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      } else {
+        showAppToast(res?.message || "Failed to switch role", "error");
+      }
+    } catch (err: any) {
+      showAppToast(err?.message || "Failed to switch role", "error");
+    } finally {
+      setIsSwitchingRole(false);
+    }
+  };
 
   const { data: allFacilities = [] } = useQuery({
     queryKey: ["facilities"],
@@ -141,10 +192,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     user?.coach?._id || (typeof user?.coach === "string" ? user?.coach : null);
 
   const { data: myGroupsData } = useQuery({
-    queryKey: ["my-groups", coachId],
+    queryKey: ["my-groups", coachId, user?._id],
     queryFn: () => {
-      console.log("Fetching groups for coach ID:", coachId);
-      return getCreatedGroups(coachId || "");
+      return getCreatedGroups(coachId || "", 1, 20, user?._id);
     },
     enabled: !!coachId && !!hasCoachProfile,
   });
@@ -165,14 +215,107 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const myClubs = myClubsData?.data || [];
   const myGroups = myGroupsData?.data || [];
 
-  const { data: likesData } = useFavorites({ eventsOnly: true });
-  const totalLikes = likesData?.data?.event?.length ?? 0;
+  const { data: favoritesData } = useFavorites();
+  const totalLikes = favoritesData?.data?.event?.length ?? 0;
 
   const {
     data: followsData,
     isFetching: isFollowsFetching,
   } = useFollows();
   const totalFollows = followsData?.counts?.total ?? followsData?.follows?.length ?? 0;
+
+  const athleteClubs = React.useMemo(() => {
+    if (!isAthlete) return [];
+    const map = new Map<string, any>();
+    (followsData?.grouped?.club || []).forEach((item: any) => {
+      const club = item.followingClub || item.club;
+      if (club && typeof club === "object" && club._id) {
+        map.set(club._id.toString(), {
+          ...club,
+          _id: club._id.toString(),
+          name: club.name || "Club",
+          photo: club.photo,
+          vision: club.vision,
+        });
+      } else if (typeof club === "string") {
+        map.set(club, { _id: club, name: "Club" });
+      }
+    });
+    return Array.from(map.values());
+  }, [isAthlete, followsData?.grouped?.club]);
+
+  const athleteCommunities = React.useMemo(() => {
+    if (!isAthlete) return [];
+    const map = new Map<string, any>();
+    (followsData?.grouped?.group || []).forEach((item: any) => {
+      const group = item.followingClubGroup || item.group;
+      if (group && typeof group === "object" && group._id) {
+        map.set(group._id.toString(), {
+          ...group,
+          _id: group._id.toString(),
+          name: group.name || "Community",
+          photo: group.photo,
+          clubName: group.clubName,
+        });
+      } else if (typeof group === "string") {
+        map.set(group, { _id: group, name: "Community" });
+      }
+    });
+    return Array.from(map.values());
+  }, [isAthlete, followsData?.grouped?.group]);
+
+  const athleteFacilities = React.useMemo(() => {
+    if (!isAthlete) return [];
+    const map = new Map<string, any>();
+    (followsData?.grouped?.facility || []).forEach((item: any) => {
+      const facility = item.followingFacility || item.facility;
+      if (facility && typeof facility === "object" && facility._id) {
+        map.set(facility._id.toString(), {
+          ...facility,
+          _id: facility._id.toString(),
+          name: facility.name || "Facility",
+          photo: facility.photo,
+          address: facility.address,
+        });
+      } else if (typeof facility === "string") {
+        map.set(facility, { _id: facility, name: "Facility" });
+      }
+    });
+    (favoritesData?.data?.facility || []).forEach((fac: any) => {
+      const id = fac?._id || fac?.id;
+      if (id && !map.has(id.toString())) {
+        map.set(id.toString(), {
+          ...fac,
+          _id: id.toString(),
+          name: fac.name || "Facility",
+          photo: fac.photo,
+          address: fac.address,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [isAthlete, followsData?.grouped?.facility, favoritesData?.data?.facility]);
+
+  const athleteCompanies = React.useMemo(() => {
+    if (!isAthlete) return [];
+    const map = new Map<string, any>();
+    (followsData?.grouped?.company || []).forEach((item: any) => {
+      const comp = item.followingCompany || item.company;
+      if (comp && typeof comp === "object" && (comp._id || comp.id)) {
+        const id = (comp._id || comp.id).toString();
+        map.set(id, {
+          ...comp,
+          _id: id,
+          id,
+          name: comp.name || "Company",
+          photo: comp.photo,
+        });
+      } else if (typeof comp === "string") {
+        map.set(comp, { _id: comp, id: comp, name: "Company" });
+      }
+    });
+    return Array.from(map.values());
+  }, [isAthlete, followsData?.grouped?.company]);
 
   const facilities = React.useMemo(() => {
     if (!user?.facility || !Array.isArray(user.facility)) return [];
@@ -441,7 +584,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       clubId,
       formData,
     }: {
-      clubId: string;
+      clubId?: string;
       formData: FormData;
     }) => createGroup(clubId, formData),
     onSuccess: () => {
@@ -618,47 +761,53 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       }
 
       formDataToSend.append("name", formData.name);
-      formDataToSend.append("address", formData.address);
-      formDataToSend.append("companyType", formData.companyType);
+      if (formData.address) formDataToSend.append("address", formData.address);
+      if (formData.companyType) formDataToSend.append("companyType", formData.companyType);
+      if (formData.country) formDataToSend.append("country", formData.country);
+      if (formData.city) formDataToSend.append("city", formData.city);
+      if (formData.state) formDataToSend.append("state", formData.state);
+      if (formData.district) formDataToSend.append("district", formData.district);
+      if (formData.districtName) formDataToSend.append("districtName", formData.districtName);
+      if (formData.addressLine) formDataToSend.append("addressLine", formData.addressLine);
+      if (formData.mainSport) formDataToSend.append("mainSport", formData.mainSport);
       if (formData.phone) formDataToSend.append("phone", formData.phone);
       if (formData.email) formDataToSend.append("email", formData.email);
 
       let response;
       if (editingCompany) {
         // Edit existing company
-        response = await fetch(EP.COMPANY.editCompany(editingCompany._id), {
+        response = await apiFetch(EP.COMPANY.editCompany(editingCompany._id), {
           method: "PUT",
           body: formDataToSend,
-          credentials: "include",
         });
       } else {
         // Create new company
-        response = await fetch(EP.COMPANY.createCompany, {
+        response = await apiFetch(EP.COMPANY.createCompany, {
           method: "POST",
           body: formDataToSend,
-          credentials: "include",
         });
       }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to save company");
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || "Failed to save company");
       }
 
-      const result = await response.json();
-
-      if (result.success) {
-        // Refresh user data to get updated companies
-        await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-        setEditingCompany(null);
-      } else {
-        throw new Error(result.message || "Failed to save company");
-      }
-    } catch (error) {
-      console.error("Error saving company:", error);
-      setCompanyError(
-        error instanceof Error ? error.message : "Failed to save company"
+      // Refresh user data to get updated companies
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      setEditingCompany(null);
+      setIsCompanyModalOpen(false);
+      showAppToast(
+        editingCompany ? "Company updated successfully" : "Company created successfully",
+        "success"
       );
+    } catch (error: any) {
+      console.error("Error saving company:", error);
+      const msg = error instanceof Error ? error.message : "Failed to save company";
+      setCompanyError(msg);
+      showAppToast(msg, "error");
+      throw error;
     } finally {
       setIsLoadingCompanies(false);
     }
@@ -914,7 +1063,12 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             ? `${user.firstName} ${user.lastName}`
             : "User"}
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        {userRoleLabel && (
+          <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 tracking-wide">
+            {userRoleLabel}
+          </span>
+        )}
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
           {user?.email || ""}
         </p>
 
@@ -1094,7 +1248,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     Switch provider role
                   </div>
                   <div className="text-[9px] sm:text-[10px] text-amber-800 dark:text-amber-200 truncate mt-0.5">
-                    Coach ↔ Performance Team
+                    Coach ↔ Performance / Athlete
                   </div>
                 </div>
               </button>
@@ -1103,25 +1257,70 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         )}
 
         {hasPerformanceProfile && (
-          <button
-            type="button"
-            onClick={handleOpenPerformanceModal}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-left"
-          >
-            <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/50">
-              <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-800 dark:text-white text-sm">
-                Edit Performance Team Profile
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleOpenPerformanceModal}
+              className="flex items-center gap-2 p-2 text-sm rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-left min-w-0"
+            >
+              <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/50 shrink-0">
+                <Briefcase className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               </div>
-              <div className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
-                <Check className="w-3 h-3" />
-                Performance profile saved
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-800 dark:text-white text-xs leading-tight truncate">
+                  Edit Performance Team
+                </div>
+                <div className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-0.5 mt-0.5">
+                  <Check className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">Active</span>
+                </div>
               </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          </button>
+            </button>
+            {user?.role !== 0 && (
+              <button
+                type="button"
+                onClick={() => setIsApplyChoiceOpen(true)}
+                className="flex items-center gap-2 px-2.5 py-2 text-sm rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors text-left min-w-0"
+              >
+                <div className="p-1 rounded-md bg-amber-100 dark:bg-amber-900/50 shrink-0">
+                  <Briefcase className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 dark:text-white text-[10px] sm:text-xs leading-tight">
+                    Switch provider role
+                  </div>
+                  <div className="text-[9px] sm:text-[10px] text-amber-800 dark:text-amber-200 truncate mt-0.5">
+                    Performance ↔ Coach / Athlete
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+        )}
+
+        {isAthlete && (
+          <div className="mb-2 sm:mb-2.5">
+            <button
+              type="button"
+              onClick={() => setIsApplyChoiceOpen(true)}
+              className="w-full flex items-center justify-between p-2.5 rounded-lg border border-orange-200 dark:border-orange-800/80 bg-orange-50/60 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all text-left group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-white leading-tight">
+                    Apply provider
+                  </div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                    Become a Coach or Performance Team
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-orange-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
         )}
 
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
@@ -1134,10 +1333,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               <Home className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
             <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
-              My Facilities
+              {isAthlete ? "Facilities" : "My Facilities"}
             </span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-              {facilities.length}
+              {isAthlete ? athleteFacilities.length : facilities.length}
             </span>
           </button>
 
@@ -1150,10 +1349,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               <Building className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
             <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
-              My Companies
+              {isAthlete ? "Companies" : "My Companies"}
             </span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-              {companies.length}
+              {isAthlete ? athleteCompanies.length : companies.length}
             </span>
           </button>
 
@@ -1165,48 +1364,29 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
               <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
             </div>
-            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight flex flex-col items-center">
-              <span>My</span>
-              <span>Clubs</span>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight">
+              {isAthlete ? "Clubs" : "My Clubs"}
             </span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-              {myClubs.length}
+              {isAthlete ? athleteClubs.length : myClubs.length}
             </span>
           </button>
 
-          {hasCoachProfile || user?.role === 0 ? (
-            <button
-              type="button"
-              onClick={() => setIsGroupsListOpen(true)}
-              className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
-            >
-              <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
-                <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
-                My Communities
-              </span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-                {myGroups.length}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsApplyChoiceOpen(true)}
-              className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-600 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-all"
-            >
-              <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/50 mb-1">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
-                Apply
-              </span>
-              <span className="text-[10px] text-orange-600 dark:text-orange-400 text-center leading-tight">
-                provider
-              </span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsGroupsListOpen(true)}
+            className="flex flex-col items-center p-2 sm:p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-cyan-500 dark:hover:border-cyan-500 bg-white dark:bg-gray-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-all"
+          >
+            <div className="p-1.5 rounded-md bg-cyan-50 dark:bg-cyan-900/50 mb-1">
+              <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-gray-800 dark:text-white text-center leading-tight px-0.5">
+              {isAthlete ? "Communities" : "My Communities"}
+            </span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+              {isAthlete ? athleteCommunities.length : myGroups.length}
+            </span>
+          </button>
         </div>
 
         {hasCoachProfile && (
@@ -1294,33 +1474,113 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 </>
               )}
               {hasCoachProfile && (
-                <button
-                  type="button"
-                  onClick={handleOpenPerformanceModal}
-                  className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/30"
-                >
-                  <div className="font-medium text-amber-900 dark:text-amber-100">
-                    Switch to Performance Team
-                  </div>
-                  <div className="text-sm text-amber-800 dark:text-amber-200">
-                    Your coach profile, service request data, and related messages will be removed.
-                  </div>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenPerformanceModal}
+                    className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/30"
+                  >
+                    <div className="font-medium text-amber-900 dark:text-amber-100">
+                      Switch to Performance Team
+                    </div>
+                    <div className="text-sm text-amber-800 dark:text-amber-200">
+                      Your coach profile, service request data, and related messages will be removed.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsApplyChoiceOpen(false);
+                      setConfirmSwitchToAthleteOpen(true);
+                    }}
+                    className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left hover:border-blue-400 dark:border-blue-800 dark:bg-blue-950/30"
+                  >
+                    <div className="font-medium text-blue-900 dark:text-blue-100">
+                      Switch to Athlete
+                    </div>
+                    <div className="text-sm text-blue-800 dark:text-blue-200">
+                      Your coach profile, certificates, service request data, and related messages will be removed.
+                    </div>
+                  </button>
+                </>
               )}
               {hasPerformanceProfile && !hasCoachProfile && (
-                <button
-                  type="button"
-                  onClick={handleOpenCoachModal}
-                  className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/30"
-                >
-                  <div className="font-medium text-amber-900 dark:text-amber-100">
-                    Switch to Coach
-                  </div>
-                  <div className="text-sm text-amber-800 dark:text-amber-200">
-                    Your Performance Team profile, service request data, and related messages will be removed.
-                  </div>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenCoachModal}
+                    className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/30"
+                  >
+                    <div className="font-medium text-amber-900 dark:text-amber-100">
+                      Switch to Coach
+                    </div>
+                    <div className="text-sm text-amber-800 dark:text-amber-200">
+                      Your Performance Team profile, service request data, and related messages will be removed.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsApplyChoiceOpen(false);
+                      setConfirmSwitchToAthleteOpen(true);
+                    }}
+                    className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left hover:border-blue-400 dark:border-blue-800 dark:bg-blue-950/30"
+                  >
+                    <div className="font-medium text-blue-900 dark:text-blue-100">
+                      Switch to Athlete
+                    </div>
+                    <div className="text-sm text-blue-800 dark:text-blue-200">
+                      Your Performance Team profile, service request data, and related messages will be removed.
+                    </div>
+                  </button>
+                </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmSwitchToAthleteOpen && (
+        <div className="fixed inset-0 z-app-modal flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-400">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Confirm Switch to Athlete
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 leading-relaxed">
+              Are you sure you want to switch to an Athlete account? All your active provider data, including your {hasCoachProfile ? "coach profile, branch certificates" : "performance team profile"}, service requests, and related messages will be reset.
+            </p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium mb-6 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50">
+              Note: Any remaining event creation and reply credits will not be lost. They will be safely preserved and automatically restored whenever you switch back to a Coach or Performance Team account.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmSwitchToAthleteOpen(false)}
+                disabled={isSwitchingRole}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSwitchToAthleteConfirm}
+                disabled={isSwitchingRole}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors flex items-center gap-2"
+              >
+                {isSwitchingRole ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Switching...
+                  </>
+                ) : (
+                  "Yes, Switch to Athlete"
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -1401,20 +1661,22 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                My Facilities
+                {isAthlete ? "Facilities" : "My Facilities"}
               </h2>
               <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => {
-                    setIsFacilitiesListOpen(false);
-                    handleFacilityAdd();
-                  }}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
-                >
-                  <Home className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Add Facility</span>
-                  <span className="sm:hidden">Add</span>
-                </button>
+                {!isAthlete && (
+                  <button
+                    onClick={() => {
+                      setIsFacilitiesListOpen(false);
+                      handleFacilityAdd();
+                    }}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
+                  >
+                    <Home className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Add Facility</span>
+                    <span className="sm:hidden">Add</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setIsFacilitiesListOpen(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -1431,7 +1693,49 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   {facilityError}
                 </div>
               )}
-              {facilities.length === 0 ? (
+              {isAthlete ? (
+                athleteFacilities.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <Home className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                    <p className="text-sm mb-2">No followed facilities yet</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Follow facilities to see them here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {athleteFacilities.map((facility: any) => (
+                      <div
+                        key={facility._id}
+                        onClick={() => {
+                          setSelectedFacilityForView(facility);
+                        }}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow relative cursor-pointer hover:border-cyan-300 dark:hover:border-cyan-700 bg-white dark:bg-gray-700"
+                      >
+                        {facility.photo ? (
+                          <img
+                            src={EP.assetUrl(facility.photo?.path || facility.photo)}
+                            alt={facility.name}
+                            className="w-full h-40 object-cover rounded-lg mb-3"
+                          />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-100 dark:bg-gray-600 rounded-lg mb-3 flex items-center justify-center">
+                            <Home className="w-16 h-16 text-gray-300 dark:text-gray-500" />
+                          </div>
+                        )}
+                        <h3 className="font-semibold text-gray-800 dark:text-white text-base sm:text-lg mb-1">
+                          {facility.name}
+                        </h3>
+                        {facility.address && (
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                            {facility.address}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : facilities.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Home className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                   <p className="text-sm mb-2">No facilities yet</p>
@@ -1570,20 +1874,22 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                My Companies
+                {isAthlete ? "Companies" : "My Companies"}
               </h2>
               <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => {
-                    setIsCompaniesListOpen(false);
-                    handleCompanyAdd();
-                  }}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
-                >
-                  <Building className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Add Company</span>
-                  <span className="sm:hidden">Add</span>
-                </button>
+                {!isAthlete && (
+                  <button
+                    onClick={() => {
+                      setIsCompaniesListOpen(false);
+                      handleCompanyAdd();
+                    }}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
+                  >
+                    <Building className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Add Company</span>
+                    <span className="sm:hidden">Add</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setIsCompaniesListOpen(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -1600,7 +1906,49 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   {companyError}
                 </div>
               )}
-              {companies.length === 0 ? (
+              {isAthlete ? (
+                athleteCompanies.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <Building className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                    <p className="text-sm mb-2">No followed companies yet</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Follow companies to see them here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {athleteCompanies.map((company: any) => (
+                      <div
+                        key={company._id || company.id}
+                        onClick={() => {
+                          setSelectedCompanyForView(company);
+                        }}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow relative cursor-pointer hover:border-cyan-300 dark:hover:border-cyan-700 bg-white dark:bg-gray-700"
+                      >
+                        {company.photo ? (
+                          <img
+                            src={EP.assetUrl(company.photo?.path || company.photo)}
+                            alt={company.name}
+                            className="w-full h-40 object-cover rounded-lg mb-3"
+                          />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-100 dark:bg-gray-600 rounded-lg mb-3 flex items-center justify-center">
+                            <Building className="w-16 h-16 text-gray-300 dark:text-gray-500" />
+                          </div>
+                        )}
+                        <h3 className="font-semibold text-gray-800 dark:text-white text-base sm:text-lg mb-1">
+                          {company.name}
+                        </h3>
+                        {company.location && (
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                            {company.location}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : companies.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Building className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                   <p className="text-sm mb-2">No companies yet</p>
@@ -1709,20 +2057,22 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                My Clubs
+                {isAthlete ? "Clubs" : "My Clubs"}
               </h2>
               <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => {
-                    setIsClubsListOpen(false);
-                    handleClubAdd();
-                  }}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
-                >
-                  <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Add Club</span>
-                  <span className="sm:hidden">Add</span>
-                </button>
+                {!isAthlete && (
+                  <button
+                    onClick={() => {
+                      setIsClubsListOpen(false);
+                      handleClubAdd();
+                    }}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
+                  >
+                    <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Add Club</span>
+                    <span className="sm:hidden">Add</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setIsClubsListOpen(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -1734,7 +2084,49 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
             {/* Modal Body */}
             <div className="p-4 sm:p-6 dark:bg-gray-800">
-              {myClubs.length === 0 ? (
+              {isAthlete ? (
+                athleteClubs.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <Shield className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                    <p className="text-sm mb-2">No followed clubs yet</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Follow clubs to see them here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {athleteClubs.map((club: any) => (
+                      <div
+                        key={club._id}
+                        onClick={() => {
+                          setSelectedClubForView(club);
+                        }}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow relative cursor-pointer hover:border-cyan-300 dark:hover:border-cyan-700 bg-white dark:bg-gray-700"
+                      >
+                        {club.photo ? (
+                          <img
+                            src={EP.assetUrl(club.photo?.path || club.photo)}
+                            alt={club.name}
+                            className="w-full h-40 object-cover rounded-lg mb-3"
+                          />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-100 dark:bg-gray-600 rounded-lg mb-3 flex items-center justify-center">
+                            <Shield className="w-16 h-16 text-gray-300 dark:text-gray-500" />
+                          </div>
+                        )}
+                        <h3 className="font-semibold text-gray-800 dark:text-white text-base sm:text-lg mb-1">
+                          {club.name}
+                        </h3>
+                        {club.vision && (
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                            {club.vision}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : myClubs.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Shield className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                   <p className="text-sm mb-2">No clubs yet</p>
@@ -1857,16 +2249,18 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                My Communities
+                {isAthlete ? "Communities" : "My Communities"}
               </h2>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleGroupAdd}
-                  className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  <Layers className="w-4 h-4" />
-                  <span>Add Sport Community</span>
-                </button>
+                {!isAthlete && (
+                  <button
+                    onClick={handleGroupAdd}
+                    className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span>Add Sport Community</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setIsGroupsListOpen(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
@@ -1878,7 +2272,54 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
             {/* Modal Body */}
             <div className="p-4 sm:p-6 dark:bg-gray-800">
-              {myGroups.length === 0 ? (
+              {isAthlete ? (
+                athleteCommunities.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <Layers className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                    <p className="text-sm mb-2">No followed communities yet</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Follow communities to see them here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {athleteCommunities.map((group: any) => (
+                      <div
+                        key={group._id}
+                        onClick={() => {
+                          setSelectedGroupForView(group);
+                        }}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow relative cursor-pointer hover:border-cyan-300 dark:hover:border-cyan-700 bg-white dark:bg-gray-700"
+                      >
+                        {group.photo ? (
+                          <img
+                            src={EP.assetUrl(group.photo?.path || group.photo)}
+                            alt={group.name}
+                            className="w-full h-40 object-cover rounded-lg mb-3"
+                          />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-100 dark:bg-gray-600 rounded-lg mb-3 flex items-center justify-center">
+                            <Layers className="w-16 h-16 text-gray-300 dark:text-gray-500" />
+                          </div>
+                        )}
+                        <h3 className="font-semibold text-gray-800 dark:text-white text-base sm:text-lg mb-1">
+                          {group.name}
+                        </h3>
+                        {group.clubName && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Club: {group.clubName}
+                          </p>
+                        )}
+                        {group.description && (
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                            {group.description}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : myGroups.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Layers className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                   <p className="text-sm mb-2">No sport communities yet</p>
@@ -2120,6 +2561,38 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
       />
+
+      {selectedClubForView && (
+        <ClubViewModal
+          isOpen={Boolean(selectedClubForView)}
+          onClose={() => setSelectedClubForView(null)}
+          club={selectedClubForView}
+        />
+      )}
+
+      {selectedGroupForView && (
+        <GroupViewModal
+          isOpen={Boolean(selectedGroupForView)}
+          onClose={() => setSelectedGroupForView(null)}
+          group={selectedGroupForView}
+        />
+      )}
+
+      {selectedFacilityForView && (
+        <FacilityDetailsModal
+          isOpen={Boolean(selectedFacilityForView)}
+          onClose={() => setSelectedFacilityForView(null)}
+          facility={selectedFacilityForView}
+        />
+      )}
+
+      {selectedCompanyForView && (
+        <CompanyDetailsModal
+          isOpen={Boolean(selectedCompanyForView)}
+          onClose={() => setSelectedCompanyForView(null)}
+          company={selectedCompanyForView}
+        />
+      )}
     </div>
   );
 };

@@ -362,7 +362,6 @@ export interface Club {
   name: string;
   vision?: string;
   conditions?: string;
-  president?: string;
   coaches: string[];
   photo?: {
     path: string;

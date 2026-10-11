@@ -7,6 +7,7 @@ import { Sport } from '../models/referenceDataModel.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { writeAuditLog, changedKeys, auditRoleForUser } from '../utils/auditLogger.js';
 import { AUDIT_ACTIONS } from '../constants/auditActions.js';
+import { assertCreationAllowedByLocation } from '../utils/geoFraudHelper.js';
 
 export const createCompany = async (req, res, next) => {
     try {
@@ -31,6 +32,14 @@ export const createCompany = async (req, res, next) => {
             if (!sportExists) throw new AppError(404, 'MainSport not found');
         }
         const companyPayload = await mergeLocationIntoPayload(result);
+
+        assertCreationAllowedByLocation({
+            req,
+            user,
+            targetCountry: companyPayload.location?.country || companyPayload.country,
+            actionLabel: 'company',
+        });
+
         const newCompany = await Company.create(companyPayload);
 
         await User.findByIdAndUpdate(user._id, {
@@ -91,6 +100,16 @@ export const editCompany = async (req, res, next) => {
             if (!sportExists) throw new AppError(404, 'MainSport not found');
         }
         const updatePayload = await mergeLocationIntoPayload(result);
+
+        if (updatePayload.location?.country || updatePayload.country) {
+            assertCreationAllowedByLocation({
+                req,
+                user,
+                targetCountry: updatePayload.location?.country || updatePayload.country,
+                actionLabel: 'company',
+            });
+        }
+
         const updatedCompany = await Company.findByIdAndUpdate(
             companyId,
             { $set: updatePayload },

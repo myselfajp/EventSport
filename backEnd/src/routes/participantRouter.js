@@ -41,6 +41,7 @@ router.post('/unfollow-club', participantController.unfollowClub);
 router.post('/join-to-group/:groupId', participantController.joinToClubGroup);
 router.post('/leave-group/:groupId', participantController.leaveClubGroup);
 router.post('/make-reservation', participantController.makeReservation);
+router.post('/cancel-reservation', participantController.cancelReservation);
 router.post('/enroll-series', participantController.enrollInSeries);
 router.post('/check-in', participantController.checkIn);
 router.post('/confirm-payment', participantController.confirmPayment);
@@ -57,5 +58,6 @@ router.post('/event-end-photos', participantController.getEventEndPhotos);
 router.get('/get-by-detail/:participantId', participantController.getParticipantDetails);
 router.get('/follows', participantController.getFollows);
 router.post('/my-reservations', participantController.getMyReservations);
+router.post('/switch-to-athlete', participantController.switchToAthlete);
 
 export default router;

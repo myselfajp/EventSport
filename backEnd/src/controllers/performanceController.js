@@ -79,8 +79,19 @@ export const createOrUpdateProfile = async (req, res, next) => {
             status: 'Pending',
             isVerified: false,
             rejectionReason: '',
-            ...(isNewProfile ? basicFields : {}),
         };
+
+        if (isNewProfile) {
+            const freshUser = await User.findById(req.user._id).select('preservedProviderCredits');
+            const preserved = freshUser?.preservedProviderCredits;
+            if (preserved && (Number(preserved.eventCredits) > 0 || Number(preserved.replyCredits) > 0)) {
+                update.eventCredits = preserved.eventCredits;
+                update.replyCredits = preserved.replyCredits;
+                update.subscriptionTier = preserved.subscriptionTier || basicFields.subscriptionTier;
+            } else {
+                Object.assign(update, basicFields);
+            }
+        }
 
         if (existing?.certificate?.path && req.fileMeta?.path) {
             try {
@@ -94,7 +105,10 @@ export const createOrUpdateProfile = async (req, res, next) => {
             ? await PerformanceMember.findByIdAndUpdate(existing._id, update, { new: true })
             : await PerformanceMember.create(update);
 
-        await User.findByIdAndUpdate(req.user._id, { performanceMember: profile._id });
+        await User.findByIdAndUpdate(req.user._id, {
+            performanceMember: profile._id,
+            ...(isNewProfile ? { $unset: { preservedProviderCredits: 1 } } : {}),
+        });
 
         await writeAuditLog({
             req,

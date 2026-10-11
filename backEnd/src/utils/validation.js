@@ -648,7 +648,7 @@ export const SearchQuerySchema = z
             .number()
             .int()
             .min(1, 'perPage must be at least 1')
-            .max(100, 'perPage must be at most 100')
+            .max(500, 'perPage must be at most 500')
             .optional()
             .default(10),
         pageNumber: z.number().int().min(1, 'pageNumber must be at least 1').optional().default(1),
@@ -691,6 +691,8 @@ export const SearchQuerySchema = z
         isVerified: z.boolean().optional(),
         creator: z.string().regex(MongoObjectIdRegex, 'CreatorId must be a valid ID').optional(),
         owner: z.string().regex(MongoObjectIdRegex, 'OwnerId must be a valid ID').optional(),
+        userId: z.string().regex(MongoObjectIdRegex, 'UserId must be a valid ID').optional(),
+        onlyUserClubs: z.boolean().optional(),
         /** Admin event list: active | cancelled | all (handled in get-event extraFilter) */
         status: z.enum(['active', 'cancelled', 'all']).optional(),
         /** Event list timeScope: active (endTime >= now) | past (endTime < now) */
@@ -1210,6 +1212,8 @@ export const createGroupSchema = z.object({
     city: optionalTrimmedText().optional(),
     districtName: optionalTrimmedText().optional(),
     addressLine: z.string().trim().optional(),
+    clubId: mongoObjectId.optional().nullable(),
+    coaches: z.array(mongoObjectId).optional(),
 });
 
 export const editGroupSchema = z
@@ -1237,6 +1241,8 @@ export const editGroupSchema = z
         city: optionalTrimmedText().optional(),
         districtName: optionalTrimmedText().optional(),
         addressLine: z.string().trim().optional(),
+        clubId: mongoObjectId.optional().nullable(),
+        coaches: z.array(mongoObjectId).optional(),
     })
     .refine(
         (data) => {
@@ -1251,6 +1257,8 @@ export const editGroupSchema = z
                 'city',
                 'districtName',
                 'addressLine',
+                'clubId',
+                'coaches',
             ];
             return keysToCheck.some((key) => data[key] !== undefined);
         },
@@ -1287,11 +1295,6 @@ export const createClubSchema = z
                 iss.input === undefined ? 'conditions is required.' : 'Invalid input.',
         })
         .optional(),
-    president: z
-        .string({
-            error: (iss) => (iss.input === undefined ? 'president is required.' : 'Invalid input.'),
-        })
-        .optional(),
     coaches: z.array(mongoObjectId).optional(),
     });
 
@@ -1324,12 +1327,6 @@ export const editClubSchema = z
                     iss.input === undefined ? 'conditions is required.' : 'Invalid input.',
             })
             .optional(),
-        president: z
-            .string({
-                error: (iss) =>
-                    iss.input === undefined ? 'president is required.' : 'Invalid input.',
-            })
-            .optional(),
         coaches: z.array(mongoObjectId).optional(),
     })
     .refine(
@@ -1339,7 +1336,6 @@ export const editClubSchema = z
                 'name',
                 'vision',
                 'conditions',
-                'president',
                 'coaches',
                 'mainSport',
                 'district',

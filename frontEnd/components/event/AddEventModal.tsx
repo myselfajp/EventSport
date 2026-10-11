@@ -458,8 +458,8 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
 
   // Fetch groups with search
   useEffect(() => {
-    if (formData.club && showGroupDropdown) {
-      fetchGroups(formData.club, debouncedGroupSearch);
+    if (showGroupDropdown) {
+      fetchGroups(formData.club || "", debouncedGroupSearch);
     }
   }, [formData.club, showGroupDropdown, debouncedGroupSearch]);
 
@@ -790,13 +790,32 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
       const res = await fetchJSON(EP.CLUB.getClub, {
         method: "POST",
         body: { 
-          perPage: 50, 
+          perPage: 100, 
           pageNumber: 1,
           ...(search.trim().length >= 2 && { search: search.trim() })
         },
       });
       if (res.success && res.data) {
-        setClubs(res.data);
+        let list = res.data;
+        if (user && user.role !== 0) {
+          const currentUserId = String(user._id);
+          list = list.filter((club: any) => {
+            const creatorId =
+              typeof club.creator === "object"
+                ? String(club.creator?._id)
+                : String(club.creator || "");
+            const isCreator = creatorId === currentUserId;
+            const isCoach =
+              Array.isArray(club.coaches) &&
+              club.coaches.some((c: any) => {
+                const cId =
+                  typeof c === "object" ? String(c?._id) : String(c || "");
+                return cId === currentUserId;
+              });
+            return isCreator || isCoach;
+          });
+        }
+        setClubs(list);
       } else {
         setClubs([]);
       }
@@ -811,16 +830,50 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
   const fetchGroups = async (clubId: string, search: string = "") => {
     setLoadingGroups(true);
     try {
-      const res = await fetchJSON(`${EP.GROUP.getGroup}/${clubId}`, {
+      const url = clubId ? `${EP.GROUP.getGroup}/${clubId}` : EP.GROUP.getGroup;
+      const res = await fetchJSON(url, {
         method: "POST",
         body: { 
-          perPage: 50, 
+          perPage: 100, 
           pageNumber: 1,
           ...(search.trim().length >= 2 && { search: search.trim() })
         },
       });
       if (res.success && res.data) {
-        setGroups(res.data);
+        let list = res.data;
+        if (user && user.role !== 0) {
+          const currentUserId = String(user._id);
+          const currentCoachId = user.coach
+            ? String(typeof user.coach === "object" ? user.coach._id : user.coach)
+            : "";
+          list = list.filter((group: any) => {
+            const ownerId =
+              typeof group.owner === "object"
+                ? String(group.owner?._id)
+                : String(group.owner || "");
+            const isOwner = Boolean(
+              (currentCoachId && ownerId === currentCoachId) ||
+              (currentUserId && ownerId === currentUserId)
+            );
+            const isCoach =
+              Array.isArray(group.coaches) &&
+              group.coaches.some((c: any) => {
+                const cId =
+                  typeof c === "object" ? String(c?._id) : String(c || "");
+                return cId === currentUserId || (currentCoachId && cId === currentCoachId);
+              });
+            let isParentClubAuth = false;
+            if (group.clubId && clubs.length > 0) {
+              const parentId =
+                typeof group.clubId === "object"
+                  ? String(group.clubId?._id)
+                  : String(group.clubId);
+              isParentClubAuth = clubs.some((c) => String(c._id) === parentId);
+            }
+            return isOwner || isCoach || isParentClubAuth;
+          });
+        }
+        setGroups(list);
       } else {
         setGroups([]);
       }
@@ -1535,8 +1588,6 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                           type="button"
                           onClick={() => {
                             handleInputChange("club", "");
-                            setFormData((prev) => ({ ...prev, group: "" }));
-                            setGroups([]);
                             setShowClubDropdown(false);
                             setClubSearchQuery("");
                           }}
@@ -1551,8 +1602,6 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                               type="button"
                               onClick={() => {
                                 handleInputChange("club", club._id);
-                                setFormData((prev) => ({ ...prev, group: "" }));
-                                setGroups([]);
                                 setShowClubDropdown(false);
                                 setClubSearchQuery("");
                               }}
@@ -1582,12 +1631,10 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (formData.club) {
-                        setShowGroupDropdown(!showGroupDropdown);
-                        if (!showGroupDropdown) setGroupSearchQuery("");
-                      }
+                      setShowGroupDropdown(!showGroupDropdown);
+                      if (!showGroupDropdown) setGroupSearchQuery("");
                     }}
-                    disabled={!formData.club || isAnyLoading}
+                    disabled={isAnyLoading}
                     className="w-full px-4 py-2.5 text-sm text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600 dark:text-white"
                   >
                     <span className="truncate">
@@ -1598,7 +1645,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({
                     </span>
                     <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                   </button>
-                  {showGroupDropdown && formData.club && (
+                  {showGroupDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
                       <div className="p-2 border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-700">
                         <div className="relative">

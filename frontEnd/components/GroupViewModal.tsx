@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { X, Users, Calendar, ChevronRight, Flag } from "lucide-react";
+import { X, Users, Calendar, ChevronRight, Flag, ArrowLeft } from "lucide-react";
 import { EP } from "@/app/lib/endpoints";
+import { fetchJSON } from "@/app/lib/api";
 import { fetchLinkedEvents, type LinkedEvent } from "@/app/lib/linked-events";
 import ViewEventModal from "@/components/event/ViewEventModal";
 import EntityFollowButton from "@/components/follow/EntityFollowButton";
@@ -16,10 +17,11 @@ type ViewEventModalEvent = NonNullable<
 export type GroupViewModalGroup = {
   _id: string;
   name: string;
-  owner?: string;
+  owner?: string | any;
   description?: string;
   clubId?: string;
   clubName?: string;
+  coaches?: any[];
   photo?: { path: string };
   isApproved?: boolean;
   createdAt?: string;
@@ -29,12 +31,16 @@ interface GroupViewModalProps {
   isOpen: boolean;
   onClose: () => void;
   group: GroupViewModalGroup | null;
+  onBack?: () => void;
+  backButtonText?: string;
 }
 
 const GroupViewModal: React.FC<GroupViewModalProps> = ({
   isOpen,
   onClose,
   group,
+  onBack,
+  backButtonText,
 }) => {
   const [groupEvents, setGroupEvents] = useState<LinkedEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -43,6 +49,7 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<LinkedEvent | null>(null);
   const [isEventViewOpen, setIsEventViewOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [resolvedCoachNames, setResolvedCoachNames] = useState<Record<string, string>>({});
   const { data: currentUser } = useMe();
 
   const groupId = group?._id ? String(group._id) : "";
@@ -78,6 +85,31 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
     }
   }, [isOpen, groupId, loadGroupEvents]);
 
+  useEffect(() => {
+    const stringIds = (group?.coaches || [])
+      .filter((c: any) => typeof c === "string" && /^[a-fA-F0-9]{24}$/.test(c)) as string[];
+    if (stringIds.length === 0) return;
+
+    Promise.all(
+      stringIds.map(async (id) => {
+        try {
+          const res = await fetchJSON(EP.AUTH.getUserById(id), { method: "GET" });
+          if (res?.success && res.data) {
+            const name = [res.data.firstName, res.data.lastName].filter(Boolean).join(" ");
+            return { id, name: name || res.data.email || "Coach" };
+          }
+        } catch {}
+        return { id, name: "Coach" };
+      })
+    ).then((results) => {
+      const map: Record<string, string> = {};
+      results.forEach((r) => {
+        if (r) map[r.id] = r.name;
+      });
+      setResolvedCoachNames((prev) => ({ ...prev, ...map }));
+    });
+  }, [group?.coaches]);
+
   if (!isOpen || !group) return null;
 
   const getImageUrl = (path?: string) => {
@@ -110,6 +142,20 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
     setIsEventViewOpen(true);
   };
 
+  const getDisplayName = (person: any, idx: number) => {
+    if (!person) return `Coach ${idx + 1}`;
+    if (typeof person === "object" && person !== null) {
+      const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ");
+      return fullName || person.name || person.email || `Coach ${idx + 1}`;
+    }
+    if (typeof person === "string") {
+      if (resolvedCoachNames[person]) return resolvedCoachNames[person];
+      if (/^[a-fA-F0-9]{24}$/.test(person)) return `Coach ${idx + 1}`;
+      return person;
+    }
+    return `Coach ${idx + 1}`;
+  };
+
   return (
     <>
       {!isEventViewOpen && (
@@ -117,6 +163,17 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-700">
             <div className="flex items-center gap-3">
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 transition-colors shrink-0"
+                  title="Back"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>{backButtonText || "Back"}</span>
+                </button>
+              )}
               <h2 className="text-xl font-bold text-gray-800 dark:text-white">
                 Sport Community Details
               </h2>
@@ -178,6 +235,29 @@ const GroupViewModal: React.FC<GroupViewModalProps> = ({
                   </label>
                   <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200 whitespace-pre-wrap">
                     {group.description}
+                  </div>
+                </div>
+              )}
+
+              {group.coaches && group.coaches.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                    Coaches
+                  </label>
+                  <div className="w-full px-4 py-2.5 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-200">
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.coaches.map((c: any, idx: number) => {
+                        const name = getDisplayName(c, idx);
+                        return (
+                          <span
+                            key={c?._id || idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 text-xs font-medium"
+                          >
+                            {name}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

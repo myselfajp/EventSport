@@ -11,12 +11,18 @@ const clubGroupSchema = new mongoose.Schema(
         clubId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Club',
-            required: true,
+            default: null,
         },
         clubName: {
             type: String,
-            required: true,
+            default: '',
         },
+        coaches: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            },
+        ],
         name: {
             type: String,
             required: true,

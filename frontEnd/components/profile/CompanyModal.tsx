@@ -18,6 +18,7 @@ import CascadingLocationFields, {
   normalizeCountry,
 } from "@/components/location/CascadingLocationFields";
 import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
+import { useMe } from "@/app/hooks/useAuth";
 
 type CompanyModalInitialData = Omit<CompanyFormData, "photo"> & {
   _id?: string;
@@ -27,7 +28,7 @@ type CompanyModalInitialData = Omit<CompanyFormData, "photo"> & {
 interface CompanyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (formData: CompanyFormData) => void;
+  onSubmit: (formData: CompanyFormData) => Promise<any> | void;
   initialData?: CompanyModalInitialData | null;
 }
 
@@ -54,6 +55,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
   onSubmit,
   initialData = null,
 }) => {
+  const { data: user } = useMe();
   const emptyForm: CompanyFormData = {
     name: "",
     address: "",
@@ -71,6 +73,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
   const [sports, setSports] = useState<{ _id: string; name: string }[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,7 +82,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
       try {
         const res = await fetchJSON(EP.REFERENCE.sport.get, {
           method: "POST",
-          body: { perPage: 200, pageNumber: 1 },
+          body: { perPage: 100, pageNumber: 1 },
         });
         if (res?.success && Array.isArray(res.data)) {
           setSports(res.data);
@@ -164,7 +167,8 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     } else {
       setFormData(emptyForm);
       setPhotoPreview(null);
-      setLocationValue(emptyLocationValue());
+      const userCountry = user?.location?.country ? normalizeCountry(user.location.country) : "TR";
+      setLocationValue({ ...emptyLocationValue(), country: userCountry });
     }
   }, [initialData, isOpen]);
 
@@ -205,7 +209,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
     handleInputChange("photo", "");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -265,11 +269,19 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
       payload.addressLine = locationValue.addressLine.trim();
     }
 
-    onSubmit(payload);
-    onClose();
-    setFormData(emptyForm);
-    setPhotoPreview(null);
-    setLocationValue(emptyLocationValue());
+    try {
+      setIsSubmitting(true);
+      await onSubmit(payload);
+      onClose();
+      setFormData(emptyForm);
+      setPhotoPreview(null);
+      setLocationValue(emptyLocationValue());
+    } catch (err: any) {
+      console.error("Company submission error:", err);
+      setError(err?.message || "Failed to save company");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -382,6 +394,8 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
                   value={locationValue}
                   onChange={setLocationValue}
                   showPostalCode={false}
+                  countryDisabled={Boolean(user?.location?.country)}
+                  countryLockNotice="Locked to your registered country (fraud prevention)"
                 />
                 <div className="mt-3">
                   <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
@@ -500,9 +514,14 @@ const CompanyModal: React.FC<CompanyModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
             >
-              {initialData ? "Update Company" : "Add Company"}
+              {isSubmitting
+                ? "Saving..."
+                : initialData
+                ? "Update Company"
+                : "Add Company"}
             </button>
           </div>
         </form>

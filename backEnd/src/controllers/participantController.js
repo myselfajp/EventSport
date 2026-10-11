@@ -16,6 +16,7 @@ import Event from '../models/eventModel.js';
 import Invite from '../models/inviteModel.js';
 import EventEndPhoto from '../models/eventEndPhotoModel.js';
 import RegistrationConsentLog from '../models/registrationConsentLogModel.js';
+import Notification from '../models/notificationModel.js';
 import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -37,6 +38,10 @@ import {
 } from '../utils/coachReviewHelper.js';
 import { writeAuditLog, changedKeys } from '../utils/auditLogger.js';
 import { AUDIT_ACTIONS } from '../constants/auditActions.js';
+import {
+    removeCoachProfileForUser,
+    removePerformanceProfileForUser,
+} from '../utils/providerRoleSwitch.js';
 
 /**
  * After a successful reservation, check whether this signup just hit the
@@ -1120,6 +1125,85 @@ export const makeReservation = async (req, res, next) => {
     }
 };
 
+export const cancelReservation = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.participant) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const user = req.user;
+        const eventId = zodValidation.eventId.parse(req.body?.eventId);
+
+        const reservation = await Reservation.findOne({
+            participant: user.participant,
+            event: eventId,
+        });
+        if (!reservation) {
+            throw new AppError(404, 'No active reservation found for this event.');
+        }
+
+        const event = await Event.findById(eventId).select('name startTime endTime status capacity');
+        if (!event) throw new AppError(404, 'Event not found.');
+
+        const now = new Date();
+        if (event.status === 'cancelled') {
+            throw new AppError(400, 'This event is already cancelled.');
+        }
+        if (event.startTime && now >= new Date(event.startTime)) {
+            throw new AppError(400, 'Cannot cancel participation: the event has already started.');
+        }
+
+        const wasWaitListed = reservation.isWaitListed;
+        await Reservation.deleteOne({ _id: reservation._id });
+
+        // If the cancelled participant was confirmed (not waitlisted), promote the earliest waitlisted participant
+        if (!wasWaitListed) {
+            const nextWaitlisted = await Reservation.findOne({
+                event: eventId,
+                isWaitListed: true,
+            }).sort({ createdAt: 1 });
+
+            if (nextWaitlisted) {
+                nextWaitlisted.isWaitListed = false;
+                nextWaitlisted.isApproved = true;
+                await nextWaitlisted.save();
+
+                try {
+                    const waitlistParticipant = await Participant.findById(nextWaitlisted.participant).select('user');
+                    if (waitlistParticipant?.user) {
+                        await Notification.create({
+                            user: waitlistParticipant.user,
+                            type: 'reservation_approved',
+                            title: 'Spot Available!',
+                            message: `A spot opened up for event "${event.name || 'Event'}" and your reservation has been confirmed.`,
+                            data: { eventId },
+                        });
+                    }
+                } catch (notifErr) {
+                    // non-blocking notification error
+                }
+            }
+        }
+
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.EVENT_LEFT,
+            entityType: 'reservation',
+            entityId: reservation._id,
+            description: 'Athlete cancelled participation in event',
+            metadata: { eventId, wasWaitListed },
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Your participation has been successfully cancelled.',
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const checkIn = async (req, res, next) => {
     try {
         if (!req.user || !req.user.participant) {
@@ -1806,6 +1890,59 @@ export const enrollInSeries = async (req, res, next) => {
                 reservationCount: result.reservationCount,
                 totalFee: result.totalFee,
             },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const switchToAthlete = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            throw new AppError(401);
+        }
+
+        const user = req.user;
+        const confirmSwitch = req.body?.confirmRoleSwitch === true;
+        if (!confirmSwitch) {
+            throw new AppError(
+                409,
+                'Switching to Athlete will remove your provider profile, service request data, and related messages. Confirm the role switch to continue.'
+            );
+        }
+
+        if (user.coach) {
+            await removeCoachProfileForUser(user._id);
+        }
+        if (user.performanceMember) {
+            await removePerformanceProfileForUser(user._id);
+        }
+
+        // Ensure user has participant profile
+        let updatedUser = await User.findById(user._id);
+        if (!updatedUser.participant) {
+            let participant = await Participant.findOne({ name: `${user.firstName} ${user.lastName}`.trim() });
+            if (!participant) {
+                participant = await Participant.create({
+                    name: `${user.firstName} ${user.lastName}`.trim(),
+                });
+            }
+            updatedUser.participant = participant._id;
+            await updatedUser.save();
+        }
+
+        await writeAuditLog({
+            req,
+            actorRole: 'athlete',
+            action: AUDIT_ACTIONS.PROVIDER_ROLE_SWITCHED,
+            entityType: 'user',
+            entityId: user._id,
+            description: 'Switched provider role to Athlete',
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Switched to Athlete successfully',
         });
     } catch (err) {
         next(err);

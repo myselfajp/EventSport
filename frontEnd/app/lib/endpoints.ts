@@ -201,6 +201,7 @@ export const EP = {
   LEGAL: {
     getActive: (type: string) => `${LEGAL_API}/active?type=${encodeURIComponent(type)}`,
     catalog: `${LEGAL_API}/catalog`,
+    accept: `${LEGAL_API}/accept`,
   },
   ADMIN: {
     panel: `${ADMIN_API}/panel`,
@@ -493,6 +494,7 @@ export const EP = {
   PARTICIPANT: {
     createProfile: `${PARTICIPANT_DATA_API}/create-profile`,
     editProfile: `${PARTICIPANT_DATA_API}/edit-profile`,
+    switchToAthlete: `${PARTICIPANT_DATA_API}/switch-to-athlete`,
     getDetails: (participantId: string) =>
       `${PARTICIPANT_DATA_API}/get-by-detail/${participantId}`,
     getFavorites: `${PARTICIPANT_DATA_API}/get-favorites`,
@@ -501,6 +503,7 @@ export const EP = {
     favoriteFacility: `${PARTICIPANT_DATA_API}/favorite-facility`,
     favoriteEvent: `${PARTICIPANT_DATA_API}/favorite-event`,
     makeReservation: `${PARTICIPANT_DATA_API}/make-reservation`,
+    cancelReservation: `${PARTICIPANT_DATA_API}/cancel-reservation`,
     enrollSeries: `${PARTICIPANT_DATA_API}/enroll-series`,
     checkIn: `${PARTICIPANT_DATA_API}/check-in`,
     confirmPayment: `${PARTICIPANT_DATA_API}/confirm-payment`,
@@ -658,10 +661,14 @@ export const EP = {
   },
   GROUP: {
     getGroup: `${API_V1_BASE}/get-group`,
+    getGroupByClub: (clubId: string) => `${API_V1_BASE}/get-group/${encodeURIComponent(clubId)}`,
   },
   CLUB_GROUPS: {
     getClubGroups: `${API_V1_BASE}/get-group-by-coach`,
-    createGroup: (clubId: string) => `${COACH_DATA_API}/create-group/${clubId}`,
+    createGroup: (clubId?: string) =>
+      clubId && clubId !== "none" && clubId !== "undefined"
+        ? `${COACH_DATA_API}/create-group/${encodeURIComponent(clubId)}`
+        : `${COACH_DATA_API}/create-group`,
     editGroup: (groupId: string) => `${COACH_DATA_API}/edit-group/${groupId}`,
     deleteGroup: (groupId: string) =>
       `${COACH_DATA_API}/delete-group/${groupId}`,

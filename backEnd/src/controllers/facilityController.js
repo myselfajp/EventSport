@@ -8,6 +8,7 @@ import * as zodValidation from '../utils/validation.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { writeAuditLog, changedKeys, auditRoleForUser } from '../utils/auditLogger.js';
 import { AUDIT_ACTIONS } from '../constants/auditActions.js';
+import { assertCreationAllowedByLocation } from '../utils/geoFraudHelper.js';
 
 export const createFacility = async (req, res, next) => {
     try {
@@ -31,6 +32,14 @@ export const createFacility = async (req, res, next) => {
         }
 
         const facilityPayload = await mergeLocationIntoPayload(result);
+
+        assertCreationAllowedByLocation({
+            req,
+            user,
+            targetCountry: facilityPayload.location?.country || facilityPayload.country,
+            actionLabel: 'facility',
+        });
+
         const newFacility = await Facility.create(facilityPayload);
 
         // Add facility to user's facility array
@@ -94,6 +103,16 @@ export const editFacility = async (req, res, next) => {
         }
 
         const updatePayload = await mergeLocationIntoPayload(result);
+
+        if (updatePayload.location?.country || updatePayload.country) {
+            assertCreationAllowedByLocation({
+                req,
+                user,
+                targetCountry: updatePayload.location?.country || updatePayload.country,
+                actionLabel: 'facility',
+            });
+        }
+
         const updatedFacility = await Facility.findByIdAndUpdate(
             facilityId,
             { $set: updatePayload },

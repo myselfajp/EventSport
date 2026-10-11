@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Crown, Loader2 } from "lucide-react";
+import { Check, Crown, Loader2, X, Globe, FileText } from "lucide-react";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
 import { getProviderSubscription } from "@/app/lib/subscription-credits";
+import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
+import { showAppToast } from "@/app/lib/app-toast";
 
 export type SubscriptionPlan = {
   _id: string;
@@ -34,6 +36,16 @@ export default function UpgradePlansView() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
+  const [coachDistanceDoc, setCoachDistanceDoc] = useState<{
+    _id?: string;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [isSubmittingAgreement, setIsSubmittingAgreement] = useState(false);
 
   const providerSub = getProviderSubscription(user);
   const currentTier = String(providerSub?.subscriptionTier || "").toLowerCase() || null;
@@ -67,10 +79,71 @@ export default function UpgradePlansView() {
     };
   }, []);
 
+  const handleSelectPlan = async (plan: SubscriptionPlan) => {
+    setSelectedPlan(plan);
+    setShowAgreementModal(true);
+    if (!coachDistanceDoc) {
+      setLoadingDoc(true);
+      try {
+        const res = await fetchJSON(
+          EP.LEGAL.getActive("coach_distance_selling"),
+          { method: "GET" },
+          { skipAuth: true }
+        );
+        if (res?.success && res.data) {
+          setCoachDistanceDoc(res.data);
+        }
+      } catch (e) {
+        console.error("Failed to load coach distance selling doc:", e);
+      } finally {
+        setLoadingDoc(false);
+      }
+    }
+  };
+
+  const handleAgreeAndProceed = async () => {
+    if (!selectedPlan) return;
+    setIsSubmittingAgreement(true);
+    try {
+      const res = await fetchJSON(EP.LEGAL.accept, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          docType: "coach_distance_selling",
+          versionId: coachDistanceDoc?._id,
+          planKey: selectedPlan.key,
+          planName: selectedPlan.name,
+          planPrice: formatPriceTry(selectedPlan.priceTry),
+          context: "coach_upgrade",
+        }),
+      });
+      if (res?.success) {
+        showAppToast("Agreement confirmed. Proceeding to checkout...", "success");
+        setShowAgreementModal(false);
+      } else {
+        showAppToast(res?.message || "Failed to record agreement.", "error");
+      }
+    } catch (err: any) {
+      showAppToast(err?.message || "An error occurred while confirming agreement.", "error");
+    } finally {
+      setIsSubmittingAgreement(false);
+    }
+  };
+
   const sortedPlans = useMemo(
     () => [...plans].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [plans]
   );
+
+  const coachBranch = useMemo(() => {
+    if (user?.coach?.branches && user.coach.branches.length > 0) {
+      return user.coach.branches
+        .map((b: any) => (typeof b === "object" && b !== null ? b.name : b))
+        .filter(Boolean)
+        .join(", ");
+    }
+    return user?.performanceMember ? "Performance Team" : "Coach";
+  }, [user]);
 
   return (
     <div className="space-y-8">
@@ -200,11 +273,10 @@ export default function UpgradePlansView() {
                 ) : (
                   <button
                     type="button"
-                    disabled
-                    title="Stripe checkout will be enabled when payment is ready"
-                    className="w-full rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white opacity-80 cursor-not-allowed"
+                    onClick={() => handleSelectPlan(plan)}
+                    className="w-full rounded-xl bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-2"
                   >
-                    Checkout coming soon
+                    Upgrade to {plan.name}
                   </button>
                 )}
               </article>
@@ -218,6 +290,117 @@ export default function UpgradePlansView() {
           No active plans yet. Ask an admin to seed subscription plans.
         </p>
       )}
+
+      {/* Coach & Performance Team Distance Selling Agreement Popup Modal */}
+      {showAgreementModal && selectedPlan && (
+        <div className="fixed inset-0 bg-black/70 dark:bg-black/85 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                  {coachDistanceDoc?.title || "Distance Selling Agreement (Coach)"}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Subscription agreement for <strong>{selectedPlan.name}</strong> ({formatPriceTry(selectedPlan.priceTry)})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAgreementModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Provider Info Summary Banner */}
+            <div className="bg-cyan-50 dark:bg-cyan-950/40 border-b border-cyan-100 dark:border-cyan-900/50 px-6 py-2.5 text-xs text-cyan-900 dark:text-cyan-200 flex flex-wrap gap-x-6 gap-y-1">
+              <span>
+                <strong>Buyer:</strong> {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.coach?.name || "—"}
+              </span>
+              <span>
+                <strong>Email:</strong> {user?.email || "—"}
+              </span>
+              <span>
+                <strong>Phone:</strong> {user?.phone || user?.phoneNumber || "—"}
+              </span>
+              <span>
+                <strong>Branch:</strong> {coachBranch}
+              </span>
+              <span>
+                <strong>Selected Plan:</strong> {selectedPlan.name} ({formatPriceTry(selectedPlan.priceTry)})
+              </span>
+            </div>
+
+            {/* Scrollable Agreement Content */}
+            <div className="flex-1 overflow-y-auto p-6 text-sm text-gray-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-slate-800">
+              {loadingDoc ? (
+                <div className="flex items-center justify-center gap-2 py-16 text-gray-500 dark:text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Loading contract details…
+                </div>
+              ) : coachDistanceDoc?.content ? (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: replaceContractPlaceholders(
+                      coachDistanceDoc.content,
+                      user,
+                      {
+                        planName: selectedPlan.name,
+                        price: formatPriceTry(selectedPlan.priceTry),
+                      }
+                    ),
+                  }}
+                />
+              ) : (
+                <p className="text-gray-500 dark:text-slate-400 text-center py-10">
+                  Distance selling agreement content is not available. Please try again later.
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex-wrap">
+              <a
+                href="/contracts"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1.5 py-1"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                View All Agreements
+              </a>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAgreementModal(false)}
+                  disabled={isSubmittingAgreement}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAgreeAndProceed}
+                  disabled={isSubmittingAgreement || loadingDoc || !coachDistanceDoc}
+                  className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                >
+                  {isSubmittingAgreement ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  I Have Read and Agree
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -11,6 +11,20 @@ import {
   type ContractCategory,
   type LegalDocType,
 } from "@/app/lib/contract-documents";
+import {
+  LegalArticle,
+  parseHtmlToArticles,
+  compileArticlesToHtml,
+} from "@/app/lib/legal-editor-parser";
+import {
+  Sparkles,
+  Code,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  FileText,
+} from "lucide-react";
 
 type DocTypeFilter = LegalDocType | "all";
 
@@ -55,6 +69,11 @@ export default function LegalManagement({
     content: "",
   });
 
+  const [editorMode, setEditorMode] = useState<"visual" | "code">("visual");
+  const [visualSubtitle, setVisualSubtitle] = useState("");
+  const [visualArticles, setVisualArticles] = useState<LegalArticle[]>([]);
+  const [visualFooter, setVisualFooter] = useState("");
+
   useEffect(() => {
     fetchDocs();
   }, [filter]);
@@ -83,18 +102,100 @@ export default function LegalManagement({
   const handleCreate = () => {
     setEditingDoc(null);
     const docType = docTypeFromFilter(filter, allowedDocTypes);
+    const initialTitle = DEFAULT_TITLES[docType] || "";
     setFormData({
       docType,
-      title: DEFAULT_TITLES[docType],
+      title: initialTitle,
       content: "",
     });
+    setVisualSubtitle("");
+    setVisualArticles([
+      {
+        id: "art-1",
+        heading: "MADDE 1 – TARAFLAR",
+        content: "",
+      },
+    ]);
+    setVisualFooter("");
+    setEditorMode("visual");
     setShowModal(true);
   };
 
   const handleEdit = (doc: LegalDocument) => {
     setEditingDoc(doc);
     setFormData({ docType: doc.docType, title: doc.title, content: doc.content });
+    const parsed = parseHtmlToArticles(doc.content);
+    setVisualSubtitle(parsed.subtitle);
+    setVisualArticles(parsed.articles);
+    setVisualFooter(parsed.footer);
+    setEditorMode("visual");
     setShowModal(true);
+  };
+
+  const switchToCode = () => {
+    const compiled = compileArticlesToHtml({
+      title: formData.title,
+      subtitle: visualSubtitle,
+      articles: visualArticles,
+      footer: visualFooter,
+    });
+    setFormData((prev) => ({ ...prev, content: compiled }));
+    setEditorMode("code");
+  };
+
+  const switchToVisual = () => {
+    const parsed = parseHtmlToArticles(formData.content);
+    setVisualSubtitle(parsed.subtitle);
+    setVisualArticles(parsed.articles);
+    setVisualFooter(parsed.footer);
+    setEditorMode("visual");
+  };
+
+  const addArticle = () => {
+    setVisualArticles((prev) => [
+      ...prev,
+      {
+        id: `art-${Date.now()}`,
+        heading: `MADDE ${prev.length + 1} – `,
+        content: "",
+      },
+    ]);
+  };
+
+  const removeArticle = (index: number) => {
+    setVisualArticles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const moveArticle = (index: number, direction: "up" | "down") => {
+    setVisualArticles((prev) => {
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[targetIndex];
+      copy[targetIndex] = temp;
+      return copy;
+    });
+  };
+
+  const updateArticle = (index: number, field: "heading" | "content", val: string) => {
+    setVisualArticles((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: val };
+      return copy;
+    });
+  };
+
+  const insertPlaceholderToArticle = (index: number, tag: string) => {
+    setVisualArticles((prev) => {
+      const copy = [...prev];
+      const existing = copy[index].content;
+      copy[index] = {
+        ...copy[index],
+        content: existing ? `${existing} ${tag}` : tag,
+      };
+      return copy;
+    });
   };
 
   const handleView = (doc: LegalDocument) => {
@@ -119,10 +220,20 @@ export default function LegalManagement({
     e.preventDefault();
     try {
       setError("");
+      const contentToSubmit =
+        editorMode === "visual"
+          ? compileArticlesToHtml({
+              title: formData.title,
+              subtitle: visualSubtitle,
+              articles: visualArticles,
+              footer: visualFooter,
+            })
+          : formData.content;
+
       if (editingDoc) {
         const res = await fetchJSON(EP.ADMIN.legal.update(editingDoc._id), {
           method: "PUT",
-          body: { title: formData.title, content: formData.content },
+          body: { title: formData.title, content: contentToSubmit },
         });
         if (res?.success) {
           setShowModal(false);
@@ -137,7 +248,7 @@ export default function LegalManagement({
           body: {
             docType: formData.docType,
             title: formData.title,
-            content: formData.content,
+            content: contentToSubmit,
             isActive: false,
           },
         });
@@ -295,17 +406,57 @@ export default function LegalManagement({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <h3 className="text-xl font-bold px-6 py-4 border-b border-gray-200 dark:border-slate-700 text-gray-900 dark:text-slate-100">
-              {editingDoc ? "Edit Document" : "Create New Version"}
-            </h3>
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col border border-gray-200 dark:border-slate-700 overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                  {editingDoc ? `Edit ${DOC_TYPE_LABELS[formData.docType] || "Document"}` : "Create New Document Version"}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  {editorMode === "visual"
+                    ? "Visual Clause Editor: Edit headings and clauses cleanly without raw HTML tags."
+                    : "Raw HTML Mode: Directly modify underlying HTML code."}
+                </p>
+              </div>
+
+              {/* Mode Toggle Switch */}
+              <div className="flex bg-gray-200 dark:bg-slate-700 rounded-lg p-1 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={switchToVisual}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                    editorMode === "visual"
+                      ? "bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 shadow-sm font-semibold"
+                      : "text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                  Visual Editor
+                </button>
+                <button
+                  type="button"
+                  onClick={switchToCode}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                    editorMode === "code"
+                      ? "bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 shadow-sm font-semibold"
+                      : "text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  Raw HTML
+                </button>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {!editingDoc && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
-                      Type
+                    <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">
+                      Contract Type
                     </label>
                     <select
                       value={formData.docType}
@@ -327,63 +478,239 @@ export default function LegalManagement({
                     </select>
                   </div>
                 )}
+
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
-                    Title
+                  <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">
+                    Document Title
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                    placeholder="e.g. Mesafeli Satış Sözleşmesi (Koç)"
+                    className="w-full px-3.5 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 font-medium"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
-                    Content
-                  </label>
-                  <textarea
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    rows={12}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 resize-y"
-                    placeholder="Plain text or HTML content…"
-                  />
-                  <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-                    <span className="font-semibold block mb-1">Dynamic Placeholders (automatically populated when signed):</span>
-                    <div className="flex flex-wrap gap-1">
-                      {[
-                        { tag: "{{ALICI_AD_SOYAD}}", label: "Buyer Full Name" },
-                        { tag: "{{ALICI_EPOSTA}}", label: "Buyer Email" },
-                        { tag: "{{ALICI_TELEFON}}", label: "Buyer Phone" },
-                        { tag: "{{ALICI_KONUM}}", label: "Buyer Location" },
-                        { tag: "{{ETKINLIK_ADI}}", label: "Event Name" },
-                        { tag: "{{UCRET}}", label: "Event Fee" },
-                        { tag: "{{TARIH}}", label: "Sign Date" },
-                        { tag: "{{KOC_BRANS}}", label: "Coach Branch" },
-                      ].map(({ tag, label }) => (
+
+                {editorMode === "visual" ? (
+                  <div className="space-y-6">
+                    {/* Subtitle / Header Note */}
+                    <div>
+                      <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">
+                        Subtitle / Description <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={visualSubtitle}
+                        onChange={(e) => setVisualSubtitle(e.target.value)}
+                        placeholder="e.g. 6502 Sayılı Tüketicinin Korunması Hakkında Kanun Uyarınca Düzenlenmiştir"
+                        className="w-full px-3.5 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 text-sm"
+                      />
+                    </div>
+
+                    {/* Articles Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                            Articles & Clauses ({visualArticles.length})
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-slate-400">
+                            Each article contains a title and plain paragraphs. No HTML tags needed.
+                          </p>
+                        </div>
                         <button
-                          key={tag}
                           type="button"
-                          onClick={() => setFormData((prev) => ({ ...prev, content: prev.content + " " + tag }))}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 rounded border border-cyan-200 dark:border-cyan-800 text-[11px] hover:bg-cyan-100"
-                          title={`Insert ${tag} (${label})`}
+                          onClick={addArticle}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg shadow-sm transition-colors"
                         >
-                          <code>{tag}</code>
-                          <span className="text-[10px] text-gray-500 dark:text-slate-400">({label})</span>
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Article
                         </button>
-                      ))}
+                      </div>
+
+                      <div className="space-y-4">
+                        {visualArticles.map((article, idx) => (
+                          <div
+                            key={article.id || `art-${idx}`}
+                            className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-900/40 space-y-3"
+                          >
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200 font-bold text-xs shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <input
+                                  type="text"
+                                  value={article.heading}
+                                  onChange={(e) =>
+                                    updateArticle(idx, "heading", e.target.value)
+                                  }
+                                  placeholder={`MADDE ${idx + 1} – BAŞLIK`}
+                                  className="w-full px-3 py-1.5 text-sm font-semibold border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => moveArticle(idx, "up")}
+                                  className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 disabled:opacity-30"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === visualArticles.length - 1}
+                                  onClick={() => moveArticle(idx, "down")}
+                                  className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 disabled:opacity-30"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={visualArticles.length <= 1}
+                                  onClick={() => removeArticle(idx)}
+                                  className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 disabled:opacity-30"
+                                  title="Delete Article"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <textarea
+                                value={article.content}
+                                onChange={(e) =>
+                                  updateArticle(idx, "content", e.target.value)
+                                }
+                                rows={5}
+                                placeholder="Type the clause text here. Use normal paragraphs and line breaks..."
+                                className="w-full px-3.5 py-2.5 text-sm leading-relaxed border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white resize-y"
+                              />
+                            </div>
+
+                            {/* Dynamic Placeholder Insertion Chips for this article */}
+                            <div className="pt-1">
+                              <span className="text-[11px] font-medium text-gray-500 dark:text-slate-400 block mb-1">
+                                Insert details into this clause:
+                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {[
+                                  { tag: "{{ALICI_AD_SOYAD}}", label: "Buyer Name" },
+                                  { tag: "{{ALICI_EPOSTA}}", label: "Email" },
+                                  { tag: "{{ALICI_TELEFON}}", label: "Phone" },
+                                  { tag: "{{ALICI_KONUM}}", label: "Location" },
+                                  { tag: "{{KOC_BRANS}}", label: "Branch" },
+                                  { tag: "{{PLAN_ADI}}", label: "Plan Name" },
+                                  { tag: "{{ETKINLIK_ADI}}", label: "Event Name" },
+                                  { tag: "{{UCRET}}", label: "Fee / Price" },
+                                  { tag: "{{TARIH}}", label: "Sign Date" },
+                                ].map(({ tag, label }) => (
+                                  <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={() => insertPlaceholderToArticle(idx, tag)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 rounded border border-cyan-200 dark:border-cyan-800 text-[10px] hover:bg-cyan-100 transition-colors"
+                                    title={`Insert ${tag}`}
+                                  >
+                                    <code>{tag}</code>
+                                    <span className="text-[9px] text-gray-500 dark:text-slate-400">({label})</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={addArticle}
+                        className="mt-3 w-full py-2.5 border-2 border-dashed border-gray-300 dark:border-slate-700 hover:border-cyan-500 rounded-xl text-sm font-semibold text-gray-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Another Article / Clause
+                      </button>
+                    </div>
+
+                    {/* Footer Notice */}
+                    <div>
+                      <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">
+                        Footer Note / Acceptance Notice <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                      </label>
+                      <textarea
+                        value={visualFooter}
+                        onChange={(e) => setVisualFooter(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. ALICI, platform üzerinden ilgili kutucuğu onaylayarak işbu sözleşmenin tüm maddelerini okuduğunu, anladığını ve elektronik ortamda kabul ettiğini beyan etmiştir."
+                        className="w-full px-3.5 py-2 text-xs border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 resize-y"
+                      />
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-slate-300">
+                      Raw HTML Content
+                    </label>
+                    <textarea
+                      value={formData.content}
+                      onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                      rows={14}
+                      className="w-full px-3 py-2 font-mono text-xs border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 resize-y"
+                      placeholder="HTML code…"
+                    />
+                    <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                      <span className="font-semibold block mb-1">
+                        Dynamic Placeholders:
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { tag: "{{ALICI_AD_SOYAD}}", label: "Buyer Full Name" },
+                          { tag: "{{ALICI_EPOSTA}}", label: "Buyer Email" },
+                          { tag: "{{ALICI_TELEFON}}", label: "Buyer Phone" },
+                          { tag: "{{ALICI_KONUM}}", label: "Buyer Location" },
+                          { tag: "{{KOC_BRANS}}", label: "Coach Branch" },
+                          { tag: "{{PLAN_ADI}}", label: "Plan Name" },
+                          { tag: "{{ETKINLIK_ADI}}", label: "Event Name" },
+                          { tag: "{{UCRET}}", label: "Event Fee" },
+                          { tag: "{{TARIH}}", label: "Sign Date" },
+                        ].map(({ tag, label }) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                content: prev.content + " " + tag,
+                              }))
+                            }
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 rounded border border-cyan-200 dark:border-cyan-800 text-[11px] hover:bg-cyan-100"
+                            title={`Insert ${tag} (${label})`}
+                          >
+                            <code>{tag}</code>
+                            <span className="text-[10px] text-gray-500 dark:text-slate-400">
+                              ({label})
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2 p-6 border-t border-gray-200 dark:border-slate-700">
+
+              <div className="flex gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+                  className="flex-1 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg shadow-sm transition-colors"
                 >
-                  {editingDoc ? "Update" : "Create"}
+                  {editingDoc ? "Save Changes" : "Create New Version"}
                 </button>
                 <button
                   type="button"
@@ -391,7 +718,7 @@ export default function LegalManagement({
                     setShowModal(false);
                     setEditingDoc(null);
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  className="px-6 py-2.5 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-semibold rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

@@ -6,6 +6,7 @@ import {
   X,
   ImageIcon,
   UserPlus,
+  UserMinus,
   CheckCircle,
   CreditCard,
   Copy,
@@ -229,6 +230,8 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   }, []);
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [joinStatus, setJoinStatus] = useState<{
     _id?: string;
     isWaitListed?: boolean;
@@ -440,64 +443,53 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
   };
 
   // Reservation + end-photo flags (gamers + coaches)
-  useEffect(() => {
+  const fetchEventSideInfo = useCallback(async () => {
     if (!isOpen || !event || !user) return;
+    try {
+      const response = await apiFetch(`${EP.EVENTS.getEvents}/${String(event._id)}`, {
+        method: "POST",
+      });
+      const data = await response.json();
 
-    const fetchEventSideInfo = async () => {
-      try {
-        const response = await apiFetch(`${EP.EVENTS.getEvents}/${String(event._id)}`, {
-          method: "POST",
-        });
-        const data = await response.json();
+      if (response.ok && data.success) {
+        setHasEndPhotoSubmission(!!data.hasEndPhotoSubmission);
+        setHasCoachEndPhotoSubmission(!!data.hasCoachEndPhotoSubmission);
 
-        if (response.ok && data.success) {
-          setHasEndPhotoSubmission(!!data.hasEndPhotoSubmission);
-          setHasCoachEndPhotoSubmission(!!data.hasCoachEndPhotoSubmission);
+        if (
+          typeof data.data?.checkInOpensHoursBeforeStart === "number"
+        ) {
+          setResolvedCheckInHours(data.data.checkInOpensHoursBeforeStart);
+        }
 
-          if (
-            typeof data.data?.checkInOpensHoursBeforeStart === "number"
-          ) {
-            setResolvedCheckInHours(data.data.checkInOpensHoursBeforeStart);
-          }
-
-          if (user.participant) {
-            if (data.reservation) {
-              setHasJoined(true);
-              setJoinStatus({
-                _id: data.reservation._id,
-                isWaitListed: data.reservation.isWaitListed,
-                isApproved: data.reservation.isApproved,
-                isCheckedIn: data.reservation.isCheckedIn,
-                isPaid: data.reservation.isPaid,
-                qr: data.reservation.qr,
-              });
-              if (data.reservation.isCheckedIn) {
-                setReservationId(data.reservation._id);
-              }
-            } else {
-              setHasJoined(false);
-              setJoinStatus(null);
+        if (user.participant) {
+          if (data.reservation) {
+            setHasJoined(true);
+            setJoinStatus({
+              _id: data.reservation._id,
+              isWaitListed: data.reservation.isWaitListed,
+              isApproved: data.reservation.isApproved,
+              isCheckedIn: data.reservation.isCheckedIn,
+              isPaid: data.reservation.isPaid,
+              qr: data.reservation.qr,
+            });
+            if (data.reservation.isCheckedIn) {
+              setReservationId(data.reservation._id);
             }
-          }
-
-          if (data.series) setSeriesInfo(data.series);
-          else setSeriesInfo(null);
-          if (Array.isArray(data.seriesSessions)) {
-            setSeriesSessions(data.seriesSessions);
           } else {
-            setSeriesSessions([]);
-          }
-          setSeriesEnrollment(data.seriesEnrollment ?? null);
-        } else {
-          setHasEndPhotoSubmission(false);
-          setHasCoachEndPhotoSubmission(false);
-          if (user.participant) {
             setHasJoined(false);
             setJoinStatus(null);
           }
         }
-      } catch (error) {
-        console.error("Error fetching event detail:", error);
+
+        if (data.series) setSeriesInfo(data.series);
+        else setSeriesInfo(null);
+        if (Array.isArray(data.seriesSessions)) {
+          setSeriesSessions(data.seriesSessions);
+        } else {
+          setSeriesSessions([]);
+        }
+        setSeriesEnrollment(data.seriesEnrollment ?? null);
+      } else {
         setHasEndPhotoSubmission(false);
         setHasCoachEndPhotoSubmission(false);
         if (user.participant) {
@@ -505,10 +497,47 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
           setJoinStatus(null);
         }
       }
-    };
-
-    void fetchEventSideInfo();
+    } catch (error) {
+      console.error("Error fetching event detail:", error);
+      setHasEndPhotoSubmission(false);
+      setHasCoachEndPhotoSubmission(false);
+      if (user.participant) {
+        setHasJoined(false);
+        setJoinStatus(null);
+      }
+    }
   }, [isOpen, event, user]);
+
+  useEffect(() => {
+    void fetchEventSideInfo();
+  }, [fetchEventSideInfo]);
+
+  const handleCancelParticipation = async () => {
+    if (!event?._id || !user?.participant || isLeaving) return;
+    setIsLeaving(true);
+    try {
+      const res = await apiFetch(EP.PARTICIPANT.cancelReservation, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event._id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showAppToast(data.message || "Your participation has been cancelled.", "success");
+        setHasJoined(false);
+        setJoinStatus(null);
+        setReservationId(null);
+        setShowLeaveConfirm(false);
+        void fetchEventSideInfo();
+      } else {
+        showAppToast(data?.message || "Failed to cancel participation.", "error");
+      }
+    } catch (err: any) {
+      showAppToast(err?.message || "Failed to cancel participation.", "error");
+    } finally {
+      setIsLeaving(false);
+    }
+  };
 
   const loadEndPhotoGallery = useCallback(async () => {
     if (!event?._id) {
@@ -1709,6 +1738,17 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                           ? "Registration closed"
                           : "Join this session"}
                 </button>
+                {hasJoined && !isCancelled && (
+                  <button
+                    type="button"
+                    onClick={() => setShowLeaveConfirm(true)}
+                    disabled={isLeaving}
+                    className="px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-40"
+                  >
+                    <UserMinus className="w-4 h-4" />
+                    {isLeaving ? "Cancelling…" : "Leave Event"}
+                  </button>
+                )}
                 {isPartOfSeries &&
                   !seriesEnrollment &&
                   !registrationClosed && (
@@ -2471,6 +2511,37 @@ const ViewEventModal: React.FC<ViewEventModalProps> = ({
                   I Have Read and Agree
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Leave Event Confirmation Modal */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/75 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Cancel Participation?
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-slate-300 mb-6">
+              Are you sure you want to leave this event? Your reserved spot will be released and made available to other athletes.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirm(false)}
+                disabled={isLeaving}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              >
+                Keep Spot
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelParticipation}
+                disabled={isLeaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 font-semibold"
+              >
+                {isLeaving ? "Leaving…" : "Yes, Leave Event"}
+              </button>
             </div>
           </div>
         </div>

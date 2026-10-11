@@ -95,7 +95,7 @@ router.post('/join-backup-coach/:eventId', coachController.joinBackupCoach);
 
 // clubGroup
 router.post(
-    '/create-group/:clubId',
+    ['/create-group', '/create-group/:clubId'],
     uploadFile({ fieldName: 'group-photo', optional: true }),
     coachController.createGroup
 );

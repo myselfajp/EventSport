@@ -95,6 +95,13 @@ const userSchema = new mongoose.Schema(
             type: Number,
             default: 1,
         },
+        /** Saved provider credits when user switches to Athlete, so they are restored upon returning to Coach/Performance. */
+        preservedProviderCredits: {
+            eventCredits: { type: Number, default: 0 },
+            replyCredits: { type: Number, default: 0 },
+            subscriptionTier: { type: String, default: 'basic' },
+            savedAt: { type: Date, default: null },
+        },
         /** Account inactive: sign-in and protected APIs are rejected. */
         isActive: {
             type: Boolean,

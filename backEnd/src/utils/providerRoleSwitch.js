@@ -73,6 +73,19 @@ export async function removeCoachProfileForUser(userId) {
     if (!user?.coach) return { removed: false };
 
     const coachId = user.coach;
+    const coachDoc = await Coach.findById(coachId);
+    if (coachDoc) {
+        const creditsToPreserve = {
+            eventCredits: coachDoc.eventCredits || 0,
+            replyCredits: coachDoc.replyCredits || 0,
+            subscriptionTier: coachDoc.subscriptionTier || 'basic',
+            savedAt: new Date(),
+        };
+        await User.findByIdAndUpdate(userId, {
+            $set: { preservedProviderCredits: creditsToPreserve },
+        });
+    }
+
     const branches = await Branch.find({ coach: coachId });
     for (const branch of branches) {
         await deleteBranchCertificateFile(branch);
@@ -91,11 +104,23 @@ export async function removePerformanceProfileForUser(userId) {
     if (!user?.performanceMember) return { removed: false };
 
     const profile = await PerformanceMember.findById(user.performanceMember);
-    if (profile?.certificate?.path) {
-        try {
-            await unlink(profile.certificate.path);
-        } catch (err) {
-            console.warn('Failed to delete performance certificate:', err);
+    if (profile) {
+        const creditsToPreserve = {
+            eventCredits: profile.eventCredits || 0,
+            replyCredits: profile.replyCredits || 0,
+            subscriptionTier: profile.subscriptionTier || 'basic',
+            savedAt: new Date(),
+        };
+        await User.findByIdAndUpdate(userId, {
+            $set: { preservedProviderCredits: creditsToPreserve },
+        });
+
+        if (profile.certificate?.path) {
+            try {
+                await unlink(profile.certificate.path);
+            } catch (err) {
+                console.warn('Failed to delete performance certificate:', err);
+            }
         }
     }
 

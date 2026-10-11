@@ -30,10 +30,6 @@ const clubSchema = new mongoose.Schema(
         conditions: {
             type: String,
         },
-        president: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-        },
         coaches: [
             {
                 type: mongoose.Schema.Types.ObjectId,

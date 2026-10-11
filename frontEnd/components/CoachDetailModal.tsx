@@ -172,7 +172,7 @@ const CoachDetailModal: React.FC<CoachDetailModalProps> = ({
         const userId = payload.user?._id;
         const [clubsResponse, groupsResponse] = await Promise.all([
           userId ? getCreatedClubs(userId) : Promise.resolve(null),
-          getCreatedGroups(coachDocId),
+          getCreatedGroups(coachDocId, 1, 20, userId),
         ]);
 
         if (clubsResponse?.success && clubsResponse?.data) {

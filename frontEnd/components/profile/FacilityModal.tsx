@@ -21,6 +21,7 @@ import {
 } from "@/app/lib/facility-api";
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
+import { showAppToast } from "@/app/lib/app-toast";
 import {
   PHONE_PREFIX,
   processPhoneInput,
@@ -31,6 +32,7 @@ import CascadingLocationFields, {
   normalizeCountry,
 } from "@/components/location/CascadingLocationFields";
 import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
+import { useMe } from "@/app/hooks/useAuth";
 
 interface FacilityModalProps {
   isOpen: boolean;
@@ -89,6 +91,7 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
   initialData = null,
   headerNote,
 }) => {
+  const { data: user } = useMe();
   // Facility State
   const [locationValue, setLocationValue] = useState<LocationValue>(
     emptyLocationValue()
@@ -258,8 +261,10 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     initialFormState.current = JSON.stringify(emptyForm);
     setPhotoPreview(null);
     setPhotoFile(null);
-    setLocationValue(emptyLocationValue());
-    initialLocationState.current = JSON.stringify(emptyLocationValue());
+    const userCountry = user?.location?.country ? normalizeCountry(user.location.country) : "TR";
+    const baseLoc = { ...emptyLocationValue(), country: userCountry };
+    setLocationValue(baseLoc);
+    initialLocationState.current = JSON.stringify(baseLoc);
     setSalons([]);
     setSalonPhotoFiles({});
     setSalonPhotosRemoved(new Set());
@@ -420,9 +425,6 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     // Facility Validation
     if (!initialData) {
       if (!formData.name) newErrors.name = "Facility Name is required";
-      if (!locationValue.district) {
-        newErrors.address = "Istanbul district is required";
-      }
       if (!formData.phone || !isPhoneComplete(formData.phone))
         newErrors.phone = `Phone required (9 digits after ${PHONE_PREFIX})`;
       if (!formData.email) newErrors.email = "E-mail is required";
@@ -436,12 +438,14 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
     }
 
     if (formData.phone && !isPhoneComplete(formData.phone)) {
-      newErrors.phone = `Enter full Turkish phone (9 digits after ${PHONE_PREFIX})`;
+      newErrors.phone = `Enter full phone (9 digits after ${PHONE_PREFIX})`;
     }
 
     const c = normalizeCountry(locationValue.country);
     if (!initialData) {
-      if (c === "TR" && (!locationValue.city || !locationValue.districtName)) {
+      if (!c) {
+        newErrors.location = "Country is required";
+      } else if (c === "TR" && (!locationValue.city || (!locationValue.districtName && !locationValue.district))) {
         newErrors.location = "City and district are required";
       } else if (c === "US" && (!locationValue.state || !locationValue.city)) {
         newErrors.location = "State and city are required";
@@ -603,9 +607,9 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
       }, 1500);
     } catch (err: any) {
       console.error("Error submitting facility:", err);
-      setGeneralError(
-        err.message || "Failed to save facility. Please try again."
-      );
+      const msg = err.message || "Failed to save facility. Please try again.";
+      setGeneralError(msg);
+      showAppToast(msg, "error");
     } finally {
       setIsLoading(false);
     }
@@ -720,6 +724,8 @@ const FacilityModal: React.FC<FacilityModalProps> = ({
                             onChange={setLocationValue}
                             showPostalCode={false}
                             disabled={isLoading}
+                            countryDisabled={Boolean(user?.location?.country)}
+                            countryLockNotice="Locked to your registered country (fraud prevention)"
                           />
                           <div className="mt-3">
                             <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">

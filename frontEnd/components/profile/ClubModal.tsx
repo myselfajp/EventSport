@@ -8,6 +8,7 @@ import CascadingLocationFields, {
   normalizeCountry,
 } from "@/components/location/CascadingLocationFields";
 import { emptyLocationValue, type LocationValue } from "@/app/lib/location-api";
+import { useMe } from "@/app/hooks/useAuth";
 
 interface ClubModalProps {
   isOpen: boolean;
@@ -21,7 +22,6 @@ interface ClubFormData {
   name: string;
   vision: string;
   conditions: string;
-  president: string;
   coaches: string[];
   photo: string;
   mainSport?: string;
@@ -52,11 +52,11 @@ const ClubModal: React.FC<ClubModalProps> = ({
   onSubmit,
   initialData = null,
 }) => {
+  const { data: user } = useMe();
   const [formData, setFormData] = useState<ClubFormData>({
     name: "",
     vision: "",
     conditions: "",
-    president: "",
     coaches: [],
     photo: "",
   });
@@ -70,13 +70,9 @@ const ClubModal: React.FC<ClubModalProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   
   // Search states
-  const [presidentSearch, setPresidentSearch] = useState("");
   const [coachesSearch, setCoachesSearch] = useState("");
-  const [presidentResults, setPresidentResults] = useState<CoachSearchResult[]>([]);
   const [coachesResults, setCoachesResults] = useState<CoachSearchResult[]>([]);
-  const [isSearchingPresident, setIsSearchingPresident] = useState(false);
   const [isSearchingCoaches, setIsSearchingCoaches] = useState(false);
-  const [showPresidentDropdown, setShowPresidentDropdown] = useState(false);
   const [showCoachesDropdown, setShowCoachesDropdown] = useState(false);
   const [selectedCoachesData, setSelectedCoachesData] = useState<CoachSearchResult[]>([]);
   const [locationValue, setLocationValue] = useState<LocationValue>(
@@ -91,7 +87,7 @@ const ClubModal: React.FC<ClubModalProps> = ({
       try {
         const res = await fetchJSON(EP.REFERENCE.sport.get, {
           method: "POST",
-          body: { perPage: 200, pageNumber: 1 },
+          body: { perPage: 100, pageNumber: 1 },
         });
         if (res?.success && Array.isArray(res.data)) setSports(res.data);
       } catch {
@@ -100,65 +96,39 @@ const ClubModal: React.FC<ClubModalProps> = ({
     })();
   }, [isOpen]);
 
-  const searchCoaches = async (query: string, isForPresident: boolean) => {
-    if (query.trim().length < 2) {
-      if (isForPresident) {
-        setPresidentResults([]);
-      } else {
-        setCoachesResults([]);
-      }
-      return;
-    }
-
-    if (isForPresident) {
-      setIsSearchingPresident(true);
-    } else {
-      setIsSearchingCoaches(true);
-    }
+  const searchCoaches = async (query: string = "") => {
+    setIsSearchingCoaches(true);
 
     try {
+      const trimmed = query.trim();
+      const body: any = {
+        pageNumber: 1,
+        perPage: 20,
+      };
+      if (trimmed.length > 0) {
+        body.search = trimmed;
+      }
+
       const response = await fetchJSON(EP.COACH.getCoachList, {
         method: "POST",
-        body: {
-          search: query.trim(),
-          pageNumber: 1,
-          perPage: 10,
-          isVerified: true,
-        },
+        body,
       });
 
       if (response?.success && response?.data) {
-        if (isForPresident) {
-          setPresidentResults(response.data);
-        } else {
-          setCoachesResults(response.data);
-        }
+        setCoachesResults(response.data);
       }
     } catch (err) {
       console.error("Error searching coaches:", err);
     } finally {
-      if (isForPresident) {
-        setIsSearchingPresident(false);
-      } else {
-        setIsSearchingCoaches(false);
-      }
+      setIsSearchingCoaches(false);
     }
   };
 
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (showPresidentDropdown && presidentSearch) {
-        searchCoaches(presidentSearch, true);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [presidentSearch, showPresidentDropdown]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (showCoachesDropdown && coachesSearch) {
-        searchCoaches(coachesSearch, false);
+      if (showCoachesDropdown) {
+        searchCoaches(coachesSearch);
       }
     }, 300);
     return () => clearTimeout(timer);
@@ -167,11 +137,22 @@ const ClubModal: React.FC<ClubModalProps> = ({
   useEffect(() => {
     if (initialData) {
       const initialForm = { ...initialData };
+      
+      // Normalize coaches: could be string[] or populated objects[]
+      const rawCoaches = initialData.coaches || [];
+      const coachIds: string[] = rawCoaches.map((c: any) =>
+        typeof c === "object" && c !== null ? String(c._id) : String(c)
+      );
+      initialForm.coaches = coachIds;
       setFormData(initialForm);
       initialFormState.current = JSON.stringify(initialForm);
 
       if (initialData.mainSport) {
-        setMainSport(initialData.mainSport);
+        setMainSport(
+          typeof initialData.mainSport === "object"
+            ? (initialData.mainSport as any)?._id || ""
+            : String(initialData.mainSport)
+        );
       }
 
       if (initialData.location) {
@@ -212,31 +193,23 @@ const ClubModal: React.FC<ClubModalProps> = ({
       }
       setPhotoFile(null);
       
-      // Load selected coaches data if editing
-      if (initialData.coaches && initialData.coaches.length > 0) {
-        loadCoachesData(initialData.coaches);
+      // Pre-seed already populated coaches, and fetch any remaining IDs
+      const populated = rawCoaches.filter(
+        (c: any) => typeof c === "object" && c !== null && c._id && c.firstName
+      );
+      if (populated.length > 0) {
+        setSelectedCoachesData(populated as unknown as CoachSearchResult[]);
       }
-      
-      // Load president data if editing
-      if (initialData.president) {
-        loadPresidentData(initialData.president);
+      const unpopulatedIds = coachIds.filter(
+        (id) => !populated.some((p: any) => String(p._id) === id)
+      );
+      if (unpopulatedIds.length > 0) {
+        loadCoachesData(unpopulatedIds);
       }
     } else {
       resetForm();
     }
   }, [initialData, isOpen]);
-
-  const loadPresidentData = async (userId: string) => {
-    try {
-      const response = await fetchJSON(EP.AUTH.getUserById(userId), { method: "GET" });
-      if (response?.success && response?.data) {
-        const user = response.data;
-        setPresidentSearch(`${user.firstName} ${user.lastName}`);
-      }
-    } catch (err) {
-      console.error("Error loading president data:", err);
-    }
-  };
 
   const loadCoachesData = async (userIds: string[]) => {
     try {
@@ -248,8 +221,6 @@ const ClubModal: React.FC<ClubModalProps> = ({
         .filter(r => r?.success && r?.data)
         .map(r => {
           const user = r.data;
-          // Transform user data to CoachSearchResult format
-          // getUserById populates coach, so user.coach is an object (or null)
           const coachId = user.coach?._id || "";
           return {
             _id: user._id,
@@ -263,7 +234,7 @@ const ClubModal: React.FC<ClubModalProps> = ({
             }
           };
         });
-      setSelectedCoachesData(coachesData);
+      setSelectedCoachesData(prev => [...prev, ...coachesData]);
     } catch (err) {
       console.error("Error loading coaches data:", err);
     }
@@ -274,7 +245,6 @@ const ClubModal: React.FC<ClubModalProps> = ({
       name: "",
       vision: "",
       conditions: "",
-      president: "",
       coaches: [],
       photo: "",
     };
@@ -284,13 +254,12 @@ const ClubModal: React.FC<ClubModalProps> = ({
     setPhotoFile(null);
     setErrors({});
     setGeneralError("");
-    setPresidentSearch("");
     setCoachesSearch("");
-    setPresidentResults([]);
     setCoachesResults([]);
     setSelectedCoachesData([]);
     setMainSport("");
-    setLocationValue(emptyLocationValue());
+    const userCountry = user?.location?.country ? normalizeCountry(user.location.country) : "TR";
+    setLocationValue({ ...emptyLocationValue(), country: userCountry });
   };
 
   const handleInputChange = (
@@ -319,19 +288,13 @@ const ClubModal: React.FC<ClubModalProps> = ({
     }
   };
 
-  const selectPresident = (coach: CoachSearchResult) => {
-    handleInputChange("president", coach._id);
-    setPresidentSearch(`${coach.firstName} ${coach.lastName}`);
-    setShowPresidentDropdown(false);
-  };
-
   const toggleCoach = (coach: CoachSearchResult) => {
     const currentCoaches = formData.coaches || [];
-    const userId = coach._id; // Use User ID, not Coach ID
+    const userId = String(coach._id);
     
     if (currentCoaches.includes(userId)) {
       handleInputChange("coaches", currentCoaches.filter(id => id !== userId));
-      setSelectedCoachesData(prev => prev.filter(c => c._id !== userId));
+      setSelectedCoachesData(prev => prev.filter(c => String(c._id) !== userId));
     } else {
       handleInputChange("coaches", [...currentCoaches, userId]);
       setSelectedCoachesData(prev => [...prev, coach]);
@@ -340,12 +303,17 @@ const ClubModal: React.FC<ClubModalProps> = ({
 
   const removeCoach = (userId: string) => {
     handleInputChange("coaches", formData.coaches.filter(id => id !== userId));
-    setSelectedCoachesData(prev => prev.filter(c => c._id !== userId));
+    setSelectedCoachesData(prev => prev.filter(c => String(c._id) !== userId));
   };
 
-  const getCoachName = (userId: string) => {
-    const coach = selectedCoachesData.find(c => c._id === userId);
-    return coach ? `${coach.firstName} ${coach.lastName}` : userId;
+  const getCoachName = (id: any) => {
+    const coachId = typeof id === "object" && id !== null ? String(id._id) : String(id);
+    const coach = selectedCoachesData.find(c => String(c._id) === coachId);
+    if (coach) return `${coach.firstName} ${coach.lastName}`;
+    if (typeof id === "object" && id !== null && (id.firstName || id.lastName)) {
+      return `${id.firstName || ""} ${id.lastName || ""}`.trim();
+    }
+    return coachId;
   };
 
   const validateForm = () => {
@@ -398,10 +366,10 @@ const ClubModal: React.FC<ClubModalProps> = ({
         clubData.addressLine = locationValue.addressLine.trim();
       }
       
+      if (mainSport) clubData.mainSport = mainSport;
       if (formData.vision) clubData.vision = formData.vision;
       if (formData.conditions) clubData.conditions = formData.conditions;
-      if (formData.president) clubData.president = formData.president;
-      if (formData.coaches && formData.coaches.length > 0) {
+      if (Array.isArray(formData.coaches)) {
         clubData.coaches = formData.coaches;
       }
 
@@ -418,49 +386,47 @@ const ClubModal: React.FC<ClubModalProps> = ({
       setTimeout(() => {
         onClose();
         setIsSuccess(false);
-        resetForm();
       }, 1500);
+
     } catch (err: any) {
-      console.error("Error submitting club:", err);
+      console.error("Error saving club:", err);
       setGeneralError(err.message || "Failed to save club. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleClose = () => {
-    onClose();
-    resetForm();
-    setIsLoading(false);
-    setIsSuccess(false);
-  };
-
   if (!isOpen) return null;
 
-  const hasExistingPhoto = initialData && initialData.photo;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-app-modal p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-auto max-h-[90vh] flex flex-col">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            {initialData ? "Edit Club" : "Add Club"}
-          </h2>
+    <div className="fixed inset-0 z-app-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700 animate-scale-up">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+              {initialData ? "Edit Club" : "Create New Club"}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {initialData
+                ? "Update your club details"
+                : "Fill in the details to create a new club"}
+            </p>
+          </div>
           <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 dark:bg-gray-800">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
           {isSuccess ? (
-            <div className="flex flex-col items-center justify-center text-center h-full py-12">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
-                <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-cyan-100 dark:bg-cyan-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-cyan-500" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
                 Success!
@@ -476,15 +442,17 @@ const ClubModal: React.FC<ClubModalProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Club Name {!initialData && <span className="text-red-500">*</span>}
+                      Club Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
                       placeholder="Enter club name"
-                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
-                        errors.name ? "border-red-300 focus:ring-red-200 dark:border-red-500" : "border-gray-200 dark:border-gray-600 focus:ring-cyan-500"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
+                        errors.name
+                          ? "border-red-500"
+                          : "border-gray-200 dark:border-gray-600"
                       }`}
                       disabled={isLoading}
                     />
@@ -519,6 +487,8 @@ const ClubModal: React.FC<ClubModalProps> = ({
                       onChange={setLocationValue}
                       showPostalCode={false}
                       disabled={isLoading}
+                      countryDisabled={Boolean(user?.location?.country)}
+                      countryLockNotice="Locked to your registered country (fraud prevention)"
                     />
                     <div className="mt-3">
                       <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">
@@ -570,60 +540,7 @@ const ClubModal: React.FC<ClubModalProps> = ({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      President
-                    </label>
-                    <div className="relative">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={presidentSearch}
-                          onChange={(e) => setPresidentSearch(e.target.value)}
-                          onFocus={() => setShowPresidentDropdown(true)}
-                          onBlur={() => setTimeout(() => setShowPresidentDropdown(false), 200)}
-                          placeholder="Search for president..."
-                          className="w-full px-3 py-2.5 pl-10 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                        />
-                        <SearchIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      </div>
-                      
-                      { showPresidentDropdown && (presidentResults.length > 0 || isSearchingPresident) && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {isSearchingPresident ? (
-                            <div className="p-3 text-sm text-gray-500 dark:text-gray-400 text-center">Searching...</div>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleInputChange("president", "");
-                                  setPresidentSearch("");
-                                  setShowPresidentDropdown(false);
-                                }}
-                                className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-gray-400 dark:text-gray-500"
-                              >
-                                None
-                              </button>
-                              {presidentResults.map(coach => (
-                                <button
-                                  key={coach._id}
-                                  type="button"
-                                  onClick={() => selectPresident(coach)}
-                                  className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-white"
-                                >
-                                  <div className="font-medium">{coach.firstName} {coach.lastName}</div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">{coach.email}</div>
-                                </button>
-                              ))}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Coaches
+                      Coaches (Optional)
                     </label>
                     <div className="relative">
                       <div className="relative">
@@ -631,7 +548,12 @@ const ClubModal: React.FC<ClubModalProps> = ({
                           type="text"
                           value={coachesSearch}
                           onChange={(e) => setCoachesSearch(e.target.value)}
-                          onFocus={() => setShowCoachesDropdown(true)}
+                          onFocus={() => {
+                            setShowCoachesDropdown(true);
+                            if (coachesResults.length === 0) {
+                              searchCoaches(coachesSearch);
+                            }
+                          }}
                           onBlur={() => setTimeout(() => setShowCoachesDropdown(false), 200)}
                           placeholder="Search for coaches..."
                           className="w-full px-3 py-2.5 pl-10 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
@@ -640,7 +562,10 @@ const ClubModal: React.FC<ClubModalProps> = ({
                       </div>
                       
                       {showCoachesDropdown && (coachesResults.length > 0 || isSearchingCoaches) && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <div 
+                          onMouseDown={(e) => e.preventDefault()}
+                          className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        >
                           {isSearchingCoaches ? (
                             <div className="p-3 text-sm text-gray-500 dark:text-gray-400 text-center">Searching...</div>
                           ) : (
@@ -650,12 +575,12 @@ const ClubModal: React.FC<ClubModalProps> = ({
                                 type="button"
                                 onClick={() => toggleCoach(coach)}
                                 className={`w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-2 ${
-                                  formData.coaches.includes(coach._id) ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300' : 'dark:text-white'
+                                  formData.coaches.includes(String(coach._id)) ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300' : 'dark:text-white'
                                 }`}
                               >
                                 <input
                                   type="checkbox"
-                                  checked={formData.coaches.includes(coach._id)}
+                                  checked={formData.coaches.includes(String(coach._id))}
                                   readOnly
                                   className="w-4 h-4 text-cyan-500 border-gray-300 dark:border-gray-600 rounded"
                                 />
@@ -673,13 +598,13 @@ const ClubModal: React.FC<ClubModalProps> = ({
                       <div className="mt-2 flex flex-wrap gap-1">
                         {formData.coaches.map(coachId => (
                           <span
-                            key={coachId}
+                            key={typeof coachId === 'object' && coachId !== null ? (coachId as any)._id : coachId}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 text-xs rounded"
                           >
                             {getCoachName(coachId)}
                             <button
                               type="button"
-                              onClick={() => removeCoach(coachId)}
+                              onClick={() => removeCoach(typeof coachId === 'object' && coachId !== null ? (coachId as any)._id : coachId)}
                               className="hover:text-cyan-900 dark:hover:text-cyan-100"
                             >
                               <X className="w-3 h-3" />
@@ -706,70 +631,74 @@ const ClubModal: React.FC<ClubModalProps> = ({
                               alt="Club preview"
                               className="h-48 w-full object-cover rounded-lg"
                             />
+                            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 rounded-md hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors">
+                              <Upload className="w-3.5 h-3.5" />
+                              Change Photo
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoUpload}
+                                className="hidden"
+                                disabled={isLoading}
+                              />
+                            </label>
                           </div>
                         ) : (
-                          <div className="space-y-3">
-                            <Upload className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500" />
+                          <label className="cursor-pointer block space-y-3">
+                            <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mx-auto text-gray-400">
+                              <Upload className="w-6 h-6" />
+                            </div>
                             <div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                                {hasExistingPhoto ? "Change photo" : "Add photo"}
+                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Click to upload photo
                               </p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500">
-                                PNG, JPG, JPEG up to 10MB
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                PNG, JPG up to 10MB
                               </p>
                             </div>
-                          </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handlePhotoUpload}
+                              className="hidden"
+                              disabled={isLoading}
+                            />
+                          </label>
                         )}
-                        <input
-                          type="file"
-                          accept="image/png,image/jpg,image/jpeg"
-                          onChange={handlePhotoUpload}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                          disabled={isLoading}
-                        />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {generalError && (
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
+                  {generalError}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Error Message */}
-        {generalError && (
-          <div className="px-6 pb-4">
-            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-lg">
-              {generalError}
-            </div>
-          </div>
-        )}
-
-        {/* Modal Footer */}
+        {/* Footer */}
         {!isSuccess && (
-          <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 shrink-0">
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
             <button
               type="button"
-              onClick={handleClose}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+              onClick={onClose}
               disabled={isLoading}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSubmit}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
               disabled={isLoading}
+              className="px-6 py-2 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
             >
-              {isLoading ? (
-                <>
-                  <Loader className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
+              {isLoading && <Loader className="w-4 h-4 animate-spin" />}
+              {initialData ? "Update Club" : "Create Club"}
             </button>
           </div>
         )}

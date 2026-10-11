@@ -74,11 +74,12 @@ export function renderContractContent(html, user, event = null, date = new Date(
             .join(', ');
     }
 
-    const eventName = event?.name || '';
+    const planName = options?.planName || '';
+    const eventName = event?.name || options?.eventName || planName || '';
     const eventPrice =
         event?.participationFee != null
             ? `${event.participationFee} ${event.currency || 'TRY'}`
-            : '';
+            : (options?.price || options?.planPrice || '');
 
     const replacements = {
         '{{ALICI_AD_SOYAD}}': fullName || '[Alıcı Adı Soyadı]',
@@ -93,8 +94,10 @@ export function renderContractContent(html, user, event = null, date = new Date(
         '{{BUYER_LOCATION}}': locationText || '[Buyer Location]',
         '{{KOC_BRANS}}': coachBranch || '[Antrenörlük Branşı]',
         '{{COACH_BRANCH}}': coachBranch || '[Coaching Branch]',
-        '{{ETKINLIK_ADI}}': eventName || '[Etkinlik]',
-        '{{EVENT_NAME}}': eventName || '[Event Name]',
+        '{{PLAN_ADI}}': planName || eventName || '[Plan]',
+        '{{PLAN_NAME}}': planName || eventName || '[Plan Name]',
+        '{{ETKINLIK_ADI}}': eventName || planName || '[Etkinlik]',
+        '{{EVENT_NAME}}': eventName || planName || '[Event Name]',
         '{{UCRET}}': eventPrice || '[Ücret]',
         '{{PRICE}}': eventPrice || '[Price]',
         '{{TARIH}}': dateFormatted,
@@ -117,6 +120,8 @@ export async function recordLegalAcceptance(req, userId, opts) {
         eventId = null,
         reservationId = null,
         acceptedAt = new Date(),
+        planName = null,
+        planPrice = null,
     } = opts;
 
     const doc = await validateActiveLegalDocument(versionId, expectedDocType);
@@ -142,7 +147,10 @@ export async function recordLegalAcceptance(req, userId, opts) {
 
     let renderedContent = null;
     if (doc.content) {
-        renderedContent = renderContractContent(doc.content, userDoc, eventDoc, acceptedAt);
+        renderedContent = renderContractContent(doc.content, userDoc, eventDoc, acceptedAt, {
+            planName,
+            planPrice,
+        });
     }
 
     const signerName = userDoc

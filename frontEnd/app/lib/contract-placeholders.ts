@@ -30,6 +30,7 @@ export function replaceContractPlaceholders(
     date?: Date | string;
     eventName?: string;
     price?: string | number;
+    planName?: string;
   }
 ): string {
   if (!html) return "";
@@ -71,7 +72,8 @@ export function replaceContractPlaceholders(
       .join(", ");
   }
 
-  const eventName = options?.eventName || "";
+  const planName = options?.planName || "";
+  const eventName = options?.eventName || planName || "";
   const eventPrice = options?.price != null ? String(options.price) : "";
 
   const replacements: Record<string, string> = {
@@ -97,9 +99,11 @@ export function replaceContractPlaceholders(
     "{{KOC_BRANS}}": coachBranch || "[Antrenörlük Branşı]",
     "{{COACH_BRANCH}}": coachBranch || "[Coaching Branch]",
 
-    // Etkinlik ve Ücret
-    "{{ETKINLIK_ADI}}": eventName || "[Etkinlik]",
-    "{{EVENT_NAME}}": eventName || "[Event Name]",
+    // Plan, Etkinlik ve Ücret
+    "{{PLAN_ADI}}": planName || eventName || "[Plan]",
+    "{{PLAN_NAME}}": planName || eventName || "[Plan Name]",
+    "{{ETKINLIK_ADI}}": eventName || planName || "[Etkinlik]",
+    "{{EVENT_NAME}}": eventName || planName || "[Event Name]",
     "{{UCRET}}": eventPrice || "[Ücret]",
     "{{PRICE}}": eventPrice || "[Price]",
 

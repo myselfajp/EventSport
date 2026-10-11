@@ -17,6 +17,18 @@ import { applyLocationFilter } from '../utils/locationHelper.js';
 import EventSeries from '../models/eventSeriesModel.js';
 import SeriesEnrollment from '../models/seriesEnrollmentModel.js';
 
+export const toDiacriticInsensitivePattern = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    const escaped = str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escaped
+        .replace(/[iıİI]/g, '[iıİI]')
+        .replace(/[cçCÇ]/g, '[cçCÇ]')
+        .replace(/[sşSŞ]/g, '[sşSŞ]')
+        .replace(/[gğGĞ]/g, '[gğGĞ]')
+        .replace(/[uüUÜ]/g, '[uüUÜ]')
+        .replace(/[oöOÖ]/g, '[oöOÖ]');
+};
+
 export const createSearchController = (model, config = {}) => {
     const {
         searchFields = [],
@@ -25,6 +37,7 @@ export const createSearchController = (model, config = {}) => {
         extraFilter = null,
         defaultSort = { createdAt: -1 },
         districtFilterField = 'location.district',
+        populate = null,
     } = config;
 
     return async (req, res, next) => {
@@ -53,9 +66,10 @@ export const createSearchController = (model, config = {}) => {
 
             // Text search on configured fields
             if (trimmedSearch && searchFields.length > 0) {
+                const searchPattern = toDiacriticInsensitivePattern(trimmedSearch);
                 orParts.push(
                     ...searchFields.map((field) => ({
-                        [field]: { $regex: trimmedSearch, $options: 'i' },
+                        [field]: { $regex: searchPattern, $options: 'i' },
                     }))
                 );
             }
@@ -84,7 +98,12 @@ export const createSearchController = (model, config = {}) => {
                         return; // Skip unauthorized filters
                     }
                     if (
-                        (key === 'mainSport' || key === 'sport') &&
+                        (key === 'mainSport' ||
+                            key === 'sport' ||
+                            key === 'creator' ||
+                            key === 'owner' ||
+                            key === 'clubId' ||
+                            key === 'coaches') &&
                         mongoose.Types.ObjectId.isValid(value)
                     ) {
                         filter[key] = new mongoose.Types.ObjectId(value);
@@ -96,7 +115,7 @@ export const createSearchController = (model, config = {}) => {
 
             // Extra filter from route params
             if (extraFilter) {
-                const routeExtraFilter = extraFilter(req) || {};
+                const routeExtraFilter = (await Promise.resolve(extraFilter(req))) || {};
 
                 // If both filters have top-level $or, combine safely via $and.
                 // Otherwise one $or overwrites the other and search/status filtering breaks.
@@ -153,6 +172,8 @@ export const createSearchController = (model, config = {}) => {
                         select: 'name frequency interval sessionCount priceType participationFeePerSession status',
                     },
                 ]);
+            } else if (populate) {
+                query = query.populate(populate);
             }
             // Execute query
             const [data, total] = await Promise.all([query, model.countDocuments(filter)]);
@@ -193,16 +214,17 @@ export const getCoachList = async (req, res, next) => {
         // Build coach query filters
         if (search && search.trim()) {
             const trimmed = search.trim();
+            const pattern = toDiacriticInsensitivePattern(trimmed);
             const coachesByName = await Coach.find({
-                name: { $regex: trimmed, $options: 'i' },
+                name: { $regex: pattern, $options: 'i' },
             })
                 .select('_id')
                 .lean();
             const usersByName = await User.find({
                 coach: { $ne: null },
                 $or: [
-                    { firstName: { $regex: trimmed, $options: 'i' } },
-                    { lastName: { $regex: trimmed, $options: 'i' } },
+                    { firstName: { $regex: pattern, $options: 'i' } },
+                    { lastName: { $regex: pattern, $options: 'i' } },
                 ],
             })
                 .select('coach')

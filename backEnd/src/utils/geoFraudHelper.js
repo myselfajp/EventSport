@@ -120,6 +120,7 @@ export function assertCreationAllowedByLocation({
     actionLabel = 'event',
 }) {
     if (!user) throw new AppError(401);
+    if (user.role === 0) return true;
 
     const userCountry = normalizeCountry(user.location?.country);
     if (!userCountry) {

@@ -340,13 +340,23 @@ export const createBranch = async (req, res, next) => {
         let coach = user.coach;
         if (!coach) {
             const basicFields = await getBasicPlanAssignmentFields();
+            const freshUser = await User.findById(user._id).select('preservedProviderCredits');
+            const preserved = freshUser?.preservedProviderCredits;
+            const initialCredits = preserved && (Number(preserved.eventCredits) > 0 || Number(preserved.replyCredits) > 0)
+                ? {
+                    eventCredits: preserved.eventCredits,
+                    replyCredits: preserved.replyCredits,
+                    subscriptionTier: preserved.subscriptionTier || basicFields.subscriptionTier,
+                }
+                : basicFields;
+
             coach = await Coach.create({
                 name: `${user.firstName} ${user.lastName}`,
-                ...basicFields,
+                ...initialCredits,
             });
             const addToUser = await User.findByIdAndUpdate(
                 user._id,
-                { coach: coach._id },
+                { coach: coach._id, $unset: { preservedProviderCredits: 1 } },
                 { new: true }
             );
             if (!addToUser) throw new AppError(404);
@@ -637,6 +647,28 @@ export const createEvent = async (req, res, next) => {
             throw new AppError(404, `${notFound.join(', ')} not found`);
         }
 
+        if (eventFields.club) {
+            const club = await Club.findById(eventFields.club);
+            if (club) {
+                const isCreator = club.creator && (club.creator.equals(user._id) || (user.coach && club.creator.equals(user.coach)));
+                const isCoach = Array.isArray(club.coaches) && club.coaches.some((c) => c.equals(user._id) || (user.coach && c.equals(user.coach)));
+                if (!isCreator && !isCoach && user.role !== 0) {
+                    throw new AppError(403, 'You are not authorized to create events for this club');
+                }
+            }
+        }
+
+        if (eventFields.group) {
+            const group = await ClubGroup.findById(eventFields.group);
+            if (group) {
+                const isOwner = group.owner && (group.owner.equals(user._id) || (user.coach && group.owner.equals(user.coach)));
+                const isCoach = Array.isArray(group.coaches) && group.coaches.some((c) => c.equals(user._id) || (user.coach && c.equals(user.coach)));
+                if (!isOwner && !isCoach && user.role !== 0) {
+                    throw new AppError(403, 'You are not authorized to create events for this group');
+                }
+            }
+        }
+
         // Fetch EventStyle to populate eventStyle field
         const eventStyleData = await EventStyle.findById(eventFields.style);
         if (!eventStyleData) {
@@ -901,6 +933,28 @@ export const editEvent = async (req, res, next) => {
                 if (!allValid) {
                     const notFound = models.filter((r) => !r.exists).map((r) => r.name);
                     throw new AppError(404, `${notFound.join(', ')} not found`);
+                }
+            }
+        }
+
+        if (result.club) {
+            const club = await Club.findById(result.club);
+            if (club) {
+                const isCreator = club.creator && (club.creator.equals(user._id) || (user.coach && club.creator.equals(user.coach)));
+                const isCoach = Array.isArray(club.coaches) && club.coaches.some((c) => c.equals(user._id) || (user.coach && c.equals(user.coach)));
+                if (!isCreator && !isCoach && user.role !== 0) {
+                    throw new AppError(403, 'You are not authorized to use this club');
+                }
+            }
+        }
+
+        if (result.group) {
+            const group = await ClubGroup.findById(result.group);
+            if (group) {
+                const isOwner = group.owner && (group.owner.equals(user._id) || (user.coach && group.owner.equals(user.coach)));
+                const isCoach = Array.isArray(group.coaches) && group.coaches.some((c) => c.equals(user._id) || (user.coach && c.equals(user.coach)));
+                if (!isOwner && !isCoach && user.role !== 0) {
+                    throw new AppError(403, 'You are not authorized to use this group');
                 }
             }
         }
@@ -1291,12 +1345,29 @@ export const createGroup = async (req, res, next) => {
         }
 
         const result = zodValidation.createGroupSchema.parse(rawData);
-        const clubId = zodValidation.mongoObjectId.parse(req.params.clubId);
+        const rawClubId = req.params.clubId || result.clubId;
+        let clubExists = null;
+        if (rawClubId) {
+            const clubId = zodValidation.mongoObjectId.parse(rawClubId);
+            clubExists = await Club.findById(clubId);
+            if (!clubExists) throw new AppError(404, 'Club not found');
+        }
 
-        const clubExists = await Club.findById(clubId);
-        if (!clubExists) throw new AppError(404, 'Club not found');
+        if (result.coaches && result.coaches.length > 0) {
+            const checks = await Promise.all(
+                result.coaches.map(async (id) => {
+                    const exists = await User.exists({ _id: new ObjectId(id) });
+                    return { id, exists: Boolean(exists) };
+                })
+            );
+            const allValid = checks.every((r) => r.exists);
+            if (!allValid) {
+                const notFound = checks.filter((r) => !r.exists).map((r) => r.id);
+                throw new AppError(404, `User with id: ${notFound.join(', ')} not found`);
+            }
+        }
 
-        if (!result.mainSport && clubExists.mainSport) {
+        if (!result.mainSport && clubExists?.mainSport) {
             result.mainSport = clubExists.mainSport;
         }
         if (result.mainSport) {
@@ -1309,10 +1380,18 @@ export const createGroup = async (req, res, next) => {
         }
 
         const groupPayload = await mergeLocationIntoPayload(result);
+
+        assertCreationAllowedByLocation({
+            req,
+            user,
+            targetCountry: groupPayload.location?.country || groupPayload.country,
+            actionLabel: 'community',
+        });
+
         const createGroup = await ClubGroup.create({
             owner: ownerCoach,
-            clubId,
-            clubName: clubExists.name,
+            clubId: clubExists ? clubExists._id : null,
+            clubName: clubExists ? clubExists.name : '',
             ...groupPayload,
             isApproved: true,
         });
@@ -1325,7 +1404,7 @@ export const createGroup = async (req, res, next) => {
             entityId: createGroup._id,
             after: createGroup,
             description: `Group created: ${createGroup.name || ''}`,
-            metadata: { clubId },
+            metadata: { clubId: clubExists ? clubExists._id : null },
         });
         res.status(201).json({
             success: true,
@@ -1358,11 +1437,46 @@ export const editGroup = async (req, res, next) => {
         if (!(groupExists.owner.equals(user.coach) || user.role === 0))
             throw new AppError(403, 'You are not group creator');
 
+        if (result.clubId !== undefined) {
+            if (result.clubId) {
+                const club = await Club.findById(result.clubId);
+                if (!club) throw new AppError(404, 'Club not found');
+                result.clubName = club.name;
+            } else {
+                result.clubId = null;
+                result.clubName = '';
+            }
+        }
+
+        if (result.coaches && result.coaches.length > 0) {
+            const checks = await Promise.all(
+                result.coaches.map(async (id) => {
+                    const exists = await User.exists({ _id: new ObjectId(id) });
+                    return { id, exists: Boolean(exists) };
+                })
+            );
+            const allValid = checks.every((r) => r.exists);
+            if (!allValid) {
+                const notFound = checks.filter((r) => !r.exists).map((r) => r.id);
+                throw new AppError(404, `User with id: ${notFound.join(', ')} not found`);
+            }
+        }
+
         if (result.mainSport) {
             const sportExists = await Sport.exists({ _id: result.mainSport });
             if (!sportExists) throw new AppError(404, 'MainSport not found');
         }
         const groupUpdate = await mergeLocationIntoPayload(result);
+
+        if (groupUpdate.location?.country || groupUpdate.country) {
+            assertCreationAllowedByLocation({
+                req,
+                user,
+                targetCountry: groupUpdate.location?.country || groupUpdate.country,
+                actionLabel: 'community',
+            });
+        }
+
         const editGroup = await ClubGroup.findByIdAndUpdate(groupId, { ...groupUpdate }, { new: true });
 
         await writeAuditLog({
@@ -1402,6 +1516,10 @@ export const deleteGroup = async (req, res, next) => {
         }
 
         await ClubGroup.findByIdAndDelete(groupId);
+        await Follow.deleteMany({ followingClubGroup: groupId }).catch(() => {});
+        await Invite.deleteMany({ group: groupId }).catch(() => {});
+        await JoinGroup.deleteMany({ group: groupId }).catch(() => {});
+        await Event.updateMany({ group: groupId }, { $unset: { group: 1 } }).catch(() => {});
 
         await writeAuditLog({
             req,
@@ -1431,14 +1549,8 @@ export const createClub = async (req, res, next) => {
         const data = JSON.parse(req.body.data);
         const result = zodValidation.createClubSchema.parse(data);
 
-        // check for president
-        if (result.president) {
-            const exists = await User.exists({ _id: new ObjectId(result.president) });
-            if (!exists) throw new AppError(404, 'President not found');
-        }
-
         // check for coaches array
-        if (result.coaches.length > 0) {
+        if (result.coaches && result.coaches.length > 0) {
             const checks = await Promise.all(
                 result.coaches.map(async (id) => {
                     const exists = await User.exists({ _id: new ObjectId(id) });
@@ -1462,6 +1574,14 @@ export const createClub = async (req, res, next) => {
         }
 
         const clubPayload = await mergeLocationIntoPayload(result);
+
+        assertCreationAllowedByLocation({
+            req,
+            user,
+            targetCountry: clubPayload.location?.country || clubPayload.country,
+            actionLabel: 'club',
+        });
+
         const createClub = await Club.create({
             creator: user._id,
             ...clubPayload,
@@ -1506,14 +1626,8 @@ export const editClub = async (req, res, next) => {
         if (!(clubExists.creator.equals(user._id) || user.role === 0))
             throw new AppError(403, 'You are not Club creator');
 
-        // check for president
-        if (result.president) {
-            const exists = await User.exists({ _id: new ObjectId(result.president) });
-            if (!exists) throw new AppError(404, 'President not found');
-        }
-
         // check for coaches array
-        if (result.coaches.length > 0) {
+        if (result.coaches && result.coaches.length > 0) {
             const checks = await Promise.all(
                 result.coaches.map(async (id) => {
                     const exists = await User.exists({ _id: new ObjectId(id) });
@@ -1537,6 +1651,16 @@ export const editClub = async (req, res, next) => {
         }
 
         const clubUpdate = await mergeLocationIntoPayload(result);
+
+        if (clubUpdate.location?.country || clubUpdate.country) {
+            assertCreationAllowedByLocation({
+                req,
+                user,
+                targetCountry: clubUpdate.location?.country || clubUpdate.country,
+                actionLabel: 'club',
+            });
+        }
+
         const editClub = await Club.findByIdAndUpdate(clubId, { ...clubUpdate }, { new: true });
 
         await writeAuditLog({
