@@ -188,6 +188,16 @@ export const signupSchema = z.object({
         .string()
         .regex(MongoObjectIdRegex, 'Invalid commercial messages version ID.')
         .optional(),
+    acceptances: z
+        .array(
+            z.object({
+                docType: z.string().trim().min(1).max(80),
+                versionId: z.string().regex(MongoObjectIdRegex, 'Invalid agreement version ID.'),
+                agreed: z.boolean(),
+            })
+        )
+        .optional()
+        .default([]),
 
     country: countryCodeInput,
     state: optionalTrimmedText(),
@@ -772,6 +782,7 @@ export const coachProfilePayloadSchema = z
     .object({
         branches: createCoachSchema,
         agreeCoachAgreement: z.boolean().optional(),
+        agreeProviderAgreement: z.boolean().optional(),
         marketingConsent: z.boolean().optional(),
         commercialMessagesVersionId: z
             .string()
@@ -798,14 +809,17 @@ export const parseCoachProfileFormData = (dataString) => {
         return {
             branches: createCoachSchema.parse(raw),
             agreeCoachAgreement: undefined,
+            agreeProviderAgreement: undefined,
             marketingConsent: undefined,
             commercialMessagesVersionId: undefined,
         };
     }
     const obj = coachProfilePayloadSchema.parse(raw);
+    const agreed = obj.agreeProviderAgreement ?? obj.agreeCoachAgreement;
     return {
         branches: obj.branches,
-        agreeCoachAgreement: obj.agreeCoachAgreement,
+        agreeCoachAgreement: agreed,
+        agreeProviderAgreement: agreed,
         marketingConsent: obj.marketingConsent,
         commercialMessagesVersionId: obj.commercialMessagesVersionId,
         confirmRoleSwitch: obj.confirmRoleSwitch,

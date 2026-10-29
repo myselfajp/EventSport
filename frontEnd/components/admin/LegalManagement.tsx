@@ -24,17 +24,21 @@ import {
   ArrowUp,
   ArrowDown,
   FileText,
+  PlusCircle,
 } from "lucide-react";
 
-type DocTypeFilter = LegalDocType | "all";
+// We keep allowedDocTypes as LegalDocType[] for predefined ones,
+// but the component also discovers and shows any custom docTypes from the API.
+type DocTypeFilter = string; // "all" | any docType string
 
 interface LegalDocument {
   _id: string;
-  docType: LegalDocType;
+  docType: string;
   version: number;
   title: string;
   content: string;
   isActive: boolean;
+  category?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,12 +48,9 @@ type LegalManagementProps = {
   allowedDocTypes: readonly LegalDocType[];
 };
 
-function docTypeFromFilter(
-  f: DocTypeFilter,
-  allowed: readonly LegalDocType[]
-): LegalDocType {
-  if (f === "all") return allowed[0];
-  return f;
+/** Get a display label for any docType (predefined or custom) */
+function getDocTypeLabel(docType: string): string {
+  return (DOC_TYPE_LABELS as Record<string, string>)[docType] || docType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function LegalManagement({
@@ -64,9 +65,12 @@ export default function LegalManagement({
   const [editingDoc, setEditingDoc] = useState<LegalDocument | null>(null);
   const [viewModal, setViewModal] = useState<{ title: string; content: string } | null>(null);
   const [formData, setFormData] = useState({
-    docType: "kvkk" as LegalDocType,
+    docType: allowedDocTypes[0] as string,
+    customDocType: "",
+    isCustomType: false,
     title: "",
     content: "",
+    category: category as string,
   });
 
   const [editorMode, setEditorMode] = useState<"visual" | "code">("visual");
@@ -82,10 +86,8 @@ export default function LegalManagement({
     try {
       setLoading(true);
       setError("");
-      const url =
-        filter === "all"
-          ? EP.ADMIN.legal.list(undefined, category)
-          : EP.ADMIN.legal.list(filter);
+      // Always fetch by category so we get ALL docs (including custom ones)
+      const url = EP.ADMIN.legal.list(undefined, category);
       const res = await fetchJSON(url, { method: "GET" });
       if (res?.success && Array.isArray(res?.data)) {
         setDocs(res.data);
@@ -99,14 +101,24 @@ export default function LegalManagement({
     }
   };
 
+  // All docTypes present in fetched docs
+  const allDocTypesInDocs = Array.from(new Set(docs.map((d) => d.docType)));
+
+  // Merge predefined + discovered custom types for filter buttons
+  const allKnownDocTypes = Array.from(
+    new Set([...allowedDocTypes, ...allDocTypesInDocs])
+  );
+
   const handleCreate = () => {
     setEditingDoc(null);
-    const docType = docTypeFromFilter(filter, allowedDocTypes);
-    const initialTitle = DEFAULT_TITLES[docType] || "";
+    const firstType = allowedDocTypes[0] as string;
     setFormData({
-      docType,
-      title: initialTitle,
+      docType: firstType,
+      customDocType: "",
+      isCustomType: false,
+      title: (DEFAULT_TITLES as Record<string, string>)[firstType] || "",
       content: "",
+      category,
     });
     setVisualSubtitle("");
     setVisualArticles([
@@ -123,7 +135,14 @@ export default function LegalManagement({
 
   const handleEdit = (doc: LegalDocument) => {
     setEditingDoc(doc);
-    setFormData({ docType: doc.docType, title: doc.title, content: doc.content });
+    setFormData({
+      docType: doc.docType,
+      customDocType: "",
+      isCustomType: false,
+      title: doc.title,
+      content: doc.content,
+      category: doc.category || category,
+    });
     const parsed = parseHtmlToArticles(doc.content);
     setVisualSubtitle(parsed.subtitle);
     setVisualArticles(parsed.articles);
@@ -202,17 +221,24 @@ export default function LegalManagement({
     setViewModal({ title: doc.title, content: doc.content });
   };
 
-  const handleSetActive = async (doc: LegalDocument) => {
+  const handleToggleActive = async (doc: LegalDocument, targetStatus?: boolean) => {
     try {
       setError("");
-      const res = await fetchJSON(EP.ADMIN.legal.activate(doc._id), { method: "PUT" });
+      const nextActive = targetStatus !== undefined ? targetStatus : !doc.isActive;
+      const res = await fetchJSON(EP.ADMIN.legal.activate(doc._id), {
+        method: "PUT",
+        body: { isActive: nextActive },
+      });
       if (res?.success) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("eventsport:contracts-updated"));
+        }
         fetchDocs();
       } else {
-        setError(res?.message || res?.error || "Failed to set active");
+        setError(res?.message || res?.error || "Failed to update status");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to set active");
+      setError(err.message || "Failed to update status");
     }
   };
 
@@ -220,6 +246,17 @@ export default function LegalManagement({
     e.preventDefault();
     try {
       setError("");
+
+      // Resolve the final docType (predefined or custom)
+      const resolvedDocType = formData.isCustomType
+        ? formData.customDocType.trim()
+        : formData.docType;
+
+      if (formData.isCustomType && !resolvedDocType) {
+        setError("Please enter a contract type key.");
+        return;
+      }
+
       const contentToSubmit =
         editorMode === "visual"
           ? compileArticlesToHtml({
@@ -236,6 +273,9 @@ export default function LegalManagement({
           body: { title: formData.title, content: contentToSubmit },
         });
         if (res?.success) {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("eventsport:contracts-updated"));
+          }
           setShowModal(false);
           setEditingDoc(null);
           fetchDocs();
@@ -246,13 +286,17 @@ export default function LegalManagement({
         const res = await fetchJSON(EP.ADMIN.legal.create, {
           method: "POST",
           body: {
-            docType: formData.docType,
+            docType: resolvedDocType,
             title: formData.title,
             content: contentToSubmit,
             isActive: false,
+            category: formData.category,
           },
         });
         if (res?.success) {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("eventsport:contracts-updated"));
+          }
           setShowModal(false);
           fetchDocs();
         } else {
@@ -264,15 +308,16 @@ export default function LegalManagement({
     }
   };
 
-  const filtered = docs
-    .filter((d) => allowedDocTypes.includes(d.docType))
-    .filter((d) => filter === "all" || d.docType === filter);
+  // Filtered documents for the table
+  const filtered = filter === "all"
+    ? docs
+    : docs.filter((d) => d.docType === filter);
 
   const filterButtons: { key: DocTypeFilter; label: string }[] = [
     { key: "all", label: "All" },
-    ...allowedDocTypes.map((dt) => ({
+    ...allKnownDocTypes.map((dt) => ({
       key: dt as DocTypeFilter,
-      label: DOC_TYPE_LABELS[dt],
+      label: getDocTypeLabel(dt),
     })),
   ];
 
@@ -281,7 +326,7 @@ export default function LegalManagement({
       <p className="text-xs text-gray-500 dark:text-slate-400">
         {CATEGORY_LABELS[category]} — only the <strong>active</strong> version is shown on the site and during registration.
         Individual URL:{" "}
-        {allowedDocTypes.map((dt) => (
+        {allKnownDocTypes.map((dt) => (
           <code
             key={dt}
             className="bg-gray-100 dark:bg-slate-800 px-1 rounded text-[11px] mr-1"
@@ -310,9 +355,10 @@ export default function LegalManagement({
         <button
           type="button"
           onClick={handleCreate}
-          className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-medium"
         >
-          Create New Version
+          <PlusCircle className="w-4 h-4" />
+          Create Document
         </button>
       </div>
 
@@ -327,7 +373,7 @@ export default function LegalManagement({
           <div className="p-8 text-center text-gray-500 dark:text-slate-400">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-gray-500 dark:text-slate-400">
-            No documents. Create a new version.
+            No documents. Create a new document.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -355,7 +401,8 @@ export default function LegalManagement({
                 {filtered.map((doc) => (
                   <tr key={doc._id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
                     <td className="border-b border-gray-300 dark:border-slate-600 p-3 text-sm text-gray-900 dark:text-slate-100">
-                      {DOC_TYPE_LABELS[doc.docType]}
+                      <div className="font-medium">{getDocTypeLabel(doc.docType)}</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500 font-mono mt-0.5">{doc.docType}</div>
                     </td>
                     <td className="border-b border-gray-300 dark:border-slate-600 p-3 text-sm">
                       v{doc.version}
@@ -365,9 +412,13 @@ export default function LegalManagement({
                     </td>
                     <td className="border-b border-gray-300 dark:border-slate-600 p-3 text-sm">
                       {doc.isActive ? (
-                        <span className="text-green-600 dark:text-green-400 font-medium">Active</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                          Active
+                        </span>
                       ) : (
-                        <span className="text-gray-500 dark:text-slate-400">—</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-400 border border-gray-300 dark:border-slate-600">
+                          Inactive
+                        </span>
                       )}
                     </td>
                     <td className="border-b border-gray-300 dark:border-slate-600 p-3">
@@ -375,22 +426,32 @@ export default function LegalManagement({
                         <button
                           type="button"
                           onClick={() => handleView(doc)}
-                          className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                          className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium transition-colors"
                         >
                           View
                         </button>
                         <button
                           type="button"
                           onClick={() => handleEdit(doc)}
-                          className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 text-sm"
+                          className="px-3 py-1 bg-cyan-600 text-white rounded hover:bg-cyan-700 text-sm font-medium transition-colors"
                         >
                           Edit
                         </button>
-                        {!doc.isActive && (
+                        {doc.isActive ? (
                           <button
                             type="button"
-                            onClick={() => handleSetActive(doc)}
-                            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                            onClick={() => handleToggleActive(doc, false)}
+                            className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm font-medium transition-colors"
+                            title="Deactivate this contract so it will not appear on the website"
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleActive(doc, true)}
+                            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium transition-colors"
+                            title="Activate this contract version on the website"
                           >
                             Set Active
                           </button>
@@ -413,7 +474,7 @@ export default function LegalManagement({
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                  {editingDoc ? `Edit ${DOC_TYPE_LABELS[formData.docType] || "Document"}` : "Create New Document Version"}
+                  {editingDoc ? `Edit ${getDocTypeLabel(formData.docType)}` : "Create Document"}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                   {editorMode === "visual"
@@ -454,28 +515,82 @@ export default function LegalManagement({
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {!editingDoc && (
-                  <div>
+                  <div className="space-y-3">
                     <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">
                       Contract Type
                     </label>
-                    <select
-                      value={formData.docType}
-                      onChange={(e) => {
-                        const docType = e.target.value as LegalDocType;
-                        setFormData({
-                          docType,
-                          title: DEFAULT_TITLES[docType],
-                          content: formData.content,
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
-                    >
-                      {allowedDocTypes.map((dt) => (
-                        <option key={dt} value={dt}>
-                          {DOC_TYPE_LABELS[dt]}
-                        </option>
-                      ))}
-                    </select>
+
+                    {/* Toggle: predefined or new custom type */}
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, isCustomType: false }))}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                          !formData.isCustomType
+                            ? "bg-cyan-600 text-white"
+                            : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+                        }`}
+                      >
+                        Select existing type
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, isCustomType: true, customDocType: "" }))}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                          formData.isCustomType
+                            ? "bg-cyan-600 text-white"
+                            : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+                        }`}
+                      >
+                        <Plus className="w-3 h-3" />
+                        Create new type
+                      </button>
+                    </div>
+
+                    {!formData.isCustomType ? (
+                      <select
+                        value={formData.docType}
+                        onChange={(e) => {
+                          const docType = e.target.value;
+                          setFormData({
+                            ...formData,
+                            docType,
+                            title: (DEFAULT_TITLES as Record<string, string>)[docType] || "",
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                      >
+                        {allowedDocTypes.map((dt) => (
+                          <option key={dt} value={dt}>
+                            {getDocTypeLabel(dt)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-300">
+                          <strong>New contract type:</strong> Enter a unique key (e.g. <code>liability_waiver</code>).
+                          Use lowercase letters, numbers and underscores only. This type will appear in the{" "}
+                          <strong>{CATEGORY_LABELS[category]}</strong> section on the public Agreements page once activated.
+                        </div>
+                        <input
+                          type="text"
+                          required={formData.isCustomType}
+                          value={formData.customDocType}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              customDocType: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "_"),
+                            }))
+                          }
+                          placeholder="e.g. liability_waiver"
+                          className="w-full px-3.5 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 font-mono text-sm"
+                        />
+                        <p className="text-[11px] text-gray-400 dark:text-slate-500">
+                          Key preview: <code className="bg-gray-100 dark:bg-slate-800 px-1 rounded">/legal/{formData.customDocType || "your_key"}</code>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -488,7 +603,7 @@ export default function LegalManagement({
                     required
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g. Mesafeli Satış Sözleşmesi (Koç)"
+                    placeholder="e.g. Liability Waiver Agreement"
                     className="w-full px-3.5 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 font-medium"
                   />
                 </div>
@@ -705,12 +820,18 @@ export default function LegalManagement({
                 )}
               </div>
 
+              {error && (
+                <div className="px-6 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+
               <div className="flex gap-3 px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg shadow-sm transition-colors"
                 >
-                  {editingDoc ? "Save Changes" : "Create New Version"}
+                  {editingDoc ? "Save Changes" : "Create Document"}
                 </button>
                 <button
                   type="button"

@@ -7,6 +7,7 @@ import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
 import * as videoController from '../controllers/videoController.js';
 import * as legalController from '../controllers/legalController.js';
+import * as registrationConsentController from '../controllers/registrationConsentController.js';
 import * as contractAcceptanceController from '../controllers/contractAcceptanceController.js';
 import * as auditLogController from '../controllers/auditLogController.js';
 import * as adminPermissionGroupController from '../controllers/adminPermissionGroupController.js';
@@ -14,6 +15,7 @@ import * as blacklistController from '../controllers/blacklistController.js';
 import * as reportController from '../controllers/reportController.js';
 import * as subscriptionPlanController from '../controllers/subscriptionPlanController.js';
 import * as welcomePageController from '../controllers/welcomePageController.js';
+import * as socialLinksController from '../controllers/socialLinksController.js';
 import { requireAdminPermission, requireFullAdmin } from '../middleware/requireAdminPermission.js';
 
 const HEADER_LOGO_MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -202,6 +204,33 @@ router.put(
     legalController.setActive
 );
 
+// Registration-form consent checkboxes
+router.get(
+    '/registration-consents',
+    requireAdminPermission('admin.legal'),
+    registrationConsentController.listAdmin
+);
+router.post(
+    '/registration-consents',
+    requireAdminPermission('admin.legal'),
+    registrationConsentController.create
+);
+router.put(
+    '/registration-consents/reorder',
+    requireAdminPermission('admin.legal'),
+    registrationConsentController.reorder
+);
+router.put(
+    '/registration-consents/:itemId',
+    requireAdminPermission('admin.legal'),
+    registrationConsentController.update
+);
+router.delete(
+    '/registration-consents/:itemId',
+    requireAdminPermission('admin.legal'),
+    registrationConsentController.remove
+);
+
 // Contract acceptances (audit log)
 router.get(
     '/contract-acceptances',
@@ -378,7 +407,11 @@ router.put(
     '/dashboard-header-logo',
     requireAdminPermission('admin.dashboard_hero'),
     uploadFile({
-        fieldName: 'header-logo-image',
+        mode: 'fields',
+        fields: [
+            { name: 'header-logo-image', maxCount: 1 },
+            { name: 'header-logo-image-dark', maxCount: 1 },
+        ],
         optional: true,
         maxFileSize: HEADER_LOGO_MAX_FILE_SIZE,
         allowedMimeTypes: HEADER_LOGO_ALLOWED_MIME_TYPES,
@@ -408,5 +441,9 @@ router.get(
     requireAdminPermission('admin.welcome_page'),
     welcomePageController.listAdminWelcomePageLeads
 );
+
+// Social media links (footer)
+router.get('/social-links', requireAdminPermission('admin.static_pages', 'admin.social_links'), socialLinksController.getPublicSocialLinks);
+router.put('/social-links', requireAdminPermission('admin.static_pages', 'admin.social_links'), socialLinksController.updateAdminSocialLinks);
 
 export default router;

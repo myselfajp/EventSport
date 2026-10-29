@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { X, Upload } from "lucide-react";
 import { apiFetch, fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import { useMe } from "@/app/hooks/useAuth";
 import ProviderRoleSwitchConsent from "./ProviderRoleSwitchConsent";
+import LegalContentModal from "@/components/auth/LegalContentModal";
 
 const PERFORMANCE_BRANCHES = [
   { value: "manager", label: "Manager" },
@@ -45,6 +47,17 @@ export default function PerformanceApplyModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [roleSwitchAccepted, setRoleSwitchAccepted] = useState(false);
+  const [agreeProviderAgreement, setAgreeProviderAgreement] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [activeCommercialMessages, setActiveCommercialMessages] = useState<{
+    _id: string;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [commercialLegalModal, setCommercialLegalModal] = useState<{
+    title: string;
+    content: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,9 +67,15 @@ export default function PerformanceApplyModal({
       try {
         setLoading(true);
         setError("");
-        const res = await fetchJSON(EP.PERFORMANCE.currentProfile, {
-          method: "GET",
-        });
+        const [res, commercialRes] = await Promise.all([
+          fetchJSON(EP.PERFORMANCE.currentProfile, { method: "GET" }),
+          fetchJSON(
+            EP.LEGAL.getActive("commercial_messages"),
+            { method: "GET" },
+            { skipAuth: true }
+          ).catch(() => null),
+        ]);
+
         if (cancelled) return;
         const data = (res?.data || null) as PerformanceProfile | null;
         setProfile(data);
@@ -64,6 +83,9 @@ export default function PerformanceApplyModal({
           setBranch(data.branch || "dietitian");
           setTitle(data.title || "");
           setAbout(data.about || "");
+        }
+        if (commercialRes?.success && commercialRes?.data) {
+          setActiveCommercialMessages(commercialRes.data);
         }
       } catch (err) {
         if (!cancelled) {
@@ -84,6 +106,9 @@ export default function PerformanceApplyModal({
     setError("");
     setCertificate(null);
     setRoleSwitchAccepted(false);
+    setAgreeProviderAgreement(false);
+    setMarketingConsent(false);
+    setCommercialLegalModal(null);
     onClose();
   };
 
@@ -93,6 +118,11 @@ export default function PerformanceApplyModal({
 
     if (user?.coach && !roleSwitchAccepted) {
       setError("Please confirm that you understand your coach data will be deleted.");
+      return;
+    }
+
+    if (!profile && !agreeProviderAgreement) {
+      setError("You must read and accept the Provider Agreement.");
       return;
     }
 
@@ -110,6 +140,11 @@ export default function PerformanceApplyModal({
           branch,
           title,
           about,
+          agreeProviderAgreement,
+          marketingConsent,
+          ...(marketingConsent && activeCommercialMessages?._id
+            ? { commercialMessagesVersionId: activeCommercialMessages._id }
+            : {}),
           ...(user?.coach ? { confirmRoleSwitch: true } : {}),
         })
       );
@@ -241,6 +276,67 @@ export default function PerformanceApplyModal({
                   </label>
                 </div>
 
+                {!profile && (
+                  <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-4">
+                    <h3 className="text-base font-medium text-gray-800 dark:text-white">
+                      Approvals
+                    </h3>
+                    <label className="flex items-start gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={agreeProviderAgreement}
+                        onChange={(e) => setAgreeProviderAgreement(e.target.checked)}
+                        className="mt-1 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                        disabled={saving}
+                      />
+                      <span>
+                        I have read and agree to the{" "}
+                        <Link
+                          href="/contracts#coach-agreement"
+                          className="text-cyan-600 dark:text-cyan-400 underline font-medium"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Provider Agreement
+                        </Link>
+                        .
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={marketingConsent}
+                        onChange={(e) => setMarketingConsent(e.target.checked)}
+                        className="mt-1 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                        disabled={saving || !activeCommercialMessages}
+                      />
+                      <span>
+                        {activeCommercialMessages ? (
+                          <>
+                            I consent to receiving commercial electronic messages. I have read the{" "}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCommercialLegalModal({
+                                  title: activeCommercialMessages.title,
+                                  content: activeCommercialMessages.content,
+                                });
+                              }}
+                              className="text-cyan-600 dark:text-cyan-400 underline font-medium"
+                            >
+                              Commercial Electronic Messages Consent (IYS)
+                            </button>
+                            .
+                          </>
+                        ) : (
+                          <>Commercial messages opt-in is unavailable until an active consent text is published in Admin → Legal.</>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                )}
+
                 {error && (
                   <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200">
                     {error}
@@ -270,6 +366,14 @@ export default function PerformanceApplyModal({
           )}
         </form>
       </div>
+
+      {commercialLegalModal && (
+        <LegalContentModal
+          title={commercialLegalModal.title}
+          content={commercialLegalModal.content}
+          onClose={() => setCommercialLegalModal(null)}
+        />
+      )}
     </div>
   );
 }

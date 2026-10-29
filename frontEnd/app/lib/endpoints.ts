@@ -168,6 +168,7 @@ export const EP = {
       `${API_V1_BASE}/public/videos/${encodeURIComponent(slug)}`,
     heroClick: (slideId: string) =>
       `${API_V1_BASE}/public/hero-click/${encodeURIComponent(slideId)}`,
+    socialLinks: `${API_V1_BASE}/public/social-links`,
   },
   LOCATION: {
     detect: `${LOCATION_API}/detect`,
@@ -201,6 +202,7 @@ export const EP = {
   LEGAL: {
     getActive: (type: string) => `${LEGAL_API}/active?type=${encodeURIComponent(type)}`,
     catalog: `${LEGAL_API}/catalog`,
+    registrationConsents: `${LEGAL_API}/registration-consents`,
     accept: `${LEGAL_API}/accept`,
   },
   ADMIN: {
@@ -225,6 +227,13 @@ export const EP = {
       update: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
       activate: (documentId: string) =>
         `${ADMIN_API}/legal/${documentId}/activate`,
+    },
+    registrationConsents: {
+      list: `${ADMIN_API}/registration-consents`,
+      create: `${ADMIN_API}/registration-consents`,
+      update: (itemId: string) => `${ADMIN_API}/registration-consents/${itemId}`,
+      remove: (itemId: string) => `${ADMIN_API}/registration-consents/${itemId}`,
+      reorder: `${ADMIN_API}/registration-consents/reorder`,
     },
     blacklist: {
       list: `${ADMIN_API}/blacklist`,
@@ -448,6 +457,10 @@ export const EP = {
         const qs = q.toString();
         return `${ADMIN_API}/welcome-page/leads${qs ? `?${qs}` : ""}`;
       },
+    },
+    socialLinks: {
+      get: `${ADMIN_API}/social-links`,
+      update: `${ADMIN_API}/social-links`,
     },
   },
   REFERENCE: {

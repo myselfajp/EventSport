@@ -16,6 +16,12 @@ const dashboardHeaderLogoSchema = new mongoose.Schema(
             mimeType: { type: String },
             size: { type: Number },
         },
+        imageDark: {
+            path: { type: String },
+            originalName: { type: String },
+            mimeType: { type: String },
+            size: { type: Number },
+        },
         imageAlt: {
             type: String,
             default: 'EventSport',

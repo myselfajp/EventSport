@@ -1,5 +1,6 @@
 import express from 'express';
 import * as publicContentController from '../controllers/publicContentController.js';
+import * as socialLinksController from '../controllers/socialLinksController.js';
 import * as subscriptionPlanController from '../controllers/subscriptionPlanController.js';
 import * as blogController from '../controllers/blogController.js';
 import * as newsController from '../controllers/newsController.js';
@@ -22,6 +23,7 @@ router.get(
     publicContentController.getPublicActiveStaticPages
 );
 router.get('/public/static-page/:name', publicContentController.getPublicStaticPageByName);
+router.get('/public/social-links', socialLinksController.getPublicSocialLinks);
 router.get('/public/dashboard-header-logo', publicContentController.getPublicDashboardHeaderLogo);
 router.get('/public/dashboard-hero-slides', publicContentController.getPublicDashboardHeroSlides);
 router.get('/public/sport-groups', publicContentController.getPublicSportGroups);

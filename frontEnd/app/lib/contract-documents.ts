@@ -1,6 +1,6 @@
 /** Mirrors backEnd/src/constants/contractDocuments.js */
 
-export type ContractCategory = "legal" | "gamer" | "coach";
+export type ContractCategory = "legal" | "gamer" | "coach" | "cookie";
 
 export type LegalDocType =
   | "kvkk"
@@ -20,7 +20,6 @@ export const LEGAL_DOC_TYPES: LegalDocType[] = [
   "kvkk",
   "terms",
   "commercial_messages",
-  "cookie_policy",
   "coach_me_consent",
 ];
 
@@ -37,8 +36,10 @@ export const COACH_DOC_TYPES: LegalDocType[] = [
   "coach_privacy",
 ];
 
+export const COOKIE_DOC_TYPES: LegalDocType[] = ["cookie_policy"];
+
 export const ALL_CONTRACT_DOC_TYPES: LegalDocType[] = [
-  ...new Set([...LEGAL_DOC_TYPES, ...GAMER_DOC_TYPES, ...COACH_DOC_TYPES]),
+  ...new Set([...LEGAL_DOC_TYPES, ...GAMER_DOC_TYPES, ...COACH_DOC_TYPES, ...COOKIE_DOC_TYPES]),
 ];
 
 export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
@@ -48,12 +49,12 @@ export const DOC_TYPE_LABELS: Record<LegalDocType, string> = {
   cookie_policy: "Cookie Policy",
   coach_me_consent: "Coach Me Email Contact Consent",
   distance_selling: "Distance Selling Agreement (Athlete)",
-  coach_distance_selling: "Distance Selling Agreement (Coach)",
+  coach_distance_selling: "Distance Selling Agreement (Provider)",
   event_contract: "Event Agreement",
-  coach_agreement: "Coach Agreement",
+  coach_agreement: "Provider Agreement",
   coach_penalties: "Penalty Terms",
-  coach_equipment: "Coach Equipment",
-  coach_privacy: "Coach Privacy Agreement",
+  coach_equipment: "Provider Equipment",
+  coach_privacy: "Provider Privacy Agreement",
 };
 
 /** Default titles shown on site when admin title is empty. */
@@ -64,12 +65,12 @@ export const DEFAULT_TITLES: Record<LegalDocType, string> = {
   cookie_policy: "Cookie Policy",
   coach_me_consent: "Coach Me Email Contact Consent",
   distance_selling: "Distance Selling Agreement (Athlete)",
-  coach_distance_selling: "Distance Selling Agreement (Coach)",
+  coach_distance_selling: "Distance Selling Agreement (Provider)",
   event_contract: "Event Agreement",
-  coach_agreement: "Coach Agreement",
+  coach_agreement: "Provider Agreement",
   coach_penalties: "Penalty Terms",
-  coach_equipment: "Coach Equipment",
-  coach_privacy: "Coach Privacy Agreement",
+  coach_equipment: "Provider Equipment",
+  coach_privacy: "Provider Privacy Agreement",
 };
 
 /** @deprecated Use DEFAULT_TITLES */
@@ -78,7 +79,8 @@ export const DEFAULT_TITLES_TR = DEFAULT_TITLES;
 export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   legal: "Legal Documents",
   gamer: "Athlete Agreements",
-  coach: "Coach Agreements",
+  coach: "Provider Agreements",
+  cookie: "Cookie Policy",
 };
 
 export const CONTRACTS_SECTION_ANCHORS: Record<LegalDocType, string> = {
@@ -111,4 +113,48 @@ export const LEGACY_STATIC_CONTRACT_REDIRECTS: Record<string, string> = {
 
 export function isLegalDocType(v: string): v is LegalDocType {
   return (ALL_CONTRACT_DOC_TYPES as string[]).includes(v);
+}
+
+/** Must remain on an enabled + required registration checkbox. */
+export const LOCKED_SIGNUP_DOC_TYPES = ["terms", "kvkk"] as const;
+
+export type SignupConsentDocument = {
+  _id: string;
+  docType: string;
+  title: string;
+  content: string;
+  version: number;
+};
+
+export type SignupConsentItem = {
+  _id: string;
+  checkboxLabel: string;
+  docTypes: string[];
+  required: boolean;
+  sortOrder: number;
+  enabled?: boolean;
+  documents: SignupConsentDocument[];
+};
+
+export function getDocTypeLabel(docType: string): string {
+  return (
+    (DOC_TYPE_LABELS as Record<string, string>)[docType] ||
+    docType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+export function splitConsentLabel(
+  label: string
+): Array<{ type: "text" | "token"; value: string }> {
+  const parts: Array<{ type: "text" | "token"; value: string }> = [];
+  for (const part of label.split(/(\{\{[a-z0-9_-]+\}\})/gi)) {
+    if (!part) continue;
+    const match = part.match(/^\{\{([a-z0-9_-]+)\}\}$/i);
+    if (match) {
+      parts.push({ type: "token", value: match[1] });
+    } else {
+      parts.push({ type: "text", value: part });
+    }
+  }
+  return parts;
 }

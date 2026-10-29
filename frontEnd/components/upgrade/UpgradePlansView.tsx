@@ -153,7 +153,6 @@ export default function UpgradePlansView() {
         </h1>
         <p className="mt-3 text-sm sm:text-base text-gray-600 dark:text-slate-300">
           Choose a provider membership. Create more events and reply to more Coach Me requests.
-          Online payment arrives with Stripe; plans and prices are already live from admin.
         </p>
       </section>
 

@@ -1,11 +1,10 @@
 /** Contract categories (English keys). */
-export const CONTRACT_CATEGORIES = ['legal', 'gamer', 'coach'];
+export const CONTRACT_CATEGORIES = ['legal', 'gamer', 'coach', 'cookie'];
 
 export const LEGAL_DOC_TYPES = [
     'kvkk',
     'terms',
     'commercial_messages',
-    'cookie_policy',
     'coach_me_consent',
 ];
 export const GAMER_DOC_TYPES = ['distance_selling', 'event_contract'];
@@ -16,15 +15,17 @@ export const COACH_DOC_TYPES = [
     'coach_equipment',
     'coach_privacy',
 ];
+export const COOKIE_DOC_TYPES = ['cookie_policy'];
 
 export const ALL_CONTRACT_DOC_TYPES = [
-    ...new Set([...LEGAL_DOC_TYPES, ...GAMER_DOC_TYPES, ...COACH_DOC_TYPES]),
+    ...new Set([...LEGAL_DOC_TYPES, ...GAMER_DOC_TYPES, ...COACH_DOC_TYPES, ...COOKIE_DOC_TYPES]),
 ];
 
 export const DOC_TYPE_TO_CATEGORY = Object.fromEntries([
     ...LEGAL_DOC_TYPES.map((t) => [t, 'legal']),
     ...GAMER_DOC_TYPES.map((t) => [t, 'gamer']),
     ...COACH_DOC_TYPES.map((t) => [t, 'coach']),
+    ...COOKIE_DOC_TYPES.map((t) => [t, 'cookie']),
 ]);
 
 /** Default English display titles when admin title is empty. */
@@ -35,24 +36,54 @@ export const DEFAULT_TITLES = {
     cookie_policy: 'Cookie Policy',
     coach_me_consent: 'Coach Me Email Contact Consent',
     distance_selling: 'Distance Selling Agreement (Athlete)',
-    coach_distance_selling: 'Distance Selling Agreement (Coach)',
+    coach_distance_selling: 'Distance Selling Agreement (Provider)',
     event_contract: 'Event Agreement',
-    coach_agreement: 'Coach Agreement',
+    coach_agreement: 'Provider Agreement',
     coach_penalties: 'Penalty Terms',
-    coach_equipment: 'Coach Equipment',
-    coach_privacy: 'Coach Privacy Agreement',
+    coach_equipment: 'Provider Equipment',
+    coach_privacy: 'Provider Privacy Agreement',
 };
 
 /** @deprecated Use DEFAULT_TITLES */
 export const DEFAULT_TITLES_TR = DEFAULT_TITLES;
 
-/** Coach profile signup must accept all active versions of these types. */
+/** These document types must stay on an enabled + required registration checkbox. */
+export const LOCKED_SIGNUP_DOC_TYPES = ['terms', 'kvkk'];
+
+/** Seed rows for the account-creation checkbox list. */
+export const DEFAULT_SIGNUP_CONSENTS = [
+    {
+        checkboxLabel: 'I agree to the {{terms}}.',
+        docTypes: ['terms'],
+        required: true,
+        enabled: true,
+        sortOrder: 1,
+    },
+    {
+        checkboxLabel: 'I agree to the {{kvkk}}.',
+        docTypes: ['kvkk'],
+        required: true,
+        enabled: true,
+        sortOrder: 2,
+    },
+    {
+        checkboxLabel:
+            'I consent to receiving commercial electronic messages (SMS, email, phone) including campaigns and promotions. I have read the {{commercial_messages}}. (Optional)',
+        docTypes: ['commercial_messages'],
+        required: false,
+        enabled: true,
+        sortOrder: 3,
+    },
+];
+
+/** Provider (coach / performance) profile signup must accept all active versions of these types. */
 export const COACH_PROFILE_REQUIRED_DOC_TYPES = [
     'coach_agreement',
     'coach_penalties',
     'coach_equipment',
     'coach_privacy',
 ];
+export const PROVIDER_PROFILE_REQUIRED_DOC_TYPES = COACH_PROFILE_REQUIRED_DOC_TYPES;
 
 /**
  * Legacy static page slugs → redirect target (path + hash on /contracts).

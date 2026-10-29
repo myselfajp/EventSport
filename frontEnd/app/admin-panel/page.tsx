@@ -13,6 +13,7 @@ import EnumManagement from "../../components/admin/EnumManagement";
 import EventsManagement from "../../components/admin/EventsManagement";
 import NotificationManagement from "../../components/admin/NotificationManagement";
 import ContractsManagement from "../../components/admin/ContractsManagement";
+import SocialLinksManagement from "../../components/admin/SocialLinksManagement";
 import StaticPagesManagement from "../../components/admin/StaticPagesManagement";
 import SubscriptionPlansManagement from "../../components/admin/SubscriptionPlansManagement";
 import SuggestionsManagement from "../../components/admin/SuggestionsManagement";
@@ -45,29 +46,8 @@ type TabType =
   | "audit-logs"
   | "dashboard-hero"
   | "welcome-page"
-  | "permission-groups";
-
-const TAB_ORDER: TabType[] = [
-  "users",
-  "blacklist",
-  "reports",
-  "coaches",
-  "performance",
-  "enums",
-  "events",
-  "blogs",
-  "news",
-  "videos",
-  "notifications",
-  "contracts",
-  "site-pages",
-  "subscription-plans",
-  "dashboard-hero",
-  "welcome-page",
-  "suggestions",
-  "audit-logs",
-  "permission-groups",
-];
+  | "permission-groups"
+  | "social-media";
 
 const TAB_LABEL: Record<TabType, string> = {
   users: "Users",
@@ -89,7 +69,33 @@ const TAB_LABEL: Record<TabType, string> = {
   reports: "Reports",
   "audit-logs": "Audit Logs",
   "permission-groups": "Permission Groups",
+  "social-media": "Social Media",
 };
+
+const TAB_ORDER: TabType[] = (
+  [
+    "users",
+    "blacklist",
+    "reports",
+    "coaches",
+    "performance",
+    "enums",
+    "events",
+    "blogs",
+    "news",
+    "videos",
+    "notifications",
+    "contracts",
+    "site-pages",
+    "subscription-plans",
+    "dashboard-hero",
+    "welcome-page",
+    "suggestions",
+    "audit-logs",
+    "permission-groups",
+    "social-media",
+  ] as TabType[]
+).sort((a, b) => TAB_LABEL[a].localeCompare(TAB_LABEL[b], "en"));
 
 /** Admin API permission slug per tab (UI-only tabs use same keys as backend constants). */
 const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
@@ -111,6 +117,7 @@ const TAB_PERM: Partial<Record<TabType, string | string[]>> = {
   suggestions: "admin.suggestions",
   reports: "admin.reports",
   "audit-logs": "admin.audit_logs",
+  "social-media": "admin.static_pages",
 };
 
 export default function AdminPanelPage() {
@@ -391,6 +398,7 @@ export default function AdminPanelPage() {
             {activeTab === "reports" && <ReportsManagement />}
             {activeTab === "audit-logs" && <AuditLogsManagement />}
             {activeTab === "permission-groups" && <AdminPermissionGroupsManagement />}
+            {activeTab === "social-media" && <SocialLinksManagement />}
           </div>
         </div>
       </div>

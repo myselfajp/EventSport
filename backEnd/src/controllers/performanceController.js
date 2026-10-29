@@ -6,6 +6,11 @@ import { removeCoachProfileForUser } from '../utils/providerRoleSwitch.js';
 import { getBasicPlanAssignmentFields } from '../utils/subscriptionPlanHelper.js';
 import { writeAuditLog, changedKeys } from '../utils/auditLogger.js';
 import { AUDIT_ACTIONS } from '../constants/auditActions.js';
+import {
+    recordCoachProfileLegalAcceptances,
+    recordLegalAcceptance,
+    recordMarketingConsent,
+} from '../utils/contractAcceptanceHelper.js';
 
 const normalizeText = (value, max = 2000) =>
     typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -68,6 +73,16 @@ export const createOrUpdateProfile = async (req, res, next) => {
 
         const certificate = req.fileMeta || existing?.certificate;
         const isNewProfile = !existing;
+
+        const agreeProviderAgreement =
+            payload.agreeProviderAgreement === true || payload.agreeCoachAgreement === true;
+        const marketingConsent = payload.marketingConsent;
+        const commercialMessagesVersionId = payload.commercialMessagesVersionId;
+
+        if (isNewProfile && !agreeProviderAgreement) {
+            throw new AppError(400, 'You must accept the Provider Agreement.');
+        }
+
         const basicFields = isNewProfile ? await getBasicPlanAssignmentFields() : {};
         const update = {
             user: req.user._id,
@@ -108,7 +123,35 @@ export const createOrUpdateProfile = async (req, res, next) => {
         await User.findByIdAndUpdate(req.user._id, {
             performanceMember: profile._id,
             ...(isNewProfile ? { $unset: { preservedProviderCredits: 1 } } : {}),
+            ...(typeof marketingConsent === 'boolean'
+                ? {
+                      marketingConsent: {
+                          agreed: marketingConsent,
+                          consentedAt: marketingConsent ? new Date() : null,
+                      },
+                  }
+                : {}),
         });
+
+        if (isNewProfile && agreeProviderAgreement) {
+            await recordCoachProfileLegalAcceptances(req, req.user._id, 'performance_application');
+            if (typeof marketingConsent === 'boolean') {
+                if (marketingConsent && commercialMessagesVersionId) {
+                    await recordLegalAcceptance(req, req.user._id, {
+                        versionId: commercialMessagesVersionId,
+                        expectedDocType: 'commercial_messages',
+                        context: 'performance_application',
+                    });
+                } else if (marketingConsent) {
+                    await recordMarketingConsent(
+                        req,
+                        req.user._id,
+                        marketingConsent,
+                        'performance_application'
+                    );
+                }
+            }
+        }
 
         await writeAuditLog({
             req,

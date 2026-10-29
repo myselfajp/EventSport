@@ -2134,6 +2134,12 @@ function formatDashboardHeaderLogo(row) {
                   path: uploadsRelativePath(row.image.path),
               }
             : undefined,
+        imageDark: row.imageDark?.path
+            ? {
+                  ...row.imageDark,
+                  path: uploadsRelativePath(row.imageDark.path),
+              }
+            : undefined,
         updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
     };
 }
@@ -2169,25 +2175,37 @@ export const updateDashboardHeaderLogo = async (req, res, next) => {
         if (body.isActive !== undefined) {
             logo.isActive = body.isActive !== false;
         }
-        const removingImage = !!body.removeImage && !req.fileMeta;
+
+        const lightFile =
+            req.fileMeta?.['header-logo-image']?.[0] ||
+            (!req.fileMeta?.['header-logo-image'] && !req.fileMeta?.['header-logo-image-dark'] && req.fileMeta?.path
+                ? req.fileMeta
+                : null);
+        const darkFile = req.fileMeta?.['header-logo-image-dark']?.[0] || null;
 
         if (body.removeImage) {
             await safeUnlinkHeroImage(logo.image);
             logo.image = undefined;
         }
-        if (req.fileMeta) {
-            await safeUnlinkHeroImage(logo.image);
-            logo.image = req.fileMeta;
+        if (body.removeImageDark) {
+            await safeUnlinkHeroImage(logo.imageDark);
+            logo.imageDark = undefined;
         }
 
-        if (!logo.image?.path && !req.fileMeta) {
-            if (removingImage || logo.isNew) {
-                if (!logo.isNew) {
-                    await logo.deleteOne();
-                }
-                return res.status(200).json({ success: true, data: null });
+        if (lightFile) {
+            await safeUnlinkHeroImage(logo.image);
+            logo.image = lightFile;
+        }
+        if (darkFile) {
+            await safeUnlinkHeroImage(logo.imageDark);
+            logo.imageDark = darkFile;
+        }
+
+        if (!logo.image?.path && !logo.imageDark?.path) {
+            if (!logo.isNew) {
+                await logo.deleteOne();
             }
-            throw new AppError(400, 'Upload a logo image');
+            return res.status(200).json({ success: true, data: null });
         }
 
         await logo.save();
@@ -2208,6 +2226,7 @@ export const deleteDashboardHeaderLogo = async (req, res, next) => {
             return res.status(200).json({ success: true, data: null });
         }
         await safeUnlinkHeroImage(logo.image);
+        await safeUnlinkHeroImage(logo.imageDark);
         await logo.deleteOne();
         res.status(200).json({
             success: true,

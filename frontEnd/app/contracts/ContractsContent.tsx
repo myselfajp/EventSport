@@ -19,7 +19,7 @@ import {
 import SiteFooter from "@/components/SiteFooter";
 
 type CatalogDoc = {
-  docType: LegalDocType;
+  docType: string;
   category: ContractCategory;
   title: string;
   content: string;
@@ -30,12 +30,13 @@ type CatalogData = {
   legal: CatalogDoc[];
   gamer: CatalogDoc[];
   coach: CatalogDoc[];
+  cookie: CatalogDoc[];
 };
 
 import { useMe } from "@/app/hooks/useAuth";
 import { replaceContractPlaceholders } from "@/app/lib/contract-placeholders";
 
-const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach"];
+const CATEGORY_ORDER: ContractCategory[] = ["legal", "gamer", "coach", "cookie"];
 
 const PROSE_CLASS =
   "text-sm text-gray-700 dark:text-slate-300 contracts-prose max-w-none [&_a]:text-cyan-600 dark:[&_a]:text-cyan-400 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6";
@@ -45,20 +46,27 @@ function SectionBody({ html, user }: { html: string; user?: any }) {
   return <div className={PROSE_CLASS} dangerouslySetInnerHTML={{ __html: renderedHtml }} />;
 }
 
-function slugToDocType(slug: string): LegalDocType | null {
+function slugToDocType(slug: string, catalog?: CatalogData | null): string | null {
   if (!slug) return null;
   if (isLegalDocType(slug)) return slug;
   for (const [docType, anchor] of Object.entries(CONTRACTS_SECTION_ANCHORS)) {
-    if (anchor === slug) return docType as LegalDocType;
+    if (anchor === slug) return docType;
   }
-  return null;
+  if (catalog) {
+    const all = getAllDocs(catalog);
+    const found = all.find(
+      (d) => d.docType === slug || d.docType.replace(/_/g, "-") === slug
+    );
+    if (found) return found.docType;
+  }
+  return slug;
 }
 
 function getAllDocs(catalog: CatalogData): CatalogDoc[] {
   return CATEGORY_ORDER.flatMap((cat) => catalog[cat] ?? []);
 }
 
-function findDoc(catalog: CatalogData, docType: LegalDocType): CatalogDoc | undefined {
+function findDoc(catalog: CatalogData, docType: string): CatalogDoc | undefined {
   return getAllDocs(catalog).find((d) => d.docType === docType);
 }
 
@@ -69,11 +77,12 @@ export default function ContractsContent() {
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
-  const [activeDocType, setActiveDocType] = useState<LegalDocType | null>(null);
+  const [activeDocType, setActiveDocType] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<ContractCategory, boolean>>({
     legal: true,
     gamer: true,
     coach: true,
+    cookie: true,
   });
 
   useEffect(() => {
@@ -125,12 +134,12 @@ export default function ContractsContent() {
     };
   }, []);
 
-  const resolveDocFromUrl = useCallback((data: CatalogData): LegalDocType | null => {
+  const resolveDocFromUrl = useCallback((data: CatalogData): string | null => {
     if (typeof window === "undefined") return null;
     const hash = window.location.hash.replace(/^#/, "");
     const queryDoc = new URLSearchParams(window.location.search).get("doc") ?? "";
     const slug = queryDoc || hash;
-    const docType = slugToDocType(slug);
+    const docType = slugToDocType(slug, data);
     if (docType && findDoc(data, docType)) return docType;
     const first = getAllDocs(data)[0];
     return first?.docType ?? null;
@@ -155,9 +164,9 @@ export default function ContractsContent() {
     return () => window.removeEventListener("hashchange", apply);
   }, [catalog, resolveDocFromUrl]);
 
-  const selectDoc = useCallback((docType: LegalDocType) => {
+  const selectDoc = useCallback((docType: string) => {
     setActiveDocType(docType);
-    const anchor = CONTRACTS_SECTION_ANCHORS[docType];
+    const anchor = CONTRACTS_SECTION_ANCHORS[docType as LegalDocType] || docType.replace(/_/g, "-");
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `/contracts#${anchor}`);
     }
@@ -197,7 +206,7 @@ export default function ContractsContent() {
             {expanded && (
               <ul className="pb-2">
                 {docs.map((doc) => {
-                  const label = doc.title || DOC_TYPE_LABELS[doc.docType];
+                  const label = doc.title || DOC_TYPE_LABELS[doc.docType as LegalDocType] || doc.docType;
                   const isActive = activeDocType === doc.docType;
                   return (
                     <li key={doc.docType}>
@@ -285,7 +294,7 @@ export default function ContractsContent() {
                   <optgroup key={cat} label={CATEGORY_LABELS[cat]}>
                     {docs.map((doc) => (
                       <option key={doc.docType} value={doc.docType}>
-                        {doc.title || DOC_TYPE_LABELS[doc.docType]}
+                        {doc.title || (DOC_TYPE_LABELS as Record<string, string>)[doc.docType] || doc.docType}
                       </option>
                     ))}
                   </optgroup>
@@ -311,7 +320,7 @@ export default function ContractsContent() {
                 <article className="px-4 sm:px-8 py-6 sm:py-8">
                   <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
                     <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">
-                      {activeDoc.title || DOC_TYPE_LABELS[activeDoc.docType]}
+                      {activeDoc.title || (DOC_TYPE_LABELS as Record<string, string>)[activeDoc.docType] || activeDoc.docType}
                     </h2>
                     <Link
                       href={`/legal/${activeDoc.docType}`}

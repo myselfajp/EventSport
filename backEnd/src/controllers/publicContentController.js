@@ -148,10 +148,10 @@ export const getPublicDashboardHeaderLogo = async (req, res, next) => {
             key: HEADER_LOGO_KEY,
             isActive: true,
         })
-            .select('image imageAlt updatedAt')
+            .select('image imageDark imageAlt updatedAt')
             .lean();
 
-        if (!row?.image?.path) {
+        if (!row?.image?.path && !row?.imageDark?.path) {
             return res.status(200).json({ success: true, data: null });
         }
 
@@ -159,10 +159,18 @@ export const getPublicDashboardHeaderLogo = async (req, res, next) => {
             success: true,
             data: {
                 imageAlt: row.imageAlt || '',
-                image: {
-                    path: uploadsRelativePath(row.image.path),
-                    mimeType: row.image.mimeType,
-                },
+                image: row.image?.path
+                    ? {
+                          path: uploadsRelativePath(row.image.path),
+                          mimeType: row.image.mimeType,
+                      }
+                    : undefined,
+                imageDark: row.imageDark?.path
+                    ? {
+                          path: uploadsRelativePath(row.imageDark.path),
+                          mimeType: row.imageDark.mimeType,
+                      }
+                    : undefined,
                 updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
             },
         });

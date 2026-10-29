@@ -14,20 +14,14 @@ import {
 import { fetchJSON } from "@/app/lib/api";
 import { EP } from "@/app/lib/endpoints";
 import LegalContentModal from "./LegalContentModal";
+import RegistrationConsentLabel from "./RegistrationConsentLabel";
 import { emptyLocationValue } from "@/components/location/LocationFields";
 import RegistrationLocationFields from "@/components/location/RegistrationLocationFields";
 import type { LocationValue } from "@/app/lib/location-api";
+import type { SignupConsentDocument, SignupConsentItem } from "@/app/lib/contract-documents";
 
 interface RegistrationFormProps {
   onToggleForm: () => void;
-}
-
-interface ActiveLegal {
-  _id: string;
-  title: string;
-  content: string;
-  docType: string;
-  version: number;
 }
 
 const RegistrationForm: React.FC<RegistrationFormProps> = ({
@@ -42,13 +36,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [agreeTerms, setAgreeTerms] = useState(false);
-  const [agreeKvkk, setAgreeKvkk] = useState(false);
-  const [agreeCommercialMessages, setAgreeCommercialMessages] = useState(false);
+  const [agreedItems, setAgreedItems] = useState<Record<string, boolean>>({});
   const [validationError, setValidationError] = useState("");
-  const [activeTerms, setActiveTerms] = useState<ActiveLegal | null>(null);
-  const [activeKvkk, setActiveKvkk] = useState<ActiveLegal | null>(null);
-  const [activeCommercialMessages, setActiveCommercialMessages] = useState<ActiveLegal | null>(null);
+  const [consentItems, setConsentItems] = useState<SignupConsentItem[]>([]);
+  const [consentsReady, setConsentsReady] = useState(false);
   const [legalModal, setLegalModal] = useState<{ title: string; content: string } | null>(null);
   const [legalLoading, setLegalLoading] = useState(true);
   const [otp, setOtp] = useState("");
@@ -61,28 +52,20 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     (async () => {
       setLegalLoading(true);
       try {
-        const [termsRes, kvkkRes, commercialRes] = await Promise.all([
-          fetchJSON(EP.LEGAL.getActive("terms"), { method: "GET" }, { skipAuth: true }),
-          fetchJSON(EP.LEGAL.getActive("kvkk"), { method: "GET" }, { skipAuth: true }),
-          fetchJSON(
-            EP.LEGAL.getActive("commercial_messages"),
-            { method: "GET" },
-            { skipAuth: true }
-          ).catch(() => null),
-        ]);
+        const res = await fetchJSON(
+          EP.LEGAL.registrationConsents,
+          { method: "GET" },
+          { skipAuth: true }
+        );
         if (cancelled) return;
-        if (termsRes?.success && termsRes?.data) setActiveTerms(termsRes.data);
-        if (kvkkRes?.success && kvkkRes?.data) setActiveKvkk(kvkkRes.data);
-        if (commercialRes?.success && commercialRes?.data) {
-          setActiveCommercialMessages(commercialRes.data);
-        } else {
-          setActiveCommercialMessages(null);
-        }
+        const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+        setConsentItems(items);
+        setConsentsReady(Boolean(res?.data?.ready));
+        setAgreedItems({});
       } catch {
         if (!cancelled) {
-          setActiveTerms(null);
-          setActiveKvkk(null);
-          setActiveCommercialMessages(null);
+          setConsentItems([]);
+          setConsentsReady(false);
         }
       } finally {
         if (!cancelled) setLegalLoading(false);
@@ -97,16 +80,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     e.preventDefault();
     setValidationError("");
 
-    if (!agreeTerms) {
-      setValidationError("Please agree to the Terms and Conditions.");
+    if (!consentsReady) {
+      setValidationError("Required agreements are not available. Please try again later.");
       return;
     }
-    if (!agreeKvkk) {
-      setValidationError("Please agree to the KVKK.");
-      return;
-    }
-    if (!activeTerms || !activeKvkk) {
-      setValidationError("Terms and KVKK are not available. Please try again later.");
+
+    const missingRequired = consentItems.find(
+      (item) => item.required && !agreedItems[item._id]
+    );
+    if (missingRequired) {
+      setValidationError("Please agree to all required agreements.");
       return;
     }
 
@@ -139,6 +122,27 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     const otpDigits = otp.replace(/\D/g, "");
     if (otpDigits.length !== 6) {
       setValidationError("Enter the 6-digit verification code sent to your email.");
+      return;
+    }
+
+    const acceptances: Array<{ docType: string; versionId: string; agreed: boolean }> = [];
+    for (const item of consentItems) {
+      if (!agreedItems[item._id]) continue;
+      for (const doc of item.documents) {
+        if (acceptances.some((row) => row.docType === doc.docType)) continue;
+        acceptances.push({
+          docType: doc.docType,
+          versionId: doc._id,
+          agreed: true,
+        });
+      }
+    }
+
+    const termsDoc = acceptances.find((row) => row.docType === "terms");
+    const kvkkDoc = acceptances.find((row) => row.docType === "kvkk");
+    const commercialDoc = acceptances.find((row) => row.docType === "commercial_messages");
+    if (!termsDoc || !kvkkDoc) {
+      setValidationError("Terms and KVKK are not available. Please try again later.");
       return;
     }
 
@@ -192,12 +196,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
       districtName: districtName || undefined,
       agreeTerms: true,
       agreeKvkk: true,
-      termsVersionId: activeTerms._id,
-      kvkkVersionId: activeKvkk._id,
-      marketingConsent: agreeCommercialMessages,
-      ...(agreeCommercialMessages && activeCommercialMessages
-        ? { commercialMessagesVersionId: activeCommercialMessages._id }
+      termsVersionId: termsDoc.versionId,
+      kvkkVersionId: kvkkDoc.versionId,
+      marketingConsent: Boolean(commercialDoc),
+      ...(commercialDoc
+        ? { commercialMessagesVersionId: commercialDoc.versionId }
         : {}),
+      acceptances,
     });
   };
 
@@ -225,24 +230,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }
   };
 
-  const openTermsModal = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (activeTerms) setLegalModal({ title: activeTerms.title, content: activeTerms.content });
-  };
-
-  const openKvkkModal = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (activeKvkk) setLegalModal({ title: activeKvkk.title, content: activeKvkk.content });
-  };
-
-  const openCommercialMessagesModal = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (activeCommercialMessages) {
-      setLegalModal({
-        title: activeCommercialMessages.title,
-        content: activeCommercialMessages.content,
-      });
-    }
+  const openConsentDocument = (doc: SignupConsentDocument) => {
+    setLegalModal({ title: doc.title, content: doc.content });
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -448,96 +437,41 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
             />
           </div>
 
-          {/* Terms and Conditions */}
-          <div className="flex items-start gap-3 py-2">
-            <input
-              type="checkbox"
-              id="terms"
-              checked={agreeTerms}
-              onChange={(e) => setAgreeTerms(e.target.checked)}
-              disabled={!activeTerms}
-              className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900 disabled:opacity-50"
-            />
-            <label
-              htmlFor="terms"
-              className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed"
-            >
-              I agree to the{" "}
-              <button
-                type="button"
-                onClick={openTermsModal}
-                disabled={!activeTerms}
-                className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Terms and Conditions
-              </button>
-              .
-            </label>
-          </div>
-
-          {/* KVKK */}
-          <div className="flex items-start gap-3 py-2">
-            <input
-              type="checkbox"
-              id="kvkk"
-              checked={agreeKvkk}
-              onChange={(e) => setAgreeKvkk(e.target.checked)}
-              disabled={!activeKvkk}
-              className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900 disabled:opacity-50"
-            />
-            <label
-              htmlFor="kvkk"
-              className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed"
-            >
-              I agree to the{" "}
-              <button
-                type="button"
-                onClick={openKvkkModal}
-                disabled={!activeKvkk}
-                className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors underline disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                KVKK
-              </button>
-              .
-            </label>
-          </div>
-
-          {/* Commercial electronic messages (IYS) — optional */}
-          {activeCommercialMessages && (
-            <div className="flex items-start gap-3 py-2">
+          {consentItems.map((item) => (
+            <div key={item._id} className="flex items-start gap-3 py-2">
               <input
                 type="checkbox"
-                id="commercial-messages"
-                checked={agreeCommercialMessages}
-                onChange={(e) => setAgreeCommercialMessages(e.target.checked)}
+                id={`consent-${item._id}`}
+                checked={Boolean(agreedItems[item._id])}
+                onChange={(e) =>
+                  setAgreedItems((prev) => ({
+                    ...prev,
+                    [item._id]: e.target.checked,
+                  }))
+                }
                 className="mt-0.5 w-4 h-4 text-cyan-500 border-gray-300 dark:border-slate-600 rounded focus:ring-cyan-500 bg-white dark:bg-slate-900"
               />
               <label
-                htmlFor="commercial-messages"
+                htmlFor={`consent-${item._id}`}
                 className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed"
               >
-                I consent to receiving commercial electronic messages (SMS, email, phone) including
-                campaigns and promotions. I have read the{" "}
-                <button
-                  type="button"
-                  onClick={openCommercialMessagesModal}
-                  className="text-cyan-500 dark:text-cyan-400 cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors underline"
-                >
-                  Commercial Electronic Messages Consent (IYS)
-                </button>
-                . (Optional)
+                <RegistrationConsentLabel
+                  label={item.checkboxLabel}
+                  documents={item.documents}
+                  onOpen={openConsentDocument}
+                />
               </label>
             </div>
-          )}
+          ))}
 
           {legalLoading && (
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Loading Terms and KVKK...
+              Loading agreements...
             </p>
           )}
-          {!legalLoading && (!activeTerms || !activeKvkk) && (
+          {!legalLoading && !consentsReady && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              Terms and KVKK are not available. Registration is temporarily disabled.
+              Required agreements are not available. Registration is temporarily disabled.
             </p>
           )}
 
@@ -551,7 +485,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
           <button
             type="submit"
-            disabled={isPending || legalLoading || !activeTerms || !activeKvkk}
+            disabled={isPending || legalLoading || !consentsReady}
             className="w-full bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 
                        disabled:opacity-60 disabled:cursor-not-allowed 
                        text-white py-2.5 px-4 rounded-lg transition-colors font-medium shadow-sm hover:shadow-md text-sm"

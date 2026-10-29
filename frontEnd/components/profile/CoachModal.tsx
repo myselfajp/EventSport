@@ -461,7 +461,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
     }
 
     if (!adminUserId && !isEditMode && !agreeCoachAgreement) {
-      setError("You must read and accept the Coach Agreement.");
+      setError("You must read and accept the Provider Agreement.");
       return;
     }
 
@@ -1071,7 +1071,7 @@ const CoachModal: React.FC<CoachModalProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Coach Agreement
+                      Provider Agreement
                     </Link>
                     .
                   </span>

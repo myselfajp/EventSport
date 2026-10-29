@@ -1,5 +1,6 @@
 import LegalDocument from '../models/legalDocumentModel.js';
 import { migrateStaticContractsToLegal } from './migrateStaticContractsToLegal.js';
+import { seedRegistrationConsents } from './registrationConsentHelper.js';
 
 const DEFAULT_KVKK = {
     docType: 'kvkk',
@@ -244,6 +245,7 @@ export const initLegal = async () => {
         }
 
         await migrateStaticContractsToLegal();
+        await seedRegistrationConsents();
     } catch (err) {
         console.error('❌ Error initializing legal documents:', err.message);
     }

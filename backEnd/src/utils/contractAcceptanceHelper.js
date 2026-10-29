@@ -37,7 +37,7 @@ export async function validateActiveLegalDocument(versionId, expectedDocType) {
     return doc;
 }
 
-export function renderContractContent(html, user, event = null, date = new Date()) {
+export function renderContractContent(html, user, event = null, date = new Date(), options = {}) {
     if (!html) return '';
     const dateFormatted = new Date(date).toLocaleDateString('tr-TR', {
         day: '2-digit',

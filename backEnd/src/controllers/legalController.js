@@ -7,40 +7,85 @@ import {
     LEGAL_DOC_TYPES,
     GAMER_DOC_TYPES,
     COACH_DOC_TYPES,
+    COOKIE_DOC_TYPES,
+    getCategoryForDocType,
 } from '../constants/contractDocuments.js';
 import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
-
-const DOC_TYPES = ALL_CONTRACT_DOC_TYPES;
 
 const DOC_TYPES_BY_CATEGORY = {
     legal: LEGAL_DOC_TYPES,
     gamer: GAMER_DOC_TYPES,
     coach: COACH_DOC_TYPES,
+    cookie: COOKIE_DOC_TYPES,
 };
+
+let legacyTitlesMigrated = false;
+async function ensureLegacyProviderTitlesMigrated() {
+    if (legacyTitlesMigrated) return;
+    try {
+        await Promise.all([
+            LegalDocument.updateMany(
+                { docType: 'coach_equipment', title: { $regex: /coach equipment/i } },
+                { $set: { title: 'Provider Equipment' } }
+            ),
+            LegalDocument.updateMany(
+                { docType: 'coach_agreement', title: { $regex: /coach agreement/i } },
+                { $set: { title: 'Provider Agreement' } }
+            ),
+            LegalDocument.updateMany(
+                { docType: 'coach_privacy', title: { $regex: /coach privacy/i } },
+                { $set: { title: 'Provider Privacy Agreement' } }
+            ),
+            LegalDocument.updateMany(
+                { docType: 'coach_distance_selling', title: { $regex: /distance selling agreement \(coach\)/i } },
+                { $set: { title: 'Distance Selling Agreement (Provider)' } }
+            ),
+            LegalDocument.updateMany(
+                { docType: 'cookie_policy' },
+                { $set: { category: 'cookie' } }
+            ),
+            ...Object.entries(DOC_TYPES_BY_CATEGORY).map(([cat, types]) =>
+                LegalDocument.updateMany(
+                    {
+                        docType: { $in: types },
+                        $or: [{ category: null }, { category: { $exists: false } }],
+                    },
+                    { $set: { category: cat } }
+                )
+            ),
+        ]);
+        legacyTitlesMigrated = true;
+    } catch (e) {
+        console.warn('Legacy title migration check:', e?.message);
+    }
+}
 
 function buildListFilter(query) {
     const type = query?.type;
     const category = query?.category;
-    if (type && DOC_TYPES.includes(type)) {
+    if (type) {
         return { docType: type };
     }
     if (category && CONTRACT_CATEGORIES.includes(category)) {
-        return { docType: { $in: DOC_TYPES_BY_CATEGORY[category] } };
+        return {
+            $or: [
+                { category: category },
+                { docType: { $in: DOC_TYPES_BY_CATEGORY[category] || [] } },
+            ],
+        };
     }
     return {};
 }
 
 export const getActive = async (req, res, next) => {
     try {
+        await ensureLegacyProviderTitlesMigrated();
         const type = req.query?.type;
-        if (!type || !DOC_TYPES.includes(type)) {
-            throw new AppError(
-                400,
-                `Invalid or missing type. Valid values: ${DOC_TYPES.join(', ')}.`
-            );
+        if (!type || typeof type !== 'string') {
+            throw new AppError(400, 'Invalid or missing type.');
         }
 
-        const doc = await LegalDocument.findOne({ docType: type, isActive: true }).lean();
+        const doc = await LegalDocument.findOne({ docType: type.trim(), isActive: true }).lean();
         if (!doc) {
             throw new AppError(404, `No active ${type} document found.`);
         }
@@ -60,6 +105,7 @@ export const list = async (req, res, next) => {
             throw new AppError(!req.user ? 401 : 403);
         }
 
+        await ensureLegacyProviderTitlesMigrated();
         const filter = buildListFilter(req.query);
 
         const docs = await LegalDocument.find(filter)
@@ -81,20 +127,27 @@ export const create = async (req, res, next) => {
             throw new AppError(!req.user ? 401 : 403);
         }
 
-        const docType = req.body?.docType;
+        let docType = typeof req.body?.docType === 'string' ? req.body.docType.trim() : '';
         const title = req.body?.title;
         const content = req.body?.content ?? '';
         const isActive = !!req.body?.isActive;
+        const categoryInput = req.body?.category;
 
-        if (!docType || !DOC_TYPES.includes(docType)) {
-            throw new AppError(
-                400,
-                `docType is required and must be one of: ${DOC_TYPES.join(', ')}.`
-            );
+        if (!docType) {
+            throw new AppError(400, 'docType is required.');
         }
+
+        // Normalize docType slug (lowercase alphanumeric with underscores/hyphens)
+        docType = docType.toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_');
+
         if (!title || typeof title !== 'string' || !title.trim()) {
             throw new AppError(400, 'title is required.');
         }
+
+        const category =
+            categoryInput && CONTRACT_CATEGORIES.includes(categoryInput)
+                ? categoryInput
+                : getCategoryForDocType(docType) || 'coach';
 
         const maxVersion = await LegalDocument.findOne({ docType })
             .sort({ version: -1 })
@@ -108,6 +161,7 @@ export const create = async (req, res, next) => {
 
         const doc = await LegalDocument.create({
             docType,
+            category,
             version,
             title: title.trim(),
             content: typeof content === 'string' ? content : '',
@@ -170,8 +224,20 @@ export const setActive = async (req, res, next) => {
         const doc = await LegalDocument.findById(id);
         if (!doc) throw new AppError(404, 'Legal document not found.');
 
-        await LegalDocument.updateMany({ docType: doc.docType }, { $set: { isActive: false } });
-        doc.isActive = true;
+        let targetActive = !doc.isActive;
+        if (req.body?.isActive !== undefined) {
+            targetActive = Boolean(req.body.isActive);
+        } else if (req.body?.active !== undefined) {
+            targetActive = Boolean(req.body.active);
+        }
+
+        if (targetActive) {
+            await LegalDocument.updateMany({ docType: doc.docType }, { $set: { isActive: false } });
+            doc.isActive = true;
+        } else {
+            doc.isActive = false;
+        }
+
         await doc.save();
 
         res.status(200).json({
@@ -205,35 +271,64 @@ export const getById = async (req, res, next) => {
 /** Public catalog: active document per docType, grouped by category (legal / gamer / coach). */
 export const getActiveCatalog = async (req, res, next) => {
     try {
+        await ensureLegacyProviderTitlesMigrated();
         const activeDocs = await LegalDocument.find({ isActive: true })
-            .select('docType title content version updatedAt')
+            .select('docType title content version updatedAt category')
             .lean();
 
-        const byType = Object.fromEntries(activeDocs.map((d) => [d.docType, d]));
+        const data = {
+            legal: [],
+            gamer: [],
+            coach: [],
+            cookie: [],
+        };
 
-        const group = (types, categoryKey) =>
-            types
-                .map((docType) => {
-                    const doc = byType[docType];
-                    if (!doc) return null;
-                    return {
-                        docType,
-                        category: categoryKey,
-                        title: doc.title,
-                        content: doc.content,
-                        version: doc.version,
-                        updatedAt: doc.updatedAt,
-                    };
-                })
-                .filter(Boolean);
+        const processedDocTypes = new Set();
+
+        const addDocs = (types, catKey) => {
+            for (const dt of types) {
+                const found = activeDocs.find((d) => d.docType === dt);
+                if (found) {
+                    data[catKey].push({
+                        docType: found.docType,
+                        category: catKey,
+                        title: found.title,
+                        content: found.content,
+                        version: found.version,
+                        updatedAt: found.updatedAt,
+                    });
+                    processedDocTypes.add(found.docType);
+                }
+            }
+        };
+
+        addDocs(LEGAL_DOC_TYPES, 'legal');
+        addDocs(GAMER_DOC_TYPES, 'gamer');
+        addDocs(COACH_DOC_TYPES, 'coach');
+        addDocs(COOKIE_DOC_TYPES, 'cookie');
+
+        // Add any custom/new docTypes to their respective category
+        for (const doc of activeDocs) {
+            if (processedDocTypes.has(doc.docType)) continue;
+            const cat =
+                doc.category && data[doc.category]
+                    ? doc.category
+                    : getCategoryForDocType(doc.docType) || 'coach';
+
+            data[cat].push({
+                docType: doc.docType,
+                category: cat,
+                title: doc.title,
+                content: doc.content,
+                version: doc.version,
+                updatedAt: doc.updatedAt,
+            });
+            processedDocTypes.add(doc.docType);
+        }
 
         res.status(200).json({
             success: true,
-            data: {
-                legal: group(LEGAL_DOC_TYPES, 'legal'),
-                gamer: group(GAMER_DOC_TYPES, 'gamer'),
-                coach: group(COACH_DOC_TYPES, 'coach'),
-            },
+            data,
         });
     } catch (err) {
         next(err);

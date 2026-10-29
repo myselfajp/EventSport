@@ -19,14 +19,23 @@ import {
   writeStoredConsent,
   syncCookieConsentAcceptance,
 } from "@/app/lib/cookie-consent";
+import { fetchJSON } from "@/app/lib/api";
+import { EP } from "@/app/lib/endpoints";
 import CookieConsentBanner from "@/components/cookie/CookieConsentBanner";
 import CookiePreferencesModal from "@/components/cookie/CookiePreferencesModal";
+
+interface PolicyDocInfo {
+  title: string;
+  content: string;
+  version?: number;
+}
 
 interface CookieConsentContextValue {
   consent: CookieConsentState | null;
   hasAnswered: boolean;
   showBanner: boolean;
   showPreferences: boolean;
+  policyDoc: PolicyDocInfo | null;
   acceptAll: () => void;
   acceptEssentialOnly: () => void;
   savePreferences: (preferences: CookieConsentPreferences) => void;
@@ -55,13 +64,45 @@ export function CookieConsentProvider({
   const [hydrated, setHydrated] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [policyDoc, setPolicyDoc] = useState<PolicyDocInfo | null>(null);
+
+  const loadPolicy = useCallback(async () => {
+    try {
+      const res = (await fetchJSON(
+        EP.LEGAL.getActive("cookie_policy"),
+        { method: "GET" },
+        { skipAuth: true }
+      )) as {
+        success: boolean;
+        data?: PolicyDocInfo;
+      };
+      if (res?.success && res.data) {
+        setPolicyDoc(res.data);
+      } else {
+        setPolicyDoc(null);
+      }
+    } catch {
+      setPolicyDoc(null);
+    }
+  }, []);
 
   useEffect(() => {
     const stored = readStoredConsent();
     setConsent(stored);
     setShowBanner(!stored);
     setHydrated(true);
-  }, []);
+
+    void loadPolicy();
+
+    const handleContractUpdate = () => {
+      void loadPolicy();
+    };
+
+    window.addEventListener("eventsport:contracts-updated", handleContractUpdate);
+    return () => {
+      window.removeEventListener("eventsport:contracts-updated", handleContractUpdate);
+    };
+  }, [loadPolicy]);
 
   const acceptAll = useCallback(() => {
     const state = persistConsent(ACCEPT_ALL_CONSENT);
@@ -98,6 +139,7 @@ export function CookieConsentProvider({
       hasAnswered: !!consent,
       showBanner: hydrated && showBanner,
       showPreferences,
+      policyDoc,
       acceptAll,
       acceptEssentialOnly,
       savePreferences,
@@ -109,6 +151,7 @@ export function CookieConsentProvider({
       hydrated,
       showBanner,
       showPreferences,
+      policyDoc,
       acceptAll,
       acceptEssentialOnly,
       savePreferences,
@@ -120,11 +163,12 @@ export function CookieConsentProvider({
   return (
     <CookieConsentContext.Provider value={value}>
       {children}
-      {hydrated && showBanner && !showPreferences ? (
+      {hydrated && showBanner && !showPreferences && policyDoc ? (
         <CookieConsentBanner
           onAcceptAll={acceptAll}
           onEssentialOnly={acceptEssentialOnly}
           onManagePreferences={openPreferences}
+          policyDoc={policyDoc}
         />
       ) : null}
       <CookiePreferencesModal
@@ -139,6 +183,7 @@ export function CookieConsentProvider({
         }
         onSave={savePreferences}
         onAcceptAll={acceptAll}
+        policyDoc={policyDoc}
       />
     </CookieConsentContext.Provider>
   );
@@ -146,7 +191,7 @@ export function CookieConsentProvider({
 
 export function useCookieConsent(): CookieConsentContextValue {
   const context = useContext(CookieConsentContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useCookieConsent must be used within CookieConsentProvider");
   }
   return context;

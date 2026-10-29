@@ -87,6 +87,7 @@ const Header: React.FC<HeaderProps> = ({
   const [incomingRequestsCount, setIncomingRequestsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+  const [headerLogoDarkUrl, setHeaderLogoDarkUrl] = useState<string | null>(null);
   const [headerLogoAlt, setHeaderLogoAlt] = useState("EventSport");
 
   const isProvider = !!(user?.coach || user?.performanceMember);
@@ -317,9 +318,14 @@ const Header: React.FC<HeaderProps> = ({
       { method: "GET" },
       { skipAuth: true }
     ).then((res) => {
-      if (cancelled || !res?.success || !res.data?.image?.path) return;
-      setHeaderLogoUrl(EP.assetUrl(res.data.image.path));
-      setHeaderLogoAlt(res.data.imageAlt || "EventSport");
+      if (cancelled || !res?.success) return;
+      if (res.data?.image?.path) {
+        setHeaderLogoUrl(EP.assetUrl(res.data.image.path));
+      }
+      if (res.data?.imageDark?.path) {
+        setHeaderLogoDarkUrl(EP.assetUrl(res.data.imageDark.path));
+      }
+      setHeaderLogoAlt(res.data?.imageAlt || "EventSport");
     });
     return () => {
       cancelled = true;
@@ -520,9 +526,31 @@ const Header: React.FC<HeaderProps> = ({
             }}
             aria-label="Go to home page"
           >
-            {headerLogoUrl ? (
+            {headerLogoDarkUrl && headerLogoUrl ? (
+              <>
+                <img
+                  src={headerLogoUrl}
+                  alt={headerLogoAlt}
+                  decoding="async"
+                  className="header-logo-img select-none pointer-events-none dark:hidden block"
+                />
+                <img
+                  src={headerLogoDarkUrl}
+                  alt={headerLogoAlt}
+                  decoding="async"
+                  className="header-logo-img select-none pointer-events-none hidden dark:block"
+                />
+              </>
+            ) : headerLogoUrl ? (
               <img
                 src={headerLogoUrl}
+                alt={headerLogoAlt}
+                decoding="async"
+                className="header-logo-img select-none pointer-events-none"
+              />
+            ) : headerLogoDarkUrl ? (
+              <img
+                src={headerLogoDarkUrl}
                 alt={headerLogoAlt}
                 decoding="async"
                 className="header-logo-img select-none pointer-events-none"

@@ -5,8 +5,14 @@ const legalDocumentSchema = new mongoose.Schema(
     {
         docType: {
             type: String,
-            enum: ALL_CONTRACT_DOC_TYPES,
             required: true,
+            trim: true,
+        },
+        category: {
+            type: String,
+            enum: ['legal', 'gamer', 'coach', 'cookie'],
+            default: 'coach',
+            index: true,
         },
         version: {
             type: Number,

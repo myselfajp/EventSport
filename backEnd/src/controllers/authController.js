@@ -22,6 +22,10 @@ import { checkAccountLockout, handleFailedLogin, handleSuccessfulLogin } from '.
 import { checkPasswordStrength } from '../utils/passwordStrength.js';
 import { mergeLocationIntoPayload } from '../utils/entityLocation.js';
 import { recordLegalAcceptance, recordCookieConsent } from '../utils/contractAcceptanceHelper.js';
+import {
+    mergeSignupAcceptances,
+    validateSignupAcceptances,
+} from '../utils/registrationConsentHelper.js';
 import { isSmtpConfigured, sendRegistrationOtpEmail, sendPasswordResetOtpEmail } from '../utils/emailService.js';
 import {
     assertCanResendOtp,
@@ -191,14 +195,17 @@ export const signUp = async (req, res, next) => {
             throw new AppError(400, passwordCheck.message);
         }
 
-        const termsDoc = await LegalDocument.findById(result.termsVersionId).lean();
-        if (!termsDoc || termsDoc.docType !== 'terms' || !termsDoc.isActive) {
-            throw new AppError(400, 'Invalid or inactive Terms & Conditions version.');
+        const resolvedAcceptances = await validateSignupAcceptances(
+            mergeSignupAcceptances(result)
+        );
+        const termsAcceptance = resolvedAcceptances.find((row) => row.docType === 'terms');
+        const kvkkAcceptance = resolvedAcceptances.find((row) => row.docType === 'kvkk');
+        if (!termsAcceptance || !kvkkAcceptance) {
+            throw new AppError(400, 'Terms and KVKK must be accepted to create an account.');
         }
-        const kvkkDoc = await LegalDocument.findById(result.kvkkVersionId).lean();
-        if (!kvkkDoc || kvkkDoc.docType !== 'kvkk' || !kvkkDoc.isActive) {
-            throw new AppError(400, 'Invalid or inactive KVKK version.');
-        }
+        const commercialAcceptance = resolvedAcceptances.find(
+            (row) => row.docType === 'commercial_messages'
+        );
 
         const email = result.email.trim().toLowerCase();
         const existingUser = await User.findOne({ email });
@@ -208,24 +215,17 @@ export const signUp = async (req, res, next) => {
 
         await verifyAndConsumeRegistrationOtp(email, result.otp);
 
-
-        if (result.marketingConsent) {
-            const cmDoc = await LegalDocument.findById(result.commercialMessagesVersionId).lean();
-            if (!cmDoc || cmDoc.docType !== 'commercial_messages' || !cmDoc.isActive) {
-                throw new AppError(400, 'Invalid or inactive commercial messages consent version.');
-            }
-        }
-
         const hashedPassword = await argon2.hash(result.password);
         const {
             password,
-            agreeTerms,
-            agreeKvkk,
-            termsVersionId,
-            kvkkVersionId,
+            agreeTerms: _agreeTerms,
+            agreeKvkk: _agreeKvkk,
+            termsVersionId: _termsVersionId,
+            kvkkVersionId: _kvkkVersionId,
             otp: _otp,
-            marketingConsent,
-            commercialMessagesVersionId,
+            marketingConsent: _marketingConsent,
+            commercialMessagesVersionId: _commercialMessagesVersionId,
+            acceptances: _acceptances,
             country,
             state,
             city,
@@ -258,44 +258,34 @@ export const signUp = async (req, res, next) => {
             location,
             isEmailVerified: true,
             termsAccepted: {
-                versionId: new Types.ObjectId(termsVersionId),
+                versionId: new Types.ObjectId(termsAcceptance.versionId),
                 acceptedAt: new Date(),
             },
             kvkkConsent: {
                 agreed: true,
-                versionId: new Types.ObjectId(kvkkVersionId),
+                versionId: new Types.ObjectId(kvkkAcceptance.versionId),
                 consentedAt: new Date(),
             },
             marketingConsent: {
-                agreed: Boolean(marketingConsent),
-                consentedAt: marketingConsent ? new Date() : null,
+                agreed: Boolean(commercialAcceptance),
+                consentedAt: commercialAcceptance ? new Date() : null,
             },
         });
 
-        const acceptanceTasks = [
-            recordLegalAcceptance(req, user._id, {
-                versionId: termsVersionId,
-                expectedDocType: 'terms',
-                context: 'signup',
-            }),
-            recordLegalAcceptance(req, user._id, {
-                versionId: kvkkVersionId,
-                expectedDocType: 'kvkk',
-                context: 'signup',
-            }),
-        ];
-
-        if (marketingConsent && commercialMessagesVersionId) {
-            acceptanceTasks.push(
-                recordLegalAcceptance(req, user._id, {
-                    versionId: commercialMessagesVersionId,
-                    expectedDocType: 'commercial_messages',
-                    context: 'signup',
-                })
+        try {
+            await Promise.all(
+                resolvedAcceptances.map((row) =>
+                    recordLegalAcceptance(req, user._id, {
+                        versionId: row.versionId,
+                        expectedDocType: row.docType,
+                        context: 'signup',
+                        user,
+                    })
+                )
             );
+        } catch (acceptanceErr) {
+            console.error('Failed to record signup contract acceptances:', acceptanceErr);
         }
-
-        await Promise.all(acceptanceTasks);
 
         const { password: pass, ...userWithoutPassword } = user.toObject();
 

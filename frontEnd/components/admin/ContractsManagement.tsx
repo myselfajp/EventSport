@@ -3,20 +3,24 @@
 import { useState } from "react";
 import LegalManagement from "./LegalManagement";
 import ContractAcceptanceManagement from "./ContractAcceptanceManagement";
+import RegistrationConsentsManagement from "./RegistrationConsentsManagement";
 import {
   CATEGORY_LABELS,
   COACH_DOC_TYPES,
   GAMER_DOC_TYPES,
   LEGAL_DOC_TYPES,
+  COOKIE_DOC_TYPES,
   type ContractCategory,
 } from "@/app/lib/contract-documents";
 
-type SubTab = ContractCategory | "acceptances";
+type SubTab = ContractCategory | "signup" | "acceptances";
 
 const SUB_TABS: { key: SubTab; label: string }[] = [
+  { key: "signup", label: "Registration consents" },
   { key: "legal", label: CATEGORY_LABELS.legal },
   { key: "gamer", label: CATEGORY_LABELS.gamer },
   { key: "coach", label: CATEGORY_LABELS.coach },
+  { key: "cookie", label: CATEGORY_LABELS.cookie },
   { key: "acceptances", label: "Acceptance log" },
 ];
 
@@ -71,6 +75,7 @@ export default function ContractsManagement({
         ))}
       </div>
 
+      {subTab === "signup" && <RegistrationConsentsManagement />}
       {subTab === "legal" && (
         <LegalManagement category="legal" allowedDocTypes={LEGAL_DOC_TYPES} />
       )}
@@ -79,6 +84,9 @@ export default function ContractsManagement({
       )}
       {subTab === "coach" && (
         <LegalManagement category="coach" allowedDocTypes={COACH_DOC_TYPES} />
+      )}
+      {subTab === "cookie" && (
+        <LegalManagement category="cookie" allowedDocTypes={COOKIE_DOC_TYPES} />
       )}
       {subTab === "acceptances" && <ContractAcceptanceManagement />}
     </div>

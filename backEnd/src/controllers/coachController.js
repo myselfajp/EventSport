@@ -317,8 +317,9 @@ export const createBranch = async (req, res, next) => {
         }
 
         const isFirstCoachProfile = !user.coach;
-        if (isFirstCoachProfile && agreeCoachAgreement !== true) {
-            throw new AppError(400, 'You must accept the Trainer Agreement.');
+        const hasAgreedProvider = agreeCoachAgreement === true;
+        if (isFirstCoachProfile && !hasAgreedProvider) {
+            throw new AppError(400, 'You must accept the Provider Agreement.');
         }
 
         // Separate branches by certificate presence (infer behavior)
