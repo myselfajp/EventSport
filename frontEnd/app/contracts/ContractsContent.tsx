@@ -11,12 +11,16 @@ import { EP } from "@/app/lib/endpoints";
 import {
   CATEGORY_LABELS,
   CONTRACTS_SECTION_ANCHORS,
+  COOKIE_PREFERENCES_ANCHOR,
+  COOKIE_PREFERENCES_NAV_ID,
   DOC_TYPE_LABELS,
   type ContractCategory,
   type LegalDocType,
   isLegalDocType,
 } from "@/app/lib/contract-documents";
 import SiteFooter from "@/components/SiteFooter";
+import CookiePreferencesPanel from "@/components/cookie/CookiePreferencesPanel";
+import { useCookieConsent } from "@/app/context/CookieConsentContext";
 
 type CatalogDoc = {
   docType: string;
@@ -48,6 +52,9 @@ function SectionBody({ html, user }: { html: string; user?: any }) {
 
 function slugToDocType(slug: string, catalog?: CatalogData | null): string | null {
   if (!slug) return null;
+  if (slug === COOKIE_PREFERENCES_ANCHOR || slug === COOKIE_PREFERENCES_NAV_ID) {
+    return COOKIE_PREFERENCES_NAV_ID;
+  }
   if (isLegalDocType(slug)) return slug;
   for (const [docType, anchor] of Object.entries(CONTRACTS_SECTION_ANCHORS)) {
     if (anchor === slug) return docType;
@@ -74,6 +81,11 @@ export default function ContractsContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user } = useMe();
+  const {
+    consent,
+    savePreferences,
+    acceptAll,
+  } = useCookieConsent();
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
@@ -140,6 +152,7 @@ export default function ContractsContent() {
     const queryDoc = new URLSearchParams(window.location.search).get("doc") ?? "";
     const slug = queryDoc || hash;
     const docType = slugToDocType(slug, data);
+    if (docType === COOKIE_PREFERENCES_NAV_ID) return COOKIE_PREFERENCES_NAV_ID;
     if (docType && findDoc(data, docType)) return docType;
     const first = getAllDocs(data)[0];
     return first?.docType ?? null;
@@ -152,7 +165,9 @@ export default function ContractsContent() {
       if (resolved) {
         setActiveDocType(resolved);
         const cat = CATEGORY_ORDER.find((c) =>
-          (catalog[c] ?? []).some((d) => d.docType === resolved)
+          resolved === COOKIE_PREFERENCES_NAV_ID
+            ? c === "cookie"
+            : (catalog[c] ?? []).some((d) => d.docType === resolved)
         );
         if (cat) {
           setExpandedCategories((prev) => ({ ...prev, [cat]: true }));
@@ -166,7 +181,10 @@ export default function ContractsContent() {
 
   const selectDoc = useCallback((docType: string) => {
     setActiveDocType(docType);
-    const anchor = CONTRACTS_SECTION_ANCHORS[docType as LegalDocType] || docType.replace(/_/g, "-");
+    const anchor =
+      docType === COOKIE_PREFERENCES_NAV_ID
+        ? COOKIE_PREFERENCES_ANCHOR
+        : CONTRACTS_SECTION_ANCHORS[docType as LegalDocType] || docType.replace(/_/g, "-");
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `/contracts#${anchor}`);
     }
@@ -181,13 +199,11 @@ export default function ContractsContent() {
     return findDoc(catalog, activeDocType) ?? null;
   }, [catalog, activeDocType]);
 
-  const allDocs = catalog ? getAllDocs(catalog) : [];
-
   const renderSidebarNav = (className = "") => (
     <nav className={className} aria-label="Agreement documents">
       {CATEGORY_ORDER.map((cat) => {
         const docs = catalog?.[cat] ?? [];
-        if (docs.length === 0) return null;
+        if (docs.length === 0 && cat !== "cookie") return null;
         const expanded = expandedCategories[cat];
         return (
           <div key={cat} className="border-b border-gray-100 dark:border-slate-700/80 last:border-b-0">
@@ -205,8 +221,33 @@ export default function ContractsContent() {
             </button>
             {expanded && (
               <ul className="pb-2">
+                {cat === "cookie" && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => selectDoc(COOKIE_PREFERENCES_NAV_ID)}
+                      className={`w-full flex items-start gap-2.5 px-4 py-2.5 text-left text-sm transition-colors border-l-2 ${
+                        activeDocType === COOKIE_PREFERENCES_NAV_ID
+                          ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-900/25 text-cyan-800 dark:text-cyan-200 font-medium"
+                          : "border-transparent text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/40 hover:text-gray-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <FileText
+                        className={`w-4 h-4 mt-0.5 shrink-0 ${
+                          activeDocType === COOKIE_PREFERENCES_NAV_ID
+                            ? "text-cyan-600 dark:text-cyan-400"
+                            : "text-gray-400 dark:text-slate-500"
+                        }`}
+                      />
+                      <span className="leading-snug">Cookie Preferences</span>
+                    </button>
+                  </li>
+                )}
                 {docs.map((doc) => {
-                  const label = doc.title || DOC_TYPE_LABELS[doc.docType as LegalDocType] || doc.docType;
+                  const label =
+                    doc.docType === "cookie_policy"
+                      ? "Cookie Policy"
+                      : doc.title || DOC_TYPE_LABELS[doc.docType as LegalDocType] || doc.docType;
                   const isActive = activeDocType === doc.docType;
                   return (
                     <li key={doc.docType}>
@@ -271,7 +312,7 @@ export default function ContractsContent() {
         </div>
       )}
 
-      {!loading && catalog && allDocs.length > 0 && (
+      {!loading && catalog && (
         <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 sm:py-8 min-h-0">
           {/* Mobile document picker */}
           <div className="md:hidden mb-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm px-4 py-3">
@@ -289,12 +330,17 @@ export default function ContractsContent() {
             >
               {CATEGORY_ORDER.map((cat) => {
                 const docs = catalog[cat] ?? [];
-                if (docs.length === 0) return null;
+                if (docs.length === 0 && cat !== "cookie") return null;
                 return (
                   <optgroup key={cat} label={CATEGORY_LABELS[cat]}>
+                    {cat === "cookie" && (
+                      <option value={COOKIE_PREFERENCES_NAV_ID}>Cookie Preferences</option>
+                    )}
                     {docs.map((doc) => (
                       <option key={doc.docType} value={doc.docType}>
-                        {doc.title || (DOC_TYPE_LABELS as Record<string, string>)[doc.docType] || doc.docType}
+                        {doc.docType === "cookie_policy"
+                          ? "Cookie Policy"
+                          : doc.title || (DOC_TYPE_LABELS as Record<string, string>)[doc.docType] || doc.docType}
                       </option>
                     ))}
                   </optgroup>
@@ -316,7 +362,29 @@ export default function ContractsContent() {
 
             {/* Content area */}
             <main className="flex-1 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-y-auto min-h-[50vh]">
-              {activeDoc ? (
+              {activeDocType === COOKIE_PREFERENCES_NAV_ID ? (
+                <article className="px-4 sm:px-8 py-6 sm:py-8">
+                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+                    Cookie Preferences
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
+                    Change the cookie categories you allow. These are the same choices shown when you first visit the site.
+                  </p>
+                  <div className="rounded-lg border border-gray-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 p-5 sm:p-8">
+                    <CookiePreferencesPanel
+                      initialPreferences={
+                        consent ?? {
+                          functional: false,
+                          analytics: false,
+                          marketing: false,
+                        }
+                      }
+                      onSave={savePreferences}
+                      onAcceptAll={acceptAll}
+                    />
+                  </div>
+                </article>
+              ) : activeDoc ? (
                 <article className="px-4 sm:px-8 py-6 sm:py-8">
                   <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
                     <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">
@@ -346,15 +414,6 @@ export default function ContractsContent() {
             </main>
           </div>
         </div>
-      )}
-
-      {!loading && catalog && allDocs.length === 0 && !fatalError && (
-        <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-16">
-          <p className="text-sm text-gray-600 dark:text-slate-400">
-            No published agreements yet. Create and activate the relevant documents in Admin →
-            Contracts.
-          </p>
-        </main>
       )}
 
       <SiteFooter />

@@ -47,6 +47,28 @@ export async function seedRegistrationConsents() {
     await RegistrationConsentItem.insertMany(DEFAULT_SIGNUP_CONSENTS);
 }
 
+/** When a legal docType is renamed or removed, keep signup checkboxes in sync. */
+export async function retargetConsentDocType(oldType, newType = null) {
+    if (!oldType || oldType === newType) return;
+    const items = await RegistrationConsentItem.find({ docTypes: oldType });
+    for (const item of items) {
+        if (newType) {
+            item.docTypes = [...new Set(item.docTypes.map((type) => (type === oldType ? newType : type)))];
+            item.checkboxLabel = item.checkboxLabel.split(`{{${oldType}}}`).join(`{{${newType}}}`);
+            await item.save();
+            continue;
+        }
+        item.docTypes = item.docTypes.filter((type) => type !== oldType);
+        item.checkboxLabel = item.checkboxLabel.split(`{{${oldType}}}`).join('').replace(/\s+/g, ' ').trim();
+        if (item.docTypes.length === 0) {
+            await item.deleteOne();
+            continue;
+        }
+        await item.save();
+    }
+    await assertLockedSignupCoverage();
+}
+
 export async function assertLockedSignupCoverage({
     removedId,
     updatedId,

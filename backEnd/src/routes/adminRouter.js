@@ -203,6 +203,11 @@ router.put(
     requireAdminPermission('admin.legal'),
     legalController.setActive
 );
+router.delete(
+    '/legal/:documentId',
+    requireAdminPermission('admin.legal'),
+    legalController.remove
+);
 
 // Registration-form consent checkboxes
 router.get(

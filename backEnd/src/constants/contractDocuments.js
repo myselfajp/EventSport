@@ -50,6 +50,14 @@ export const DEFAULT_TITLES_TR = DEFAULT_TITLES;
 /** These document types must stay on an enabled + required registration checkbox. */
 export const LOCKED_SIGNUP_DOC_TYPES = ['terms', 'kvkk'];
 
+/** System types that cannot be renamed or deleted from admin. */
+export const LOCKED_LEGAL_DOC_TYPES = [
+    'terms',
+    'kvkk',
+    'cookie_policy',
+    'commercial_messages',
+];
+
 /** Seed rows for the account-creation checkbox list. */
 export const DEFAULT_SIGNUP_CONSENTS = [
     {

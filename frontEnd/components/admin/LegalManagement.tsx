@@ -8,6 +8,7 @@ import {
   CATEGORY_LABELS,
   DEFAULT_TITLES,
   DOC_TYPE_LABELS,
+  LOCKED_LEGAL_DOC_TYPES,
   type ContractCategory,
   type LegalDocType,
 } from "@/app/lib/contract-documents";
@@ -135,10 +136,13 @@ export default function LegalManagement({
 
   const handleEdit = (doc: LegalDocument) => {
     setEditingDoc(doc);
+    const isKnown = (allowedDocTypes as readonly string[]).includes(doc.docType);
+    const firstUnlocked =
+      allowedDocTypes.find((dt) => !isLockedType(dt)) || allowedDocTypes[0];
     setFormData({
-      docType: doc.docType,
-      customDocType: "",
-      isCustomType: false,
+      docType: isKnown ? doc.docType : firstUnlocked,
+      customDocType: isKnown ? "" : doc.docType,
+      isCustomType: !isKnown,
       title: doc.title,
       content: doc.content,
       category: doc.category || category,
@@ -270,7 +274,11 @@ export default function LegalManagement({
       if (editingDoc) {
         const res = await fetchJSON(EP.ADMIN.legal.update(editingDoc._id), {
           method: "PUT",
-          body: { title: formData.title, content: contentToSubmit },
+          body: {
+            title: formData.title,
+            content: contentToSubmit,
+            docType: resolvedDocType,
+          },
         });
         if (res?.success) {
           if (typeof window !== "undefined") {
@@ -305,6 +313,37 @@ export default function LegalManagement({
       }
     } catch (err: any) {
       setError(err.message || "Failed to save");
+    }
+  };
+
+  const isLockedType = (docType: string) =>
+    (LOCKED_LEGAL_DOC_TYPES as readonly string[]).includes(docType);
+
+  const handleDelete = async (doc: LegalDocument) => {
+    if (isLockedType(doc.docType)) {
+      setError(`Cannot delete the system document type "${doc.docType}".`);
+      return;
+    }
+    if (!window.confirm(`Delete "${doc.title}" (v${doc.version})? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      setError("");
+      const res = await fetchJSON(EP.ADMIN.legal.remove(doc._id), { method: "DELETE" });
+      if (res?.success) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("eventsport:contracts-updated"));
+        }
+        if (editingDoc?._id === doc._id) {
+          setShowModal(false);
+          setEditingDoc(null);
+        }
+        fetchDocs();
+      } else {
+        setError(res?.message || res?.error || "Failed to delete");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to delete");
     }
   };
 
@@ -456,6 +495,15 @@ export default function LegalManagement({
                             Set Active
                           </button>
                         )}
+                        {!isLockedType(doc.docType) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(doc)}
+                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -514,12 +562,22 @@ export default function LegalManagement({
 
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {!editingDoc && (
-                  <div className="space-y-3">
+                <div className="space-y-3">
                     <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">
                       Contract Type
                     </label>
 
+                    {editingDoc && isLockedType(editingDoc.docType) ? (
+                      <p className="text-sm text-gray-600 dark:text-slate-300">
+                        <code className="bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                          {editingDoc.docType}
+                        </code>
+                        <span className="block text-xs text-gray-400 mt-1">
+                          System document types cannot be renamed or deleted.
+                        </span>
+                      </p>
+                    ) : (
+                      <>
                     {/* Toggle: predefined or new custom type */}
                     <div className="flex gap-2 mb-2">
                       <button
@@ -555,12 +613,16 @@ export default function LegalManagement({
                           setFormData({
                             ...formData,
                             docType,
-                            title: (DEFAULT_TITLES as Record<string, string>)[docType] || "",
+                            title: editingDoc
+                              ? formData.title
+                              : (DEFAULT_TITLES as Record<string, string>)[docType] || "",
                           });
                         }}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
                       >
-                        {allowedDocTypes.map((dt) => (
+                        {allowedDocTypes
+                          .filter((dt) => !editingDoc || !isLockedType(dt))
+                          .map((dt) => (
                           <option key={dt} value={dt}>
                             {getDocTypeLabel(dt)}
                           </option>
@@ -591,8 +653,9 @@ export default function LegalManagement({
                         </p>
                       </div>
                     )}
+                      </>
+                    )}
                   </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-slate-300">

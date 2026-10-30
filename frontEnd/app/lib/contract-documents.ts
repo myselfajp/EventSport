@@ -80,8 +80,18 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   legal: "Legal Documents",
   gamer: "Athlete Agreements",
   coach: "Provider Agreements",
-  cookie: "Cookie Policy",
+  cookie: "Cookie Management",
 };
+
+export const COOKIE_PREFERENCES_NAV_ID = "__cookie_preferences";
+export const COOKIE_PREFERENCES_ANCHOR = "cookie-preferences";
+
+export const LOCKED_LEGAL_DOC_TYPES = [
+  "terms",
+  "kvkk",
+  "cookie_policy",
+  "commercial_messages",
+] as const;
 
 export const CONTRACTS_SECTION_ANCHORS: Record<LegalDocType, string> = {
   kvkk: "kvkk",

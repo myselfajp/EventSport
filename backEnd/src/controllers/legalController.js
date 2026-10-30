@@ -8,9 +8,21 @@ import {
     GAMER_DOC_TYPES,
     COACH_DOC_TYPES,
     COOKIE_DOC_TYPES,
+    LOCKED_LEGAL_DOC_TYPES,
     getCategoryForDocType,
 } from '../constants/contractDocuments.js';
 import { recordLegalAcceptance } from '../utils/contractAcceptanceHelper.js';
+import { retargetConsentDocType } from '../utils/registrationConsentHelper.js';
+
+function normalizeLegalDocType(raw) {
+    if (typeof raw !== 'string' || !raw.trim()) return '';
+    return raw
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
 
 const DOC_TYPES_BY_CATEGORY = {
     legal: LEGAL_DOC_TYPES,
@@ -184,30 +196,100 @@ export const update = async (req, res, next) => {
         }
 
         const id = mongoObjectId.parse(req.params.documentId);
+        const doc = await LegalDocument.findById(id);
+        if (!doc) throw new AppError(404, 'Legal document not found.');
+
         const title = req.body?.title;
         const content = req.body?.content;
+        const nextDocType = req.body?.docType !== undefined
+            ? normalizeLegalDocType(req.body.docType)
+            : null;
 
-        const updateData = {};
         if (title !== undefined) {
             if (typeof title !== 'string' || !title.trim()) {
                 throw new AppError(400, 'title must be a non-empty string.');
             }
-            updateData.title = title.trim();
+            doc.title = title.trim();
         }
         if (content !== undefined) {
-            updateData.content = typeof content === 'string' ? content : '';
+            doc.content = typeof content === 'string' ? content : '';
         }
 
-        if (Object.keys(updateData).length === 0) {
-            throw new AppError(400, 'Provide at least title or content to update.');
+        const oldDocType = doc.docType;
+        if (nextDocType && nextDocType !== oldDocType) {
+            if (LOCKED_LEGAL_DOC_TYPES.includes(oldDocType)) {
+                throw new AppError(400, `Cannot change the document type of "${oldDocType}".`);
+            }
+            if (LOCKED_LEGAL_DOC_TYPES.includes(nextDocType)) {
+                throw new AppError(400, `Cannot assign the system document type "${nextDocType}".`);
+            }
+            const clash = await LegalDocument.findOne({
+                docType: nextDocType,
+                version: doc.version,
+                _id: { $ne: doc._id },
+            }).lean();
+            if (clash) {
+                const maxVersion = await LegalDocument.findOne({ docType: nextDocType })
+                    .sort({ version: -1 })
+                    .select('version')
+                    .lean();
+                doc.version = (maxVersion?.version ?? 0) + 1;
+            }
+            doc.docType = nextDocType;
+            doc.category = getCategoryForDocType(nextDocType) || doc.category;
         }
 
-        const doc = await LegalDocument.findByIdAndUpdate(id, { $set: updateData }, { new: true });
-        if (!doc) throw new AppError(404, 'Legal document not found.');
+        if (
+            title === undefined &&
+            content === undefined &&
+            (!nextDocType || nextDocType === oldDocType)
+        ) {
+            throw new AppError(400, 'Provide at least title, content, or document type to update.');
+        }
+
+        await doc.save();
+
+        if (doc.docType !== oldDocType) {
+            const remaining = await LegalDocument.countDocuments({ docType: oldDocType });
+            if (remaining === 0) {
+                await retargetConsentDocType(oldDocType, doc.docType);
+            }
+        }
 
         res.status(200).json({
             success: true,
             data: doc,
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const remove = async (req, res, next) => {
+    try {
+        if (!req.user || req.user.role !== 0) {
+            throw new AppError(!req.user ? 401 : 403);
+        }
+
+        const id = mongoObjectId.parse(req.params.documentId);
+        const doc = await LegalDocument.findById(id);
+        if (!doc) throw new AppError(404, 'Legal document not found.');
+
+        if (LOCKED_LEGAL_DOC_TYPES.includes(doc.docType)) {
+            throw new AppError(400, `Cannot delete the system document type "${doc.docType}".`);
+        }
+
+        const oldDocType = doc.docType;
+        await doc.deleteOne();
+
+        const remaining = await LegalDocument.countDocuments({ docType: oldDocType });
+        if (remaining === 0) {
+            await retargetConsentDocType(oldDocType, null);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Document deleted.',
         });
     } catch (err) {
         next(err);

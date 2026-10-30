@@ -227,6 +227,7 @@ export const EP = {
       update: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
       activate: (documentId: string) =>
         `${ADMIN_API}/legal/${documentId}/activate`,
+      remove: (documentId: string) => `${ADMIN_API}/legal/${documentId}`,
     },
     registrationConsents: {
       list: `${ADMIN_API}/registration-consents`,
